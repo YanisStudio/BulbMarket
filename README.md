@@ -1,2 +1,2 @@
-# GardenGroup
-Selling various flower bulbs
+# JayFruit
+JayFruit website
