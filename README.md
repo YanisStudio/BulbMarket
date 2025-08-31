@@ -1,2 +1,1 @@
-# JayFruit
-JayFruit website
+專為球根花卉販售設計的電商網站，提供完整的購物體驗與管理系統。
