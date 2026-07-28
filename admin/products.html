@@ -177,9 +177,11 @@
             width: 80px;
         }
 
-        .product-table th:nth-child(3),
-        .product-table td:nth-child(3) {
-            width: 80px;
+        .product-id-hint {
+            display: block;
+            font-size: 11px;
+            color: #aaa;
+            margin-top: 2px;
         }
 
         .batch-schedule-panel {
@@ -692,7 +694,6 @@
                         <thead>
                             <tr>
                                 <th><input type="checkbox" id="select-all-products"></th>
-                                <th>ID</th>
                                 <th>圖片</th>
                                 <th>名稱</th>
                                 <th>分類</th>
@@ -705,7 +706,7 @@
                         </thead>
                         <tbody id="product-list">
                             <tr class="placeholder-row">
-                                <td colspan="10" class="text-center">載入商品中...</td>
+                                <td colspan="9" class="text-center">載入商品中...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -1036,7 +1037,7 @@ const waitForAdminCommon = function() {
                         if (productsSnapshot.empty) {
                             productListElement.innerHTML = `
                                 <tr class="placeholder-row">
-                                    <td colspan="10" class="text-center">暫無商品數據</td>
+                                    <td colspan="9" class="text-center">暫無商品數據</td>
                                 </tr>
                             `;
                             console.log('商品列表為空');
@@ -1074,13 +1075,13 @@ const waitForAdminCommon = function() {
                                 productsHTML += `
                                     <tr>
                                         <td><input type="checkbox" class="product-select-checkbox" data-id="${productId}"></td>
-                                        <td>${productId.substring(0, 6)}...</td>
                                         <td>
                                             <img src="${product.imageUrl || '/images/placeholder.jpg'}" alt="${escapeHtml(product.name)}" class="product-thumbnail" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
                                         </td>
                                         <td>
                                             ${escapeHtml(product.name)}
                                             ${featuredBadge}
+                                            <span class="product-id-hint">ID: ${productId.substring(0, 6)}...</span>
                                         </td>
                                         <td>${categoryText}</td>
                                         <td>${product.price} / ${product.unit}</td>
@@ -1163,7 +1164,7 @@ const waitForAdminCommon = function() {
                     if (productListElement) {
                         productListElement.innerHTML = `
                             <tr class="placeholder-row">
-                                <td colspan="10" class="text-center">查詢商品時發生權限錯誤，請檢查 Firestore 權限設置</td>
+                                <td colspan="9" class="text-center">查詢商品時發生權限錯誤，請檢查 Firestore 權限設置</td>
                             </tr>
                         `;
                     }
@@ -1178,7 +1179,7 @@ const waitForAdminCommon = function() {
                 if (productListElement) {
                     productListElement.innerHTML = `
                         <tr class="placeholder-row">
-                            <td colspan="10" class="text-center">獲取商品數據失敗，請重試</td>
+                            <td colspan="9" class="text-center">獲取商品數據失敗，請重試</td>
                         </tr>
                     `;
                 }
