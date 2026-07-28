@@ -170,7 +170,7 @@
 
 /* Hero區域基本樣式 - 所有頁面通用 */
 .hero, .about-hero, .contact-hero, .product-hero {
-    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('../images/garden-hero-bg.png');
+    background: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('../images/garden-hero-bg.jpg');
     background-size: cover;
     background-position: center center;
     background-repeat: no-repeat;
@@ -490,7 +490,7 @@
 /* 高解析度螢幕優化 */
 @media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 2dppx) {
     .hero, .about-hero, .contact-hero, .product-hero {
-        background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('../images/garden-hero-bg.png');
+        background-image: linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.4)), url('../images/garden-hero-bg.jpg');
         /* 如果有高解析度版本的背景圖，可以在這裡替換 */
     }
 }
