@@ -1,0 +1,12 @@
+{
+  "name": "bulbmarket-product-scheduler",
+  "private": true,
+  "type": "module",
+  "description": "GitHub Actions 排程用腳本：檢查 Firestore 商品的排程上/下架時間，時間到了就自動改變 status",
+  "scripts": {
+    "start": "node run.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
