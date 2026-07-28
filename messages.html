@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>我的訊息 - 球根花卉團購 | 優質球根花卉專賣店</title>
+    <meta name="description" content="球根花卉團購提供各式球根花卉、繡球花苗、進口球根、花卉種子及園藝資材。香水百合、孤挺花、鳶尾、睡蓮、鬱金香等，品質保證。">
+    <meta name="keywords" content="球根花卉,進口球根,花卉盆栽,種子,香水百合,孤挺花,鳶尾,睡蓮,鬱金香,繡球花苗,園藝資材,球根花卉團購,團購">
+    <meta name="author" content="球根花卉團購">
+    <!-- Open Graph 標籤 (用於社交媒體分享) -->
+    <meta property="og:title" content="球根花卉團購 - 優質球根花卉專賣店">
+    <meta property="og:description" content="專營各式球根花卉、繡球花苗、進口球根、花卉種子及園藝資材。香水百合、孤挺花、鳶尾、睡蓮、鬱金香等優質商品。">
+    <meta property="og:image" content="https://flowerbulb.tw/images/logo.png">
+    <meta property="og:url" content="https://flowerbulb.tw/messages.html">
+<link rel="canonical" href="https://flowerbulb.tw/messages.html">
+    <meta property="og:type" content="website">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/logo.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/images/logo.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/images/logo.png">
+<link rel="shortcut icon" href="/images/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/cart.css">
+    <link rel="stylesheet" href="/css/auth-modals.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <style>
+/* 我的訊息頁面特有樣式 */
+.orders-section {
+    padding: 50px 0;
+}
+
+.orders-container {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.orders-content {
+    display: flex;
+    gap: 30px;
+}
+
+.orders-sidebar {
+    flex: 1;
+    max-width: 250px;
+}
+
+.orders-main {
+    flex: 3;
+}
+
+.profile-menu {
+    background-color: #f8f8f8;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.profile-menu h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ddd;
+    color: #333;
+}
+
+.profile-menu ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.profile-menu li {
+    margin-bottom: 10px;
+}
+
+.profile-menu a {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    color: #666;
+    text-decoration: none;
+    border-radius: 4px;
+    transition: all 0.3s;
+}
+
+.profile-menu a:hover {
+    background-color: #f0f0f0;
+    color: #2e7d32;
+}
+
+.profile-menu a.active {
+    background-color: #2e7d32;
+    color: white;
+}
+
+.profile-menu i {
+    margin-right: 10px;
+    width: 20px;
+    text-align: center;
+}
+
+.message-card {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.message-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #eee;
+}
+
+.message-card-header h3 {
+    margin: 0;
+    color: #333;
+    font-size: 1.1em;
+}
+
+.message-card-date {
+    font-size: 0.85em;
+    color: #999;
+    white-space: nowrap;
+}
+
+.message-status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: bold;
+    margin-bottom: 12px;
+}
+
+.message-status-badge.replied {
+    background-color: #E8F5E9;
+    color: #2E7D32;
+}
+
+.message-status-badge.pending {
+    background-color: #f0f0f0;
+    color: #888;
+}
+
+.message-card-content {
+    background-color: #f9f9f9;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 3px solid #ccc;
+    margin-bottom: 12px;
+}
+
+.message-card-content p {
+    margin: 0;
+    color: #333;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.message-card-reply {
+    background-color: #e8f5e9;
+    padding: 15px;
+    border-radius: 6px;
+    border-left: 3px solid #2e7d32;
+}
+
+.message-card-reply h4 {
+    margin: 0 0 8px 0;
+    font-size: 0.9em;
+    color: #2e7d32;
+}
+
+.message-card-reply p {
+    margin: 0;
+    color: #333;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+
+.no-messages {
+    padding: 40px;
+    text-align: center;
+    color: #999;
+}
+    </style>
+
+    <!-- Firebase SDK引入 - 使用統一版本 10.7.1 -->
+    <script src="/js/firebase-config.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import {
+            getAuth,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged,
+            sendSignInLinkToEmail,
+            isSignInWithEmailLink,
+            signInWithEmailLink,
+            // Google 登入相關匯入
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            // Facebook 登入相關匯入
+            FacebookAuthProvider,
+            // 電話號碼登入相關匯入
+            RecaptchaVerifier,
+            signInWithPhoneNumber,
+            PhoneAuthProvider,
+            signInWithCredential
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import {
+            getFirestore,
+            collection,
+            doc,
+            setDoc,
+            getDoc,
+            getDocs,
+            updateDoc,
+            query,
+            orderBy,
+            where,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        // Firebase配置 - 統一使用與其他頁面相同的配置
+        const firebaseConfig = window.FIREBASE_CONFIG;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        window.firebaseServices = {
+            auth: auth,
+            db: db,
+            getAuth,
+            createUserWithEmailAndPassword,
+            signInWithEmailAndPassword,
+            signOut,
+            onAuthStateChanged,
+            doc,
+            setDoc,
+            getDoc,
+            updateDoc,
+            collection,
+            getDocs,
+            query,
+            where,
+            orderBy,
+            serverTimestamp,
+            sendSignInLinkToEmail,
+            isSignInWithEmailLink,
+            signInWithEmailLink,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            FacebookAuthProvider,
+            RecaptchaVerifier,
+            signInWithPhoneNumber,
+            PhoneAuthProvider,
+            signInWithCredential
+        };
+    </script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <!-- 漢堡選單按鈕 (手機版) -->
+            <button class="menu-toggle" id="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <a href="/index.html" class="logo-container">
+                <img src="/images/logo.jpg" alt="球根花卉團購 logo" class="logo-image" width="520" height="730">
+                <div class="logo">
+                    <h1>球根花卉團購</h1>
+                    <p>球根花卉・種子專賣</p>
+                </div>
+            </a>
+
+            <!-- 手機版頂部購物車 -->
+            <div class="mobile-header-actions">
+                <div class="cart-icon-container">
+                    <a href="/cart.html" class="cart-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count" id="cart-count-fixed">0</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 導航選單 -->
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/index.html">首頁</a></li>
+                    <li><a href="/products.html">商品</a></li>
+                    <li><a href="/about.html">關於我們</a></li>
+                    <li><a href="/contact.html">聯絡我們</a></li>
+
+                    <!-- 手機版選單中的操作選項 -->
+                    <div class="mobile-actions">
+                        <!-- 會員系統 - 未登入狀態 -->
+                        <div class="user-actions" id="user-actions-mobile">
+                            <a href="#" class="btn-login" id="login-btn-mobile">登入</a>
+                        </div>
+
+                        <!-- 會員系統 - 已登入狀態 (手機版) -->
+                        <div class="user-profile-mobile" id="user-profile-mobile">
+                            <div class="user-info">
+                                <i class="fas fa-user-circle"></i>
+                                <span id="username-display-mobile">會員名稱</span>
+                            </div>
+                            <div class="user-links">
+                                <a href="/profile.html"><i class="fas fa-user"></i> 會員資料</a>
+                                <a href="/orders.html"><i class="fas fa-shopping-bag"></i> 訂單記錄</a>
+                                <a href="/messages.html" class="active"><i class="fas fa-envelope"></i> 我的訊息</a>
+                                <a href="/admin/dashboard.html" id="admin-btn-mobile" class="admin-link" style="display: none;"><i class="fas fa-cog"></i> 系統管理</a>
+                                <a href="#" id="logout-btn-mobile"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                            </div>
+                        </div>
+                    </div>
+                </ul>
+            </nav>
+
+            <!-- 桌面版右側元素 -->
+            <div class="header-right">
+                <!-- 購物車圖標 -->
+                <div class="cart-icon-container">
+                    <a href="/cart.html" class="cart-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count" id="cart-count">0</span>
+                    </a>
+                </div>
+
+                <!-- 會員系統 - 未登入狀態 -->
+                <div class="user-actions" id="user-actions">
+                    <a href="#" class="btn-login" id="login-btn">登入</a>
+                </div>
+
+                <!-- 會員系統 - 已登入狀態 -->
+                <div class="user-profile" id="user-profile">
+                    <div class="user-name" id="user-dropdown-btn">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="username-display">會員名稱</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="user-menu" id="user-menu">
+                        <a href="/profile.html"><i class="fas fa-user"></i> 會員資料</a>
+                        <a href="/orders.html"><i class="fas fa-shopping-bag"></i> 訂單記錄</a>
+                        <a href="/messages.html" class="active"><i class="fas fa-envelope"></i> 我的訊息</a>
+                        <a href="/admin/dashboard.html" id="admin-btn" class="admin-link" style="display: none;"><i class="fas fa-cog"></i> 系統管理</a>
+                        <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 半透明背景覆蓋 (用於手機版選單) -->
+    <div class="menu-overlay" id="menu-overlay"></div>
+
+    <!-- 彈窗會由 auth-modals.js 動態創建 -->
+
+    <main>
+        <section class="product-hero profile-banner">
+            <div class="container">
+                <h1>我的訊息</h1>
+                <p>查看您傳送給我們的諮詢訊息與回覆</p>
+            </div>
+        </section>
+
+        <section class="orders-section">
+            <div class="container orders-container">
+                <!-- 未登入提示 -->
+                <div id="not-logged-in" style="display: none;">
+                    <div class="section-alert">
+                        <p>請先登入以查看您的訊息紀錄</p>
+                    </div>
+                    <div style="text-align: center; margin-top: 20px;">
+                        <button id="login-redirect-btn" class="btn btn-primary">前往登入</button>
+                    </div>
+                </div>
+
+                <!-- 我的訊息內容 -->
+                <div id="messages-content" class="orders-content" style="display: none;">
+                    <div class="orders-sidebar">
+                        <div class="profile-menu">
+                            <h3>會員中心</h3>
+                            <ul>
+                                <li><a href="/profile.html"><i class="fas fa-user"></i> 會員資料</a></li>
+                                <li><a href="/orders.html"><i class="fas fa-shopping-bag"></i> 訂單記錄</a></li>
+                                <li><a href="/messages.html" class="active"><i class="fas fa-envelope"></i> 我的訊息</a></li>
+                                <li><a href="#" id="sidebar-logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</a></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="orders-main">
+                        <div id="message-list">
+                            <div class="loading">
+                                <p>載入訊息中...</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 聯絡我們區塊移到最下面 -->
+                <div class="help-section">
+                    <h3>需要幫助？</h3>
+                    <p>有任何球根花卉相關問題，歡迎隨時與我們聯繫</p>
+                    <a href="/contact.html" class="btn">聯絡我們</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>球根花卉團購</h3>
+                    <p>為您提供最優質的球根花卉選擇</p>
+                    <div class="social-links">
+                        <a href="https://www.facebook.com/groups/g112332?locale=zh_TW" target="_blank" title="Facebook 社團"><i class="fab fa-facebook"></i></a>
+                        <a href="https://shopee.tw/vincentsayhello?categoryId=100636&entryPoint=ShopByPDP&itemId=27426426770" target="_blank" title="蝦皮賣場"><i class="fas fa-shopping-bag"></i></a>
+                    </div>
+                </div>
+
+                <div class="footer-section">
+                    <h3>商品分類</h3>
+                    <p><i class="fas fa-seedling"></i> 球根花卉（香水百合、孤挺花、鳶尾等）</p>
+                    <p><i class="fas fa-leaf"></i> 花卉盆栽（繡球花苗等）</p>
+                    <p><i class="fas fa-spa"></i> 進口花卉蔬菜種子</p>
+                    <p><i class="fas fa-tools"></i> 園藝資材用品</p>
+                </div>
+
+                <div class="footer-section">
+                    <h3>服務時間</h3>
+                    <p><i class="far fa-clock"></i> 週一至週五：9:00 - 18:00</p>
+                    <p><i class="fas fa-truck"></i> 提供超商取貨與宅急便配送服務</p>
+                    <p><i class="fas fa-users"></i> 團購優惠價格</p>
+                </div>
+            </div>
+
+            <div class="copyright">
+                <p>&copy; 2025 球根花卉團購。保留所有權利。</p>
+                <p class="disclaimer">※ 植物為活體，不適用七天鑑賞期 ※</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- 引入彈窗管理器 -->
+    <script src="/js/auth-modals.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/member.js"></script>
+    <script src="/js/cart.js"></script>
+
+    <script>
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化共用功能
+    initCommonFeatures();
+
+    // 初始化我的訊息頁面
+    initMessagesPage();
+});
+
+function initMessagesPage() {
+    initUserInterface();
+    checkLoginStatus();
+}
+
+function initUserInterface() {
+    const loginRedirectBtn = document.getElementById('login-redirect-btn');
+    if (loginRedirectBtn) {
+        loginRedirectBtn.addEventListener('click', function() {
+            // 使用統一的登入按鈕觸發登入彈窗
+            const loginBtn = document.getElementById('login-btn');
+            if (loginBtn) {
+                loginBtn.click();
+            }
+        });
+    }
+
+    // 側邊欄登出按鈕功能
+    const sidebarLogoutBtn = document.getElementById('sidebar-logout-btn');
+    if (sidebarLogoutBtn) {
+        sidebarLogoutBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            handleLogout();
+        });
+    }
+}
+
+function checkLoginStatus() {
+    if (!window.firebaseServices) {
+        console.error('Firebase 服務未初始化');
+        return;
+    }
+
+    const notLoggedInSection = document.getElementById('not-logged-in');
+    const messagesContentSection = document.getElementById('messages-content');
+
+    window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, function(user) {
+        if (user) {
+            if (notLoggedInSection) notLoggedInSection.style.display = 'none';
+            if (messagesContentSection) messagesContentSection.style.display = 'block';
+            loadUserMessages(user);
+        } else {
+            if (notLoggedInSection) notLoggedInSection.style.display = 'block';
+            if (messagesContentSection) messagesContentSection.style.display = 'none';
+        }
+    });
+}
+
+// 載入使用者自己傳送過的訊息
+async function loadUserMessages(user) {
+    const messageList = document.getElementById('message-list');
+    if (!messageList) return;
+
+    messageList.innerHTML = '<div class="loading"><p>載入訊息中...</p></div>';
+
+    try {
+        const db = window.firebaseServices.db;
+        const collection = window.firebaseServices.collection;
+        const query = window.firebaseServices.query;
+        const where = window.firebaseServices.where;
+        const getDocs = window.firebaseServices.getDocs;
+
+        // 只用 userId 相等過濾，不在 Firestore 查詢裡排序，
+        // 避免需要額外設定複合索引；改在瀏覽器端排序
+        const messagesCollectionRef = collection(db, 'messages');
+        const q = query(messagesCollectionRef, where('userId', '==', user.uid));
+        const querySnapshot = await getDocs(q);
+
+        if (querySnapshot.empty) {
+            messageList.innerHTML = '<div class="no-messages"><p>目前沒有訊息紀錄</p></div>';
+            return;
+        }
+
+        const messages = [];
+        querySnapshot.forEach((doc) => {
+            messages.push({ id: doc.id, ...doc.data() });
+        });
+
+        // 依建立時間新到舊排序
+        messages.sort((a, b) => {
+            const timeA = a.createdAt && a.createdAt.toDate ? a.createdAt.toDate().getTime() : 0;
+            const timeB = b.createdAt && b.createdAt.toDate ? b.createdAt.toDate().getTime() : 0;
+            return timeB - timeA;
+        });
+
+        let html = '';
+        messages.forEach((messageData) => {
+            const createdDate = messageData.createdAt && messageData.createdAt.toDate
+                ? messageData.createdAt.toDate().toLocaleString('zh-TW')
+                : '未知時間';
+            const hasReply = !!messageData.reply;
+            const repliedDate = messageData.repliedAt && messageData.repliedAt.toDate
+                ? messageData.repliedAt.toDate().toLocaleString('zh-TW')
+                : '';
+
+            html += `
+                <div class="message-card">
+                    <div class="message-card-header">
+                        <h3>${escapeHtml(messageData.subject) || '無主旨'}</h3>
+                        <span class="message-card-date">${createdDate}</span>
+                    </div>
+                    <span class="message-status-badge ${hasReply ? 'replied' : 'pending'}">
+                        ${hasReply ? '已回覆' : '待回覆'}
+                    </span>
+                    <div class="message-card-content">
+                        <p>${escapeHtml(messageData.message)}</p>
+                    </div>
+                    ${hasReply ? `
+                        <div class="message-card-reply">
+                            <h4><i class="fas fa-reply"></i> 商家回覆${repliedDate ? `（${repliedDate}）` : ''}</h4>
+                            <p>${escapeHtml(messageData.reply)}</p>
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        });
+
+        messageList.innerHTML = html;
+    } catch (error) {
+        console.error('載入訊息時出錯:', error);
+        messageList.innerHTML = '<div class="no-messages"><p>載入訊息時發生錯誤，請稍後再試</p></div>';
+    }
+}
+    </script>
+</body>
+</html>
