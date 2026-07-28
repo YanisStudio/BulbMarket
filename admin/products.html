@@ -24,9 +24,9 @@
             getAuth, 
             onAuthStateChanged
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
+        import {
+            getFirestore,
+            collection,
             addDoc,
             getDoc,
             getDocs,
@@ -36,7 +36,9 @@
             query,
             orderBy,
             where,
-            serverTimestamp 
+            serverTimestamp,
+            writeBatch,
+            deleteField
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
         import {
             getStorage,
@@ -72,6 +74,8 @@
             orderBy,
             where,
             serverTimestamp,
+            writeBatch,
+            deleteField,
             storageRef: ref,
             uploadBytes,
             getDownloadURL
@@ -163,16 +167,65 @@
             overflow-x: auto;
         }
         
-        .product-table th:nth-child(1), 
+        .product-table th:nth-child(1),
         .product-table td:nth-child(1) {
-            width: 80px;
+            width: 36px;
         }
-        
-        .product-table th:nth-child(2), 
+
+        .product-table th:nth-child(2),
         .product-table td:nth-child(2) {
             width: 80px;
         }
-        
+
+        .product-table th:nth-child(3),
+        .product-table td:nth-child(3) {
+            width: 80px;
+        }
+
+        .batch-schedule-panel {
+            background-color: #f9f9f9;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin: 0 20px 20px;
+        }
+
+        .batch-schedule-fields {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-bottom: 12px;
+        }
+
+        .batch-schedule-fields .form-group {
+            flex: 1;
+            min-width: 220px;
+            margin: 0;
+        }
+
+        .batch-schedule-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .batch-schedule-hint {
+            margin: 0;
+            font-size: 13px;
+            color: #888;
+        }
+
+        .schedule-cell {
+            font-size: 12px;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .schedule-cell .schedule-none {
+            color: #bbb;
+        }
+
         .product-thumbnail {
             width: 60px;
             height: 60px;
@@ -610,11 +663,35 @@
                         </button>
                     </div>
                 </div>
-                
+
+                <!-- 批次排程上下架 -->
+                <div class="batch-schedule-panel">
+                    <div class="batch-schedule-fields">
+                        <div class="form-group">
+                            <label for="batch-publish-at">上架時間（選填）</label>
+                            <input type="datetime-local" id="batch-publish-at">
+                        </div>
+                        <div class="form-group">
+                            <label for="batch-unpublish-at">下架時間（選填）</label>
+                            <input type="datetime-local" id="batch-unpublish-at">
+                        </div>
+                    </div>
+                    <div class="batch-schedule-actions">
+                        <button type="button" class="btn btn-primary" id="apply-schedule-btn">
+                            <i class="fas fa-clock"></i> 套用排程（已選 <span id="selected-count">0</span> 項）
+                        </button>
+                        <button type="button" class="btn btn-outline" id="clear-schedule-btn">
+                            清除所選商品的排程
+                        </button>
+                    </div>
+                    <p class="batch-schedule-hint">先勾選下方要排程的商品，再填時間並套用；系統每 15 分鐘檢查一次，時間到了會自動改變商品狀態，不是精準到秒。</p>
+                </div>
+
                 <div class="table-responsive product-table-container">
                     <table class="admin-table product-table">
                         <thead>
                             <tr>
+                                <th><input type="checkbox" id="select-all-products"></th>
                                 <th>ID</th>
                                 <th>圖片</th>
                                 <th>名稱</th>
@@ -622,12 +699,13 @@
                                 <th>價格</th>
                                 <th>庫存</th>
                                 <th>狀態</th>
+                                <th>排程</th>
                                 <th>操作</th>
                             </tr>
                         </thead>
                         <tbody id="product-list">
                             <tr class="placeholder-row">
-                                <td colspan="8" class="text-center">載入商品中...</td>
+                                <td colspan="10" class="text-center">載入商品中...</td>
                             </tr>
                         </tbody>
                     </table>
@@ -805,6 +883,27 @@ const waitForAdminCommon = function() {
                 });
             }
             
+            // 綁定全選勾選框
+            const selectAllBox = document.getElementById('select-all-products');
+            if (selectAllBox) {
+                selectAllBox.addEventListener('change', function() {
+                    document.querySelectorAll('.product-select-checkbox').forEach(cb => {
+                        cb.checked = selectAllBox.checked;
+                    });
+                    updateSelectedCount();
+                });
+            }
+
+            // 綁定批次排程按鈕
+            const applyScheduleBtn = document.getElementById('apply-schedule-btn');
+            if (applyScheduleBtn) {
+                applyScheduleBtn.addEventListener('click', applySchedule);
+            }
+            const clearScheduleBtn = document.getElementById('clear-schedule-btn');
+            if (clearScheduleBtn) {
+                clearScheduleBtn.addEventListener('click', clearSchedule);
+            }
+
             // 測試 Firestore 寫入權限
             testFirestoreAccess();
         };
@@ -937,7 +1036,7 @@ const waitForAdminCommon = function() {
                         if (productsSnapshot.empty) {
                             productListElement.innerHTML = `
                                 <tr class="placeholder-row">
-                                    <td colspan="8" class="text-center">暫無商品數據</td>
+                                    <td colspan="10" class="text-center">暫無商品數據</td>
                                 </tr>
                             `;
                             console.log('商品列表為空');
@@ -974,6 +1073,7 @@ const waitForAdminCommon = function() {
                                 
                                 productsHTML += `
                                     <tr>
+                                        <td><input type="checkbox" class="product-select-checkbox" data-id="${productId}"></td>
                                         <td>${productId.substring(0, 6)}...</td>
                                         <td>
                                             <img src="${product.imageUrl || '/images/placeholder.jpg'}" alt="${escapeHtml(product.name)}" class="product-thumbnail" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
@@ -989,6 +1089,7 @@ const waitForAdminCommon = function() {
                                             <span class="status-dot ${statusDotClass}"></span>
                                             ${statusText}
                                         </td>
+                                        <td class="schedule-cell">${formatScheduleCell(product)}</td>
                                         <td>
                                             <div class="action-buttons-group">
                                                 <button class="action-btn edit-btn" data-id="${productId}">
@@ -997,8 +1098,8 @@ const waitForAdminCommon = function() {
                                                 <button class="action-btn delete-btn" data-id="${productId}">
                                                     <i class="fas fa-trash"></i>
                                                 </button>
-                                                <button class="${featuredBtnClass}" 
-                                                        data-id="${productId}" 
+                                                <button class="${featuredBtnClass}"
+                                                        data-id="${productId}"
                                                         data-is-featured="${isFeatured}"
                                                         ${featuredBtnDisabled}>
                                                     ${featuredBtnText}
@@ -1008,10 +1109,10 @@ const waitForAdminCommon = function() {
                                     </tr>
                                 `;
                             });
-                            
+
                             productListElement.innerHTML = productsHTML;
                             console.log('商品列表渲染完成');
-                            
+
                             // 綁定編輯按鈕事件
                             const editButtons = document.querySelectorAll('.edit-btn');
                             editButtons.forEach(button => {
@@ -1020,7 +1121,7 @@ const waitForAdminCommon = function() {
                                     editProduct(productId);
                                 });
                             });
-                            
+
                             // 綁定刪除按鈕事件
                             const deleteButtons = document.querySelectorAll('.delete-btn');
                             deleteButtons.forEach(button => {
@@ -1029,6 +1130,9 @@ const waitForAdminCommon = function() {
                                     showConfirmDialog(productId);
                                 });
                             });
+
+                            // 綁定商品勾選事件（批次排程用）
+                            bindProductSelectionEvents();
                             
                             // 綁定精選商品按鈕事件
                             const featuredButtons = document.querySelectorAll('.featured-btn');
@@ -1059,7 +1163,7 @@ const waitForAdminCommon = function() {
                     if (productListElement) {
                         productListElement.innerHTML = `
                             <tr class="placeholder-row">
-                                <td colspan="8" class="text-center">查詢商品時發生權限錯誤，請檢查 Firestore 權限設置</td>
+                                <td colspan="10" class="text-center">查詢商品時發生權限錯誤，請檢查 Firestore 權限設置</td>
                             </tr>
                         `;
                     }
@@ -1074,7 +1178,7 @@ const waitForAdminCommon = function() {
                 if (productListElement) {
                     productListElement.innerHTML = `
                         <tr class="placeholder-row">
-                            <td colspan="8" class="text-center">獲取商品數據失敗，請重試</td>
+                            <td colspan="10" class="text-center">獲取商品數據失敗，請重試</td>
                         </tr>
                     `;
                 }
@@ -1082,7 +1186,128 @@ const waitForAdminCommon = function() {
                 hideLoading();
             }
         };
-        
+
+        // ===== 批次排程上下架 =====
+
+        // 格式化排程欄位顯示文字
+        const formatScheduleCell = function(product) {
+            const formatOne = (ts) => {
+                const d = ts && ts.toDate ? ts.toDate() : null;
+                if (!d) return null;
+                return d.toLocaleString('zh-TW', {
+                    month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit'
+                });
+            };
+            const publishText = formatOne(product.scheduledPublishAt);
+            const unpublishText = formatOne(product.scheduledUnpublishAt);
+
+            if (!publishText && !unpublishText) {
+                return '<span class="schedule-none">—</span>';
+            }
+            const parts = [];
+            if (publishText) parts.push(`上架 ${publishText}`);
+            if (unpublishText) parts.push(`下架 ${unpublishText}`);
+            return parts.join('<br>');
+        };
+
+        // 取得目前勾選的商品 ID 清單
+        const getSelectedProductIds = function() {
+            return Array.from(document.querySelectorAll('.product-select-checkbox:checked'))
+                .map(cb => cb.dataset.id);
+        };
+
+        // 更新「已選 N 項」顯示與全選框狀態
+        const updateSelectedCount = function() {
+            const countElem = document.getElementById('selected-count');
+            if (countElem) {
+                countElem.textContent = getSelectedProductIds().length;
+            }
+            const checkboxes = document.querySelectorAll('.product-select-checkbox');
+            const selectAllBox = document.getElementById('select-all-products');
+            if (selectAllBox) {
+                selectAllBox.checked = checkboxes.length > 0 &&
+                    Array.from(checkboxes).every(cb => cb.checked);
+            }
+        };
+
+        // 每次重新渲染商品列表後，重新綁定每一列勾選框的事件
+        const bindProductSelectionEvents = function() {
+            document.querySelectorAll('.product-select-checkbox').forEach(cb => {
+                cb.addEventListener('change', updateSelectedCount);
+            });
+            updateSelectedCount();
+        };
+
+        // 套用批次排程：把選填的上架/下架時間寫進所選商品
+        const applySchedule = async function() {
+            const selectedIds = getSelectedProductIds();
+            if (selectedIds.length === 0) {
+                alert('請先勾選要排程的商品');
+                return;
+            }
+
+            const publishValue = document.getElementById('batch-publish-at').value;
+            const unpublishValue = document.getElementById('batch-unpublish-at').value;
+
+            if (!publishValue && !unpublishValue) {
+                alert('請至少填寫上架時間或下架時間其中一項');
+                return;
+            }
+
+            const updateFields = {};
+            if (publishValue) updateFields.scheduledPublishAt = new Date(publishValue);
+            if (unpublishValue) updateFields.scheduledUnpublishAt = new Date(unpublishValue);
+
+            showLoading();
+            try {
+                const db = window.firebaseServices.db;
+                const batch = window.firebaseServices.writeBatch(db);
+                selectedIds.forEach(id => {
+                    const productRef = window.firebaseServices.doc(db, 'products', id);
+                    batch.update(productRef, updateFields);
+                });
+                await batch.commit();
+                alert(`已為 ${selectedIds.length} 項商品套用排程，系統每 15 分鐘檢查一次時間是否到了`);
+                loadProducts();
+            } catch (error) {
+                console.error('套用排程失敗:', error);
+                alert('套用排程失敗: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        };
+
+        // 清除所選商品的排程設定
+        const clearSchedule = async function() {
+            const selectedIds = getSelectedProductIds();
+            if (selectedIds.length === 0) {
+                alert('請先勾選要清除排程的商品');
+                return;
+            }
+
+            showLoading();
+            try {
+                const db = window.firebaseServices.db;
+                const deleteField = window.firebaseServices.deleteField;
+                const batch = window.firebaseServices.writeBatch(db);
+                selectedIds.forEach(id => {
+                    const productRef = window.firebaseServices.doc(db, 'products', id);
+                    batch.update(productRef, {
+                        scheduledPublishAt: deleteField(),
+                        scheduledUnpublishAt: deleteField()
+                    });
+                });
+                await batch.commit();
+                alert(`已清除 ${selectedIds.length} 項商品的排程設定`);
+                loadProducts();
+            } catch (error) {
+                console.error('清除排程失敗:', error);
+                alert('清除排程失敗: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        };
+
         // 編輯商品
         const editProduct = async function(productId) {
             showLoading();
