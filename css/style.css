@@ -145,6 +145,7 @@ header .container {
 
 .logo-image {
     height: 3.75em; /* 改用em */
+    width: auto; /* 避免 HTML width/height 屬性讓瀏覽器把寬度鎖死在原始像素值，導致圖片被拉伸變形 */
     margin-right: 1em; /* 改用em */
 }
 
