@@ -429,17 +429,42 @@ async function loadProducts() {
 function renderProducts(products) {
     const productGrids = document.querySelectorAll('.product-grid');
     productGrids.forEach(grid => grid.innerHTML = '');
-    
+
     // 根據螢幕寬度智能調整每頁商品數量
     const productsPerPage = getProductsPerPage(); // 👈 改用動態函數
-    const totalPages = Math.ceil(products.length / productsPerPage);
-    
+    let totalPages = Math.ceil(products.length / productsPerPage);
+
+    // 如果最後一頁的商品數量連一整列都排不滿，就併入前一頁一起顯示，
+    // 避免「明明畫面上這列還沒排滿，卻已經出現下一頁」的狀況
+    if (totalPages > 1) {
+        const lastPageCount = products.length - (totalPages - 1) * productsPerPage;
+        if (lastPageCount < getGridColumns()) {
+            totalPages -= 1;
+        }
+    }
+
     for (let i = 0; i < Math.min(totalPages, 3); i++) {
-        const pageProducts = products.slice(i * productsPerPage, (i + 1) * productsPerPage);
+        const isLastPage = i === totalPages - 1;
+        const start = i * productsPerPage;
+        const end = isLastPage ? products.length : (i + 1) * productsPerPage;
+        const pageProducts = products.slice(start, end);
         renderProductsToPage(pageProducts, i + 1);
     }
-    
+
     updatePaginationButtons(totalPages);
+}
+
+// 目前畫面實際會顯示的商品格數（需與 css/style.css 的 .product-grid 中斷點對應）
+function getGridColumns() {
+    const screenWidth = window.innerWidth;
+
+    if (screenWidth >= 1200) {
+        return 4;
+    } else if (screenWidth >= 768) {
+        return 3;
+    } else {
+        return 1;
+    }
 }
 
 // 新增這個函數（插入到 renderProducts 函數之後）
@@ -451,7 +476,7 @@ function getProductsPerPage() {
     } else if (screenWidth >= 768) {
         return 9;  // 平板：3列 x 3排 = 9個  
     } else {
-        return 6;  // 手機：2列 x 3排 = 6個
+        return 6;  // 手機：1列 x 6排 = 6個（實際 CSS 是單欄，見 getGridColumns()）
     }
 }
 
