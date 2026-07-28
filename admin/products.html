@@ -1385,6 +1385,62 @@ const waitForAdminCommon = function() {
             }
         };
         
+        // 上傳前在瀏覽器端自動縮圖壓縮，避免手機直接拍的原始大圖（常常好幾 MB）
+        // 整張傳到 Storage，拖慢每個訪客瀏覽商品頁的速度。
+        // 任何一步出錯都直接 fallback 回傳原始檔案，不會擋住商品儲存。
+        const compressImageFile = async function(file) {
+            const MAX_DIMENSION = 1600;
+            const JPEG_QUALITY = 0.85;
+
+            try {
+                if (!file.type || !file.type.startsWith('image/')) {
+                    return file;
+                }
+
+                // imageOrientation: 'from-image' 會自動套用照片的 EXIF 方向資訊，
+                // 避免手機拍的照片壓縮後變成橫的/顛倒
+                const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+                const { width, height } = bitmap;
+
+                // 圖片本來就不大，不用處理，直接用原始檔案
+                if (width <= MAX_DIMENSION && height <= MAX_DIMENSION && file.size <= 500 * 1024) {
+                    bitmap.close();
+                    return file;
+                }
+
+                const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
+                const targetWidth = Math.round(width * scale);
+                const targetHeight = Math.round(height * scale);
+
+                const canvas = document.createElement('canvas');
+                canvas.width = targetWidth;
+                canvas.height = targetHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
+                bitmap.close();
+
+                // PNG 可能有透明背景，保留原格式；其他一律輸出 JPEG（照片壓縮效果好很多）
+                const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+                const blob = await new Promise((resolve) => {
+                    canvas.toBlob(resolve, outputType, outputType === 'image/jpeg' ? JPEG_QUALITY : undefined);
+                });
+
+                if (!blob) {
+                    return file;
+                }
+
+                const newExt = outputType === 'image/png' ? 'png' : 'jpg';
+                const baseName = file.name.replace(/\.[^.]+$/, '');
+                const compressedFile = new File([blob], `${baseName}.${newExt}`, { type: outputType });
+
+                console.log(`圖片壓縮: ${file.name} ${(file.size / 1024).toFixed(0)}KB -> ${compressedFile.name} ${(compressedFile.size / 1024).toFixed(0)}KB`);
+                return compressedFile;
+            } catch (error) {
+                console.warn('圖片壓縮失敗，改用原始檔案上傳:', error);
+                return file;
+            }
+        };
+
         // 保存商品
         const saveProduct = async function() {
             showLoading();
@@ -1507,15 +1563,18 @@ const waitForAdminCommon = function() {
                     console.log('開始處理圖片上傳...');
                     
                     try {
+                        // 上傳前先在瀏覽器端自動縮圖壓縮
+                        const uploadFile = await compressImageFile(imageFile);
+
                         // 創建存儲引用
                         const timestamp = Date.now();
-                        const imagePath = `products/${category}/${timestamp}_${imageFile.name}`;
+                        const imagePath = `products/${category}/${timestamp}_${uploadFile.name}`;
                         const imageRef = storageRef(storage, imagePath);
-                        
+
                         console.log('上傳圖片到路徑:', imagePath);
-                        
+
                         // 上傳圖片
-                        await uploadBytes(imageRef, imageFile);
+                        await uploadBytes(imageRef, uploadFile);
                         console.log('圖片上傳成功');
                         
                         // 直接構造 URL 而不是使用 getDownloadURL
