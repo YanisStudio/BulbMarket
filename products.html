@@ -407,6 +407,10 @@ async function loadProducts() {
         
         if (products.length === 0) {
             productGrid.innerHTML = '<div class="no-products">目前沒有可用的商品</div>';
+            // HTML 裡的「1 2 3 下一頁」是寫死的預設樣板，平常靠 updatePaginationButtons()
+            // 依實際商品數量覆蓋掉；沒有商品時要清空，避免留下不存在的分頁按鈕誤導使用者
+            const paginationContainer = document.querySelector('.pagination');
+            if (paginationContainer) paginationContainer.innerHTML = '';
             return;
         }
         
