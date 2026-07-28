@@ -493,6 +493,10 @@
     margin: 0 2px;
     border: none;
     cursor: pointer;
+    /* css/style.css 也有一份較舊的 .action-btn（白色底、hover 才變色），
+       兩份樣式表在後台頁面同時載入時會疊在一起，這裡明確蓋掉它的漸層底色，
+       避免按鈕平常看起來像沒有顏色，要滑鼠靠近才看得到 */
+    background-image: none;
 }
 
 .action-btn:hover {
