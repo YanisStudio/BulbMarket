@@ -89,23 +89,23 @@
 }
 
 .toast-message.toast-info {
-    background: linear-gradient(135deg, #2196F3, #1976D2);
-    border-left: 4px solid #0D47A1;
+    background: linear-gradient(135deg, #2196f3, #1976d2);
+    border-left: 4px solid #0d47a1;
 }
 
 .toast-message.toast-success {
-    background: linear-gradient(135deg, #4CAF50, #388E3C);
-    border-left: 4px solid #1B5E20;
+    background: linear-gradient(135deg, #4caf50, #388e3c);
+    border-left: 4px solid #1b5e20;
 }
 
 .toast-message.toast-warning {
-    background: linear-gradient(135deg, #FF9800, #F57C00);
-    border-left: 4px solid #E65100;
+    background: linear-gradient(135deg, #ff9800, #f57c00);
+    border-left: 4px solid #e65100;
 }
 
 .toast-message.toast-error {
-    background: linear-gradient(135deg, #F44336, #D32F2F);
-    border-left: 4px solid #B71C1C;
+    background: linear-gradient(135deg, #f44336, #d32f2f);
+    border-left: 4px solid #b71c1c;
 }
 
 /* ===== 確認對話框樣式 ===== */

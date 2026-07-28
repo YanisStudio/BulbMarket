@@ -32,7 +32,7 @@
 }
 
 .progress-step.active .step-number {
-    background-color: #4CAF50;
+    background-color: #4caf50;
     color: white;
 }
 
@@ -126,7 +126,7 @@ input[type="email"]:focus,
 input[type="tel"]:focus,
 select:focus,
 textarea:focus {
-    border-color: #4CAF50;
+    border-color: #4caf50;
     outline: none;
 }
 
@@ -152,7 +152,7 @@ textarea:focus {
 }
 
 .radio-label:hover {
-    border-color: #4CAF50;
+    border-color: #4caf50;
 }
 
 input[type="radio"] {
@@ -177,13 +177,13 @@ input[type="radio"] {
     width: 10px;
     height: 10px;
     border-radius: 50%;
-    background-color: #4CAF50;
+    background-color: #4caf50;
     opacity: 0;
     transition: opacity 0.3s;
 }
 
 input[type="radio"]:checked + .custom-radio {
-    border-color: #4CAF50;
+    border-color: #4caf50;
 }
 
 input[type="radio"]:checked + .custom-radio::after {
@@ -308,7 +308,7 @@ input[type="radio"]:checked + .custom-radio::after {
     position: absolute;
     top: -8px;
     right: -8px;
-    background-color: #4CAF50;
+    background-color: #4caf50;
     color: white;
     font-size: 0.8rem;
     width: 22px;
@@ -361,7 +361,7 @@ input[type="radio"]:checked + .custom-radio::after {
 }
 
 .checkout-actions .btn-outline:hover {
-    background-color: #4CAF50;
+    background-color: #4caf50;
     color: white;
 }
 

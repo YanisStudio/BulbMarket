@@ -104,7 +104,7 @@
 
 .form-group input:focus {
     outline: none;
-    border-color: #4CAF50;
+    border-color: #4caf50;
     box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1);
 }
 
@@ -190,7 +190,7 @@
 
 /* 主要按鈕 */
 .btn-primary {
-    background-color: #4CAF50;
+    background-color: #4caf50;
     color: white;
 }
 
@@ -369,7 +369,7 @@
     }
     
     .form-group input:focus {
-        border-color: #4CAF50;
+        border-color: #4caf50;
         background-color: #2d2d2d;
     }
     

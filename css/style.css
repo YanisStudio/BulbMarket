@@ -2930,9 +2930,9 @@ footer {
 .admin-notes-form {
     margin-top: 25px;
     padding: 15px;
-    background-color: #E8F4F8;
+    background-color: #e8f4f8;
     border-radius: 6px;
-    border-left: 4px solid #2196F3;
+    border-left: 4px solid #2196f3;
 }
 
 .admin-notes-form h4 {
@@ -2954,8 +2954,8 @@ footer {
 }
 
 .admin-notes-form button {
-    background-color: #2196F3;
-    border-color: #2196F3;
+    background-color: #2196f3;
+    border-color: #2196f3;
 }
 
 .admin-notes-form button:hover {
