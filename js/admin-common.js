@@ -49,7 +49,7 @@ async function initializeFirebase() {
             onAuthStateChanged,
             signOut
         } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js");
-        const { 
+        const {
             getFirestore,
             collection,
             addDoc,
@@ -63,7 +63,9 @@ async function initializeFirebase() {
             orderBy,
             where,
             limit,
-            serverTimestamp 
+            serverTimestamp,
+            writeBatch,
+            deleteField
         } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
         const {
             getStorage,
@@ -71,16 +73,18 @@ async function initializeFirebase() {
             uploadBytes,
             getDownloadURL
         } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js");
-        
+
         // 頁面內嵌的 <script type="module"> 可能已經初始化過 Firebase，
         // 沿用同一個 app 實例，避免重複呼叫 initializeApp() 觸發 duplicate-app 錯誤
         firebaseApp = getApps().length ? getApp() : initializeApp(firebaseConfig);
         const auth = getAuth(firebaseApp);
         const db = getFirestore(firebaseApp);
         const storage = getStorage(firebaseApp);
-        
-        // 將 Firebase 服務暴露給全局使用
+
+        // 用 ...window.firebaseServices 保留頁面內嵌 script 可能自己額外加的方法
+        // （例如 admin/products.html 用到的 writeBatch/deleteField），避免這裡整個覆蓋掉
         window.firebaseServices = {
+            ...window.firebaseServices,
             app: firebaseApp,
             auth: auth,
             db: db,
@@ -103,6 +107,8 @@ async function initializeFirebase() {
             where,
             limit,
             serverTimestamp,
+            writeBatch,
+            deleteField,
             // Storage 方法
             storageRef: ref,
             uploadBytes,
