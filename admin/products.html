@@ -213,9 +213,18 @@
         }
 
         .batch-schedule-hint {
-            margin: 0;
+            margin: 0 0 12px;
             font-size: 13px;
             color: #888;
+        }
+
+        .batch-schedule-hint:last-child {
+            margin-bottom: 0;
+        }
+
+        .batch-schedule-divider {
+            border-top: 1px dashed #ddd;
+            margin: 15px 0;
         }
 
         .schedule-cell {
@@ -687,6 +696,18 @@
                         </button>
                     </div>
                     <p class="batch-schedule-hint">先勾選下方要排程的商品，再填時間並套用；系統每 15 分鐘檢查一次，時間到了會自動改變商品狀態，不是精準到秒。</p>
+
+                    <div class="batch-schedule-divider"></div>
+
+                    <div class="batch-schedule-actions">
+                        <button type="button" class="btn btn-success" id="publish-now-btn">
+                            <i class="fas fa-eye"></i> 立即上架
+                        </button>
+                        <button type="button" class="btn btn-danger" id="unpublish-now-btn">
+                            <i class="fas fa-eye-slash"></i> 立即下架
+                        </button>
+                    </div>
+                    <p class="batch-schedule-hint">不用等排程，直接把已勾選的商品狀態立刻改成上架/下架；如果該商品原本有設定排程時間，會一併清掉，避免之後排程又把狀態改回去。</p>
                 </div>
 
                 <div class="table-responsive product-table-container">
@@ -903,6 +924,18 @@ const waitForAdminCommon = function() {
             const clearScheduleBtn = document.getElementById('clear-schedule-btn');
             if (clearScheduleBtn) {
                 clearScheduleBtn.addEventListener('click', clearSchedule);
+            }
+            const publishNowBtn = document.getElementById('publish-now-btn');
+            if (publishNowBtn) {
+                publishNowBtn.addEventListener('click', function() {
+                    applyImmediateStatus('active');
+                });
+            }
+            const unpublishNowBtn = document.getElementById('unpublish-now-btn');
+            if (unpublishNowBtn) {
+                unpublishNowBtn.addEventListener('click', function() {
+                    applyImmediateStatus('inactive');
+                });
             }
 
             // 測試 Firestore 寫入權限
@@ -1304,6 +1337,49 @@ const waitForAdminCommon = function() {
             } catch (error) {
                 console.error('清除排程失敗:', error);
                 alert('清除排程失敗: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        };
+
+        // 不透過排程，直接把所選商品立刻改成上架/下架
+        const applyImmediateStatus = async function(newStatus) {
+            const selectedIds = getSelectedProductIds();
+            if (selectedIds.length === 0) {
+                alert('請先勾選要操作的商品');
+                return;
+            }
+
+            const actionText = newStatus === 'active' ? '上架' : '下架';
+            // 這頁本來就有一個寫死在 HTML 裡的 #confirm-dialog（給刪除商品用，
+            // 按鈕 id 是 #confirm-delete/#cancel-delete），跟 AdminCommon.showConfirmDialog()
+            // 期待的 #confirm-dialog-ok/#confirm-dialog-cancel 對不上，直接用會噴錯，
+            // 這裡改用這個檔案本來就在用的 confirm()
+            if (!confirm(`確定要將 ${selectedIds.length} 項商品立即設為「${actionText}」嗎？`)) return;
+
+            showLoading();
+            try {
+                const db = window.firebaseServices.db;
+                const deleteField = window.firebaseServices.deleteField;
+                const batch = window.firebaseServices.writeBatch(db);
+                selectedIds.forEach(id => {
+                    const productRef = window.firebaseServices.doc(db, 'products', id);
+                    // 立即生效之後，原本設定的排程時間就沒有意義了，一併清掉，
+                    // 避免排程之後又把狀態改回去，跟這次的手動操作互相打架
+                    const updateFields = { status: newStatus };
+                    if (newStatus === 'active') {
+                        updateFields.scheduledPublishAt = deleteField();
+                    } else {
+                        updateFields.scheduledUnpublishAt = deleteField();
+                    }
+                    batch.update(productRef, updateFields);
+                });
+                await batch.commit();
+                alert(`已將 ${selectedIds.length} 項商品立即設為「${actionText}」`);
+                loadProducts();
+            } catch (error) {
+                console.error(`立即${actionText}失敗:`, error);
+                alert(`立即${actionText}失敗: ` + error.message);
             } finally {
                 hideLoading();
             }
