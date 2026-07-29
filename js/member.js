@@ -1220,10 +1220,10 @@ async function saveUserToFirestore(user, displayName, provider) {
                     console.log('Google 登入成功:', user.uid);
                     
                     saveUserState(user);
-                    const displayName = user.displayName || user.email.split('@')[0];
+                    const displayName = user.displayName || user.email?.split('@')[0] || 'Google用戶';
                     localStorage.setItem('userName', displayName);
                     checkIfAdmin(user);
-                    
+
                     // 保存或更新用戶資料到 Firestore
                     await saveUserToFirestore(user, displayName, 'google');
                     
@@ -1429,17 +1429,28 @@ async function saveUserToFirestore(user, displayName, provider) {
         // 檢查重定向結果
         if (getRedirectResult) {
             getRedirectResult(auth)
-                .then((result) => {
+                .then(async (result) => {
                     if (result) {
                         const user = result.user;
                         console.log('重定向登入成功:', user.uid);
-                        
+
                         const displayName = user.displayName || user.email?.split('@')[0] || '用戶';
                         saveUserState(user);
                         localStorage.setItem('userName', displayName);
                         checkIfAdmin(user);
                         updateLoginUI(user);
-                        
+
+                        // 彈窗被瀏覽器擋下、改用重定向登入時，結果會從這裡回來，
+                        // 之前這裡沒有呼叫 saveUserToFirestore，導致這條路徑登入的
+                        // 使用者完全沒有寫入 Firestore 個人資料（不是欄位空白，是整份文件都沒建立）
+                        const providerId = user.providerData?.[0]?.providerId;
+                        const provider = providerId === 'facebook.com' ? 'facebook'
+                            : providerId === 'google.com' ? 'google'
+                            : null;
+                        if (provider) {
+                            await saveUserToFirestore(user, displayName, provider);
+                        }
+
                         showMemberSuccessModal('登入成功', '登入成功！');
                     }
                 })

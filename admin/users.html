@@ -543,7 +543,7 @@
                 html += `
                     <tr data-user-id="${user.id}">
                         <td>${escapeHtml(user.name)}</td>
-                        <td>${escapeHtml(user.email)}</td>
+                        <td>${escapeHtml(user.email) || '未提供'}</td>
                         <td>${escapeHtml(user.phone) || '未提供'}</td>
                         <td>${createdDate}</td>
                         <td>${lastLoginText}</td>
