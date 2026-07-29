@@ -1092,10 +1092,19 @@ async function showOrderDetail(orderId) {
             orderDetailContainer.innerHTML = '<div class="loading"><p>找不到訂單資料</p></div>';
             return;
         }
-        
+
         const order = orderDoc.data();
         order.id = orderDoc.id;
-        
+
+        // 訂單列表本來就只會列出自己的訂單，但這裡是靠 orderId 直接查單筆資料，
+        // 沒有這層檢查的話，只要知道別人的 orderId（例如透過瀏覽器紀錄、截圖流出）
+        // 就能繞過列表直接看到對方的姓名/電話/Email/地址/購買明細
+        const currentUser = window.firebaseServices.auth.currentUser;
+        if (!currentUser || order.userId !== currentUser.uid) {
+            orderDetailContainer.innerHTML = '<div class="loading"><p>找不到訂單資料</p></div>';
+            return;
+        }
+
         let orderDate = '未知日期';
         if (order.orderDate && order.orderDate.toDate) {
             const date = order.orderDate.toDate();
@@ -1266,10 +1275,20 @@ async function updateOrderNotes(orderId, notes) {
         const orderDoc = await window.firebaseServices.getDoc(
             window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId)
         );
-        
+
+        // 同樣要檢查這筆訂單是不是目前登入的人下的，避免用別人的 orderId
+        // 也能寫入備註到對方的訂單裡
+        const currentUser = window.firebaseServices.auth.currentUser;
+        if (orderDoc.exists() && currentUser && orderDoc.data().userId !== currentUser.uid) {
+            showToast('找不到訂單資料');
+            updateBtn.disabled = false;
+            updateBtn.textContent = originalBtnText;
+            return;
+        }
+
         if (orderDoc.exists()) {
             const orderData = orderDoc.data();
-            
+
             const now = new Date();
             const timestamp = now.toLocaleString('zh-TW');
             const newNoteEntry = `[${timestamp}] ${notes}`;
