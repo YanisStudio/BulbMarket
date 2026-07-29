@@ -1207,7 +1207,11 @@ async function saveUserToFirestore(user, displayName, provider) {
             provider.setCustomParameters({
                 'locale': 'zh_TW'
             });
-            
+            // Google 預設就會帶 email/profile，這裡明確要求一次，
+            // 不依賴「目前剛好是預設行為」，跟 Facebook 那邊做法一致
+            provider.addScope('email');
+            provider.addScope('profile');
+
             if (clickedBtn) {
                 const originalText = clickedBtn.innerHTML;
                 clickedBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 登入中...';
@@ -1280,7 +1284,11 @@ async function saveUserToFirestore(user, displayName, provider) {
             provider.setCustomParameters({
                 'locale': 'zh_TW'
             });
-            
+            // Facebook 登入不像 Google，預設不會自動要 email 權限，
+            // 沒有明確要求的話，即使使用者同意也常常拿不到 email，
+            // 這是先前空白會員資料的其中一個成因
+            provider.addScope('email');
+
             if (clickedBtn) {
                 const originalText = clickedBtn.innerHTML;
                 clickedBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 登入中...';
