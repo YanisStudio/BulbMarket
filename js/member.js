@@ -1460,20 +1460,12 @@ async function saveUserToFirestore(user, displayName, provider) {
                 });
         }
 
-        // 點擊用戶名稱顯示下拉選單
-        if (userDropdownBtn) {
-            userDropdownBtn.addEventListener('click', function(e) {
-                e.preventDefault();
-                userMenu.style.display = userMenu.style.display === 'block' ? 'none' : 'block';
-            });
-
-            // 點擊頁面其他區域關閉下拉選單
-            document.addEventListener('click', function(event) {
-                if (!userDropdownBtn.contains(event.target) && !userMenu.contains(event.target)) {
-                    userMenu.style.display = 'none';
-                }
-            });
-        }
+        // 下拉選單的開關已經由 js/common.js 的 initUserDropdown()（前台頁面）
+        // 或 js/admin-common.js 的 initializeUserMenu()（後台頁面）負責綁定，
+        // 這裡不要再重複綁一次——之前兩邊各綁一個 click 監聽器，同一次點擊
+        // 會被兩個監聽器輪流切換 display，兩次切換互相抵銷，選單看起來完全
+        // 打不開（後台頁面尤其明顯，因為 admin-common.js 沒有像 common.js
+        // 那樣用 cloneNode 先清掉舊的監聽器）
 
         // 處理用戶登出 (通用函數)
         function handleLogout() {
