@@ -1,28 +1,41 @@
 // 一次性工具：比對 Firebase Authentication 與 Firestore 的 users 集合，
 // 補上 Firestore 裡缺漏（完全空白）的 email / phone 欄位。
 //
-// 用法：
-//   FIREBASE_SERVICE_ACCOUNT 環境變數放服務帳戶 JSON 全文
+// 用法（兩種登入方式擇一）：
+//   1. 本機執行：設定 FIREBASE_SERVICE_ACCOUNT 環境變數（服務帳戶 JSON 全文）
+//   2. Google Cloud Shell：不用設定金鑰，直接用你自己 Google 帳號的權限
+//      （Cloud Shell 已經幫你登入好，這裡會自動偵測、不需要额外設定）
+//
 //   node run.mjs            → 只印出「會改什麼」，不會真的寫入資料庫（預設，安全）
 //   node run.mjs --apply    → 真的把上面預覽過的內容寫進 Firestore
 //
 // 只補完全空白的欄位，Firestore 裡已經有值的一律不動（不管跟 Authentication
 // 是否一致），避免蓋掉你手動改過的資料。
 
-import { initializeApp, cert } from 'firebase-admin/app';
+import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
 
-function loadServiceAccount() {
+const PROJECT_ID = 'bulb-market-217c4';
+
+function buildAppOptions() {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
-    if (!raw) {
-        throw new Error('缺少環境變數 FIREBASE_SERVICE_ACCOUNT（Firebase 服務帳戶金鑰 JSON）');
+    if (raw) {
+        // 本機執行：用貼進來的服務帳戶金鑰
+        let serviceAccount;
+        try {
+            serviceAccount = JSON.parse(raw);
+        } catch (error) {
+            throw new Error('FIREBASE_SERVICE_ACCOUNT 不是合法的 JSON：' + error.message);
+        }
+        console.log('使用 FIREBASE_SERVICE_ACCOUNT 金鑰登入');
+        return { credential: cert(serviceAccount), projectId: PROJECT_ID };
     }
-    try {
-        return JSON.parse(raw);
-    } catch (error) {
-        throw new Error('FIREBASE_SERVICE_ACCOUNT 不是合法的 JSON：' + error.message);
-    }
+
+    // 沒設金鑰：假設是在 Google Cloud Shell（或其他已經用 gcloud 登入過的環境）
+    // 執行，改用「應用程式預設憑證」，會自動用目前登入的 Google 帳號權限
+    console.log('沒有偵測到 FIREBASE_SERVICE_ACCOUNT，改用目前的 Google 帳號登入身分（適用 Cloud Shell）');
+    return { credential: applicationDefault(), projectId: PROJECT_ID };
 }
 
 function normalizePhone(phoneNumber) {
@@ -53,8 +66,7 @@ async function listAllAuthUsers(auth) {
 async function main() {
     const applyChanges = process.argv.includes('--apply');
 
-    const serviceAccount = loadServiceAccount();
-    initializeApp({ credential: cert(serviceAccount) });
+    initializeApp(buildAppOptions());
     const auth = getAuth();
     const db = getFirestore();
 
