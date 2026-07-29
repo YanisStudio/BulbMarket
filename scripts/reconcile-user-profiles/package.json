@@ -1,0 +1,12 @@
+{
+  "name": "bulbmarket-reconcile-user-profiles",
+  "private": true,
+  "type": "module",
+  "description": "一次性工具：比對 Firebase Authentication 與 Firestore users 集合，補上缺漏的 email/phone 欄位",
+  "scripts": {
+    "start": "node run.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}
