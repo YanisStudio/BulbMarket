@@ -856,6 +856,10 @@
             
             // 獲取購物車數據
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
+
+            // 送出訂單時，用這份「向 Firestore 驗證過」的商品明細（id/name/price）
+            // 取代購物車裡使用者端可任意竄改的資料，由 validateCartStock() 填入
+            let verifiedCartItems = null;
             
             // 顯示主載入覆蓋層
             showMainLoadingOverlay();
@@ -1377,11 +1381,13 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                 }
             }
             
-            // 檢查庫存並驗證購物車
+            // 檢查庫存、並用 Firestore 裡的真實價格驗證購物車
+            //（購物車存在瀏覽器 localStorage，價格欄位使用者端可以任意竄改，
+            //  不能拿來直接算訂單金額，一定要用這裡查回來的 Firestore 資料為準）
             async function validateCartStock() {
                 try {
-                    console.log('開始驗證庫存...');
-                    
+                    console.log('開始驗證庫存與價格...');
+
                     // 合併相同商品的數量
                     const mergedCart = [];
                     cart.forEach(item => {
@@ -1392,26 +1398,46 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                             mergedCart.push({...item});
                         }
                     });
-                    
-                    // 獲取所有商品的當前庫存
+
+                    // 獲取所有商品目前的真實庫存與價格
                     const stockValidationResults = [];
-                    
+                    const priceMismatchItems = [];
+                    const verifiedItems = [];
+
                     for (const item of mergedCart) {
                         try {
                             const productDoc = await firebaseServices.getDoc(
                                 firebaseServices.doc(firebaseServices.db, 'products', item.id)
                             );
-                            
+
                             if (productDoc.exists()) {
                                 const productData = productDoc.data();
                                 const currentStock = productData.stock || 0;
-                                
+                                const realPrice = productData.price || 0;
+
                                 stockValidationResults.push({
                                     id: item.id,
                                     name: item.name,
                                     requestedQuantity: item.quantity,
                                     currentStock: currentStock,
                                     isValid: currentStock >= item.quantity
+                                });
+
+                                // 購物車裡的價格跟 Firestore 目前的價格不一致（可能被竄改，
+                                // 也可能是價格剛好變動），一律以 Firestore 為準，並提醒使用者
+                                if (item.price !== realPrice) {
+                                    priceMismatchItems.push({
+                                        name: productData.name || item.name,
+                                        oldPrice: item.price,
+                                        newPrice: realPrice
+                                    });
+                                }
+
+                                verifiedItems.push({
+                                    id: item.id,
+                                    name: productData.name || item.name,
+                                    price: realPrice,
+                                    quantity: item.quantity
                                 });
                             } else {
                                 stockValidationResults.push({
@@ -1423,7 +1449,7 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                                 });
                             }
                         } catch (error) {
-                            console.error(`驗證商品 ${item.id} 庫存時出錯:`, error);
+                            console.error(`驗證商品 ${item.id} 庫存與價格時出錯:`, error);
                             stockValidationResults.push({
                                 id: item.id,
                                 name: item.name,
@@ -1433,26 +1459,41 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                             });
                         }
                     }
-                    
+
                     // 檢查是否有庫存不足的商品
                     const invalidItems = stockValidationResults.filter(item => !item.isValid);
-                    
+
                     if (invalidItems.length > 0) {
                         let errorMessage = '以下商品庫存不足：\n';
                         invalidItems.forEach(item => {
                             errorMessage += `• ${item.name}: 需要 ${item.requestedQuantity} 件，庫存 ${item.currentStock} 件\n`;
                         });
                         errorMessage += '\n請返回購物車調整數量。';
-                        
+
                         alert(errorMessage);
                         return false;
                     }
-                    
-                    console.log('庫存驗證通過');
+
+                    // 價格對不上，一律擋下來，請使用者回購物車重新確認金額
+                    if (priceMismatchItems.length > 0) {
+                        let errorMessage = '以下商品價格已更新：\n';
+                        priceMismatchItems.forEach(item => {
+                            errorMessage += `• ${item.name}: NT$ ${item.oldPrice} → NT$ ${item.newPrice}\n`;
+                        });
+                        errorMessage += '\n請返回購物車確認最新金額後再提交訂單。';
+
+                        alert(errorMessage);
+                        return false;
+                    }
+
+                    // 儲存驗證過的商品明細，提交訂單時改用這份資料，不要用購物車原始資料
+                    verifiedCartItems = verifiedItems;
+
+                    console.log('庫存與價格驗證通過');
                     return true;
-                    
+
                 } catch (error) {
-                    console.error('驗證庫存時發生錯誤:', error);
+                    console.error('驗證庫存與價格時發生錯誤:', error);
                     alert('驗證庫存時發生錯誤，請稍後再試');
                     return false;
                 }
@@ -1578,10 +1619,24 @@ if (shipping === 'store') {
     customerAddress = `${city}${district}${address}`;
 }
                     
-                    const subtotal = parseInt(subtotalElem.textContent);
+                    // 金額一律用 validateCartStock() 向 Firestore 驗證過的商品明細計算，
+                    // 不要相信購物車（localStorage，使用者端可竄改）或畫面上顯示的小計文字
+                    if (!verifiedCartItems || verifiedCartItems.length === 0) {
+                        alert('商品資料驗證失敗，請重新整理頁面後再試一次');
+                        if (submitOrderBtn) {
+                            submitOrderBtn.disabled = false;
+                            submitOrderBtn.textContent = '提交訂單';
+                        }
+                        if (mobileSubmitOrderBtn) {
+                            mobileSubmitOrderBtn.disabled = false;
+                            mobileSubmitOrderBtn.textContent = '提交訂單';
+                        }
+                        return;
+                    }
+                    const subtotal = verifiedCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
                     const shippingFee = window.currentShippingResult ? window.currentShippingResult.fee : 0;
                     const total = subtotal + shippingFee;
-                    
+
                     // 建立訂單對象
                     const orderData = {
                         customer: {
@@ -1594,7 +1649,7 @@ if (shipping === 'store') {
                         shippingFee: shippingFee,
                         shippingDetails: window.currentShippingResult || {},
                         payment: payment,
-                        items: cart,
+                        items: verifiedCartItems,
                         subtotal: subtotal,
                         total: total,
                         notes: notes,
