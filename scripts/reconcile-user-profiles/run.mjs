@@ -55,6 +55,25 @@ function detectProvider(user) {
     return 'unknown';
 }
 
+// Authentication 的 creationTime / lastSignInTime 是權威時間來源，
+// 不會受網站前端的寫入競爭（例如兩個頁面同時寫 Firestore）影響
+function getAuthTimes(user) {
+    const creationTime = user.metadata?.creationTime
+        ? Timestamp.fromDate(new Date(user.metadata.creationTime))
+        : Timestamp.now();
+    const lastSignInTime = user.metadata?.lastSignInTime
+        ? Timestamp.fromDate(new Date(user.metadata.lastSignInTime))
+        : creationTime;
+    return { creationTime, lastSignInTime };
+}
+
+function toMillis(value) {
+    if (!value) return null;
+    if (typeof value.toMillis === 'function') return value.toMillis();
+    const parsed = new Date(value);
+    return isNaN(parsed.getTime()) ? null : parsed.getTime();
+}
+
 async function listAllAuthUsers(auth) {
     const users = [];
     let pageToken;
@@ -91,12 +110,7 @@ async function main() {
             // Firestore 裡完全沒有這位使用者的個人資料文件
             // （例如先前 redirect 登入沒有寫入資料的那個 bug）
             const provider = detectProvider(user);
-            const creationTime = user.metadata?.creationTime
-                ? Timestamp.fromDate(new Date(user.metadata.creationTime))
-                : Timestamp.now();
-            const lastSignInTime = user.metadata?.lastSignInTime
-                ? Timestamp.fromDate(new Date(user.metadata.lastSignInTime))
-                : creationTime;
+            const { creationTime, lastSignInTime } = getAuthTimes(user);
 
             plannedUpdates.push({
                 uid: user.uid,
@@ -125,6 +139,17 @@ async function main() {
         }
         if ((!data.phone || data.phone === '') && authPhone) {
             changes.phone = authPhone;
+        }
+
+        // 註冊時間比最後登入時間還晚，邏輯上不可能發生
+        // （通常是網站前端兩個頁面同時搶寫 Firestore 造成的），
+        // 用 Authentication 的權威時間校正回去
+        const createdMs = toMillis(data.createdAt);
+        const lastLoginMs = toMillis(data.lastLoginAt);
+        if (createdMs !== null && lastLoginMs !== null && createdMs > lastLoginMs) {
+            const { creationTime, lastSignInTime } = getAuthTimes(user);
+            changes.createdAt = creationTime;
+            changes.lastLoginAt = lastSignInTime;
         }
 
         if (Object.keys(changes).length > 0) {
@@ -157,10 +182,17 @@ async function main() {
 
     console.log(`發現 ${plannedUpdates.length} 筆需要補資料：\n`);
     plannedUpdates.forEach((u) => {
-        const tag = u.isNewDoc ? '[缺整份文件]' : '[補欄位]';
+        const tag = u.isNewDoc
+            ? '[缺整份文件]'
+            : (u.changes.createdAt ? '[修正時間顛倒]' : '[補欄位]');
         const changeText = Object.entries(u.changes)
-            .filter(([k]) => k === 'email' || k === 'phone')
-            .map(([k, v]) => `${k}=${v}`)
+            .filter(([k]) => ['email', 'phone', 'createdAt', 'lastLoginAt'].includes(k))
+            .map(([k, v]) => {
+                if ((k === 'createdAt' || k === 'lastLoginAt') && v?.toDate) {
+                    return `${k}=${v.toDate().toISOString()}`;
+                }
+                return `${k}=${v}`;
+            })
             .join(', ');
         console.log(`${tag} ${u.identifier} (${u.uid}) -> ${changeText || '(建立基本資料文件)'}`);
     });

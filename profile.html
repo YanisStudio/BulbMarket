@@ -821,12 +821,15 @@
                             phone: user.phoneNumber ? user.phoneNumber.replace(/^\+886/, '0') : '',
                             provider: userProvider, // 保存檢測到的註冊方式
                             createdAt: firebaseServices.serverTimestamp(),
+                            lastLoginAt: firebaseServices.serverTimestamp(),
                             updatedAt: firebaseServices.serverTimestamp()
                         };
-                        
+
                         // 立即保存到 Firestore
+                        // 用 merge:true：避免跟 member.js 的 onAuthStateChanged（同時可能在更新 lastLoginAt）
+                        // 互相搶寫、整份覆蓋掉對方剛寫入的欄位，導致 lastLoginAt 遺失或比 createdAt 還早
                         const userDocRef = firebaseServices.doc(firebaseServices.db, 'users', uid);
-                        firebaseServices.setDoc(userDocRef, initialUserData)
+                        firebaseServices.setDoc(userDocRef, initialUserData, { merge: true })
                             .then(() => {
                                 console.log('新用戶資料已創建，註冊方式:', userProvider);
                                 setFieldPermissions(userProvider);
