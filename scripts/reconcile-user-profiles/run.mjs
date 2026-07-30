@@ -141,19 +141,26 @@ async function main() {
             changes.phone = authPhone;
         }
 
-        // 註冊時間比最後登入時間還晚，邏輯上不可能發生
-        // （通常是網站前端兩個頁面同時搶寫 Firestore 造成的），
-        // 用 Authentication 的權威時間校正回去
+        // createdAt / lastLoginAt 缺欄位，或註冊時間比最後登入時間還晚
+        // （邏輯上不可能發生，通常是網站前端兩個頁面同時搶寫 Firestore 造成的），
+        // 用 Authentication 的權威時間補上/校正回去
+        // 注意：admin/users.html 顯示「今天」不代表資料庫裡真的有這個值——
+        // 那邊在 createdAt 缺欄位時會直接 fallback 顯示今天的日期，實際上欄位是空的
         const createdMs = toMillis(data.createdAt);
         const lastLoginMs = toMillis(data.lastLoginAt);
-        if (createdMs !== null && lastLoginMs !== null && createdMs > lastLoginMs) {
+        const isReversed = createdMs !== null && lastLoginMs !== null && createdMs > lastLoginMs;
+        const missingCreatedAt = createdMs === null;
+        const missingLastLoginAt = lastLoginMs === null;
+        let dateReason = null;
+        if (isReversed || missingCreatedAt || missingLastLoginAt) {
             const { creationTime, lastSignInTime } = getAuthTimes(user);
-            changes.createdAt = creationTime;
-            changes.lastLoginAt = lastSignInTime;
+            if (isReversed || missingCreatedAt) changes.createdAt = creationTime;
+            if (isReversed || missingLastLoginAt) changes.lastLoginAt = lastSignInTime;
+            dateReason = isReversed ? '時間顛倒' : '缺日期欄位';
         }
 
         if (Object.keys(changes).length > 0) {
-            plannedUpdates.push({ uid: user.uid, identifier, isNewDoc: false, changes });
+            plannedUpdates.push({ uid: user.uid, identifier, isNewDoc: false, changes, dateReason });
         }
     }
 
@@ -184,7 +191,7 @@ async function main() {
     plannedUpdates.forEach((u) => {
         const tag = u.isNewDoc
             ? '[缺整份文件]'
-            : (u.changes.createdAt ? '[修正時間顛倒]' : '[補欄位]');
+            : (u.dateReason ? `[${u.dateReason}]` : '[補欄位]');
         const changeText = Object.entries(u.changes)
             .filter(([k]) => ['email', 'phone', 'createdAt', 'lastLoginAt'].includes(k))
             .map(([k, v]) => {

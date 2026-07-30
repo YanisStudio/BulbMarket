@@ -453,9 +453,9 @@
                         city: userData.city || '',
                         district: userData.district || '',
                         address: userData.address || '',
-                        createdAt: userData.createdAt ? 
-                            (userData.createdAt.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt.seconds * 1000)) : 
-                            new Date(),
+                        createdAt: userData.createdAt ?
+                            (userData.createdAt.toDate ? userData.createdAt.toDate() : new Date(userData.createdAt.seconds * 1000)) :
+                            null,
                         lastLoginAt: userData.lastLoginAt ? 
                             (userData.lastLoginAt.toDate ? userData.lastLoginAt.toDate() : new Date(userData.lastLoginAt.seconds * 1000)) : 
                             null,
