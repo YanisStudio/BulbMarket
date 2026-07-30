@@ -133,12 +133,22 @@ async function main() {
 
         const data = docSnap.data();
         const changes = {};
+        const reasons = [];
 
         if ((!data.email || data.email === '') && authEmail) {
             changes.email = authEmail;
         }
         if ((!data.phone || data.phone === '') && authPhone) {
             changes.phone = authPhone;
+        }
+
+        // provider 欄位跟 Authentication 記錄的登入方式不一致（例如舊版 profile.html
+        // 曾經把 provider 誤存成 'email' 的那個 bug），會讓後台會員管理的編輯彈窗
+        // 鎖錯欄位（例如電話登入的人卻鎖住電子郵件），用 Authentication 的權威資料校正
+        const authProvider = detectProvider(user);
+        if (authProvider !== 'unknown' && data.provider !== authProvider) {
+            changes.provider = authProvider;
+            reasons.push('登入方式不符');
         }
 
         // createdAt / lastLoginAt 缺欄位，或註冊時間比最後登入時間還晚
@@ -151,16 +161,15 @@ async function main() {
         const isReversed = createdMs !== null && lastLoginMs !== null && createdMs > lastLoginMs;
         const missingCreatedAt = createdMs === null;
         const missingLastLoginAt = lastLoginMs === null;
-        let dateReason = null;
         if (isReversed || missingCreatedAt || missingLastLoginAt) {
             const { creationTime, lastSignInTime } = getAuthTimes(user);
             if (isReversed || missingCreatedAt) changes.createdAt = creationTime;
             if (isReversed || missingLastLoginAt) changes.lastLoginAt = lastSignInTime;
-            dateReason = isReversed ? '時間顛倒' : '缺日期欄位';
+            reasons.push(isReversed ? '時間顛倒' : '缺日期欄位');
         }
 
         if (Object.keys(changes).length > 0) {
-            plannedUpdates.push({ uid: user.uid, identifier, isNewDoc: false, changes, dateReason });
+            plannedUpdates.push({ uid: user.uid, identifier, isNewDoc: false, changes, reasons });
         }
     }
 
@@ -191,9 +200,9 @@ async function main() {
     plannedUpdates.forEach((u) => {
         const tag = u.isNewDoc
             ? '[缺整份文件]'
-            : (u.dateReason ? `[${u.dateReason}]` : '[補欄位]');
+            : (u.reasons && u.reasons.length > 0 ? `[${u.reasons.join('、')}]` : '[補欄位]');
         const changeText = Object.entries(u.changes)
-            .filter(([k]) => ['email', 'phone', 'createdAt', 'lastLoginAt'].includes(k))
+            .filter(([k]) => ['email', 'phone', 'provider', 'createdAt', 'lastLoginAt'].includes(k))
             .map(([k, v]) => {
                 if ((k === 'createdAt' || k === 'lastLoginAt') && v?.toDate) {
                     return `${k}=${v.toDate().toISOString()}`;
