@@ -1,6 +1,7 @@
 // BulbMarket 商品排程上下架
 //
-// 由 .github/workflows/product-scheduler.yml 每 15 分鐘觸發一次。
+// .github/workflows/product-scheduler.yml 裡的 cron 設定是每 15 分鐘，
+// 但 GitHub Actions 的排程觸發是 best-effort，實際觀察大約每 3 小時才會真的執行一次。
 // 檢查 Firestore 的 products 集合裡，誰的 scheduledPublishAt / scheduledUnpublishAt
 // 已經到了，就把 status 改成對應的值，並清掉已經用過的排程欄位（避免重複觸發）。
 //
