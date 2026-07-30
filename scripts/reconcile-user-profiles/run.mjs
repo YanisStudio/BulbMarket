@@ -1,7 +1,10 @@
-// 一次性工具：比對 Firebase Authentication 與 Firestore 的 users 集合，
+// 比對 Firebase Authentication 與 Firestore 的 users 集合，
 // 補上 Firestore 裡缺漏（完全空白）的 email / phone 欄位。
+// 也會列出「帳號已被刪除，但 Firestore 還留著資料」的孤兒紀錄（只記錄，不會自動刪除）。
 //
-// 用法（兩種登入方式擇一）：
+// 這支腳本可以手動執行，也會被 .github/workflows/user-sync.yml 排程自動執行（每天一次，帶 --apply）。
+//
+// 手動用法（兩種登入方式擇一）：
 //   1. 本機執行：設定 FIREBASE_SERVICE_ACCOUNT 環境變數（服務帳戶 JSON 全文）
 //   2. Google Cloud Shell：不用設定金鑰，直接用你自己 Google 帳號的權限
 //      （Cloud Shell 已經幫你登入好，這裡會自動偵測、不需要额外設定）
@@ -128,6 +131,24 @@ async function main() {
             plannedUpdates.push({ uid: user.uid, identifier, isNewDoc: false, changes });
         }
     }
+
+    console.log('比對 Firestore users 集合，找出帳號已被刪除但資料還留著的孤兒紀錄...');
+    const authUidSet = new Set(authUsers.map((u) => u.uid));
+    const allDocsSnap = await db.collection('users').get();
+    const orphanDocs = [];
+    allDocsSnap.forEach((docSnap) => {
+        if (!authUidSet.has(docSnap.id)) {
+            const data = docSnap.data() || {};
+            orphanDocs.push({ uid: docSnap.id, identifier: data.email || data.phone || docSnap.id });
+        }
+    });
+    if (orphanDocs.length > 0) {
+        console.log(`發現 ${orphanDocs.length} 筆孤兒資料（Authentication 帳號已不存在，僅記錄、不會自動刪除）：`);
+        orphanDocs.forEach((o) => console.log(`[孤兒資料] ${o.identifier} (${o.uid})`));
+    } else {
+        console.log('沒有發現孤兒資料。');
+    }
+    console.log('');
 
     if (plannedUpdates.length === 0) {
         console.log('沒有發現需要補上的缺漏欄位，Firestore 資料跟 Authentication 一致。');
