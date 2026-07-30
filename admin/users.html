@@ -211,12 +211,13 @@
                     </div>
                     <div class="form-group">
                         <label for="edit-user-email">電子郵件</label>
-                        <input type="email" id="edit-user-email" required readonly>
-                        <small style="color: #666; font-size: 12px;">電子郵件無法修改</small>
+                        <input type="email" id="edit-user-email">
+                        <small id="edit-user-email-note" style="color: #666; font-size: 12px; display: none;">此為登入帳號，無法修改</small>
                     </div>
                     <div class="form-group">
                         <label for="edit-user-phone">電話號碼</label>
                         <input type="tel" id="edit-user-phone">
+                        <small id="edit-user-phone-note" style="color: #666; font-size: 12px; display: none;">此為登入帳號，無法修改</small>
                     </div>
                     <div class="form-group">
                         <label for="edit-user-city">城市</label>
@@ -595,7 +596,20 @@
                     document.getElementById('edit-user-city').value = userData.city || '';
                     document.getElementById('edit-user-district').value = userData.district || '';
                     document.getElementById('edit-user-address').value = userData.address || '';
-                    
+
+                    // 依照當初登入方式鎖定對應欄位（電話登入鎖電話，其餘鎖電子郵件），
+                    // 避免後台改到跟 Firebase Authentication 綁定的登入帳號，導致兩邊資料兜不起來
+                    const isPhoneLogin = userData.provider === 'phone';
+                    const emailInput = document.getElementById('edit-user-email');
+                    const phoneInput = document.getElementById('edit-user-phone');
+                    const emailNote = document.getElementById('edit-user-email-note');
+                    const phoneNote = document.getElementById('edit-user-phone-note');
+
+                    emailInput.readOnly = !isPhoneLogin;
+                    phoneInput.readOnly = isPhoneLogin;
+                    emailNote.style.display = isPhoneLogin ? 'none' : 'block';
+                    phoneNote.style.display = isPhoneLogin ? 'block' : 'none';
+
                     // 格式化註冊日期
                     let registerDate = '未知日期';
                     if (userData.createdAt && userData.createdAt.toDate) {
@@ -610,9 +624,10 @@
                     }
                     document.getElementById('edit-user-last-login').textContent = lastLogin;
                     
-                    // 設置表單的用戶ID
+                    // 設置表單的用戶ID與鎖定欄位
                     const editUserForm = document.getElementById('edit-user-form');
                     editUserForm.setAttribute('data-id', userId);
+                    editUserForm.setAttribute('data-locked-field', isPhoneLogin ? 'phone' : 'email');
                     
                     // 顯示模態框
                     const editUserModal = document.getElementById('edit-user-modal');
@@ -703,14 +718,16 @@
         const updateUserDetails = async function() {
             const editUserForm = document.getElementById('edit-user-form');
             const userId = editUserForm.getAttribute('data-id');
-            
+            const lockedField = editUserForm.getAttribute('data-locked-field') || 'email';
+
             // 獲取表單數據
             const name = document.getElementById('edit-user-name').value.trim();
             const phone = document.getElementById('edit-user-phone').value.trim();
+            const email = document.getElementById('edit-user-email').value.trim();
             const city = document.getElementById('edit-user-city').value.trim();
             const district = document.getElementById('edit-user-district').value.trim();
             const address = document.getElementById('edit-user-address').value.trim();
-            
+
             // 驗證表單
             if (!name) {
                 window.AdminCommon.showToast('姓名不能為空', 'error');
@@ -741,15 +758,23 @@
                 }
                 
                 // 使用 updateDoc 更新用戶資料到 Firestore
+                // 登入用的那個欄位（電話登入鎖電話，其餘鎖電子郵件）不寫入，
+                // 避免跟 Firebase Authentication 的登入帳號兜不起來
                 const userRef = doc(db, 'users', userId);
-                await updateDoc(userRef, {
+                const updateData = {
                     name: name,
-                    phone: phone || '',
                     city: city || '',
                     district: district || '',
                     address: address || '',
                     updatedAt: serverTimestamp()
-                });
+                };
+                if (lockedField !== 'phone') {
+                    updateData.phone = phone || '';
+                }
+                if (lockedField !== 'email') {
+                    updateData.email = email || '';
+                }
+                await updateDoc(userRef, updateData);
                 
                 console.log('用戶資料更新成功');
                 
