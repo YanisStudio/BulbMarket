@@ -272,28 +272,13 @@
             <div class="container">
                 <h2 class="section-title">全部商品</h2>
                 
-                <!-- 第一頁產品 -->
-                <div class="product-grid" id="page-1">
-                    <div class="loading-indicator">載入商品中...</div>
-                </div>
-                
-                <!-- 第二頁產品 -->
-                <div class="product-grid" id="page-2" style="display: none;">
+                <!-- 商品格 -->
+                <div class="product-grid" id="products-grid">
                     <div class="loading-indicator">載入商品中...</div>
                 </div>
 
-                <!-- 第三頁產品 -->
-                <div class="product-grid" id="page-3" style="display: none;">
-                    <div class="loading-indicator">載入商品中...</div>
-                </div>
-                
-                <!-- 分頁控制 -->
-                <div class="pagination">
-                    <button class="pagination-btn active" data-page="1">1</button>
-                    <button class="pagination-btn" data-page="2">2</button>
-                    <button class="pagination-btn" data-page="3">3</button>
-                    <button class="pagination-btn next" data-page="next">下一頁 <i class="fas fa-chevron-right"></i></button>
-                </div>
+                <!-- 分頁控制：按鈕依實際商品數量動態產生（見底部 script） -->
+                <div class="pagination"></div>
             </div>
         </section>
         
@@ -399,10 +384,15 @@ let currentFilters = {
     sort: 'default',
     search: ''
 };
-// 商品還在從 Firestore 載入時，第 2、3 頁的格子其實是空的（只有第 1 頁
-// 有寫「載入商品中...」）。如果使用者在這時候點分頁按鈕切過去，會看到
-// 一片空白，很容易誤以為「沒有商品」。用這個旗標擋下載入完成前的分頁點擊
+// 商品還在從 Firestore 載入時，還沒有任何分頁資料。如果使用者在這時候點
+// 分頁按鈕，會看到一片空白，很容易誤以為「沒有商品」。用這個旗標擋下
+// 載入完成前的分頁點擊
 let productsLoaded = false;
+
+// 分頁後的商品，paginatedPages[0] 是第 1 頁、paginatedPages[1] 是第 2 頁...
+// 依實際商品數量產生，沒有頁數上限
+let paginatedPages = [];
+let currentPageNum = 1;
 
 // DOM 載入完成後初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -442,7 +432,7 @@ function autoScrollToProducts() {
 // 從 Firebase 載入產品（使用 common.js 的 FirebaseUtils）
 async function loadProducts() {
     try {
-        const productGrid = document.getElementById('page-1');
+        const productGrid = document.getElementById('products-grid');
         productGrid.innerHTML = '<div class="loading-indicator">載入商品中...</div>';
         
         // 使用 common.js 的 FirebaseUtils 載入產品
@@ -456,8 +446,8 @@ async function loadProducts() {
 
         if (products.length === 0) {
             productGrid.innerHTML = '<div class="no-products">目前沒有可用的商品</div>';
-            // HTML 裡的「1 2 3 下一頁」是寫死的預設樣板，平常靠 updatePaginationButtons()
-            // 依實際商品數量覆蓋掉；沒有商品時要清空，避免留下不存在的分頁按鈕誤導使用者
+            // 分頁按鈕平常靠 updatePaginationButtons() 依實際商品數量產生；
+            // 沒有商品時要清空，避免留下不存在的分頁按鈕誤導使用者
             const paginationContainer = document.querySelector('.pagination');
             if (paginationContainer) paginationContainer.innerHTML = '';
             productsLoaded = true;
@@ -476,19 +466,15 @@ async function loadProducts() {
 
     } catch (error) {
         console.error("載入商品失敗:", error);
-        const productGrid = document.getElementById('page-1');
+        const productGrid = document.getElementById('products-grid');
         productGrid.innerHTML = `<div class="error-message">載入商品時出錯：${error.message}</div>`;
     }
 }
 
-// 渲染產品到頁面
+// 依商品清單重新分頁。頁數完全依實際商品數量計算，沒有上限
 function renderProducts(products) {
-    const productGrids = document.querySelectorAll('.product-grid');
-    productGrids.forEach(grid => grid.innerHTML = '');
-
-    // 根據螢幕寬度智能調整每頁商品數量
-    const productsPerPage = getProductsPerPage(); // 👈 改用動態函數
-    let totalPages = Math.ceil(products.length / productsPerPage);
+    const productsPerPage = getProductsPerPage(); // 依螢幕寬度智能調整每頁商品數量
+    let totalPages = Math.max(1, Math.ceil(products.length / productsPerPage));
 
     // 如果最後一頁的商品數量連一整列都排不滿，就併入前一頁一起顯示，
     // 避免「明明畫面上這列還沒排滿，卻已經出現下一頁」的狀況
@@ -499,15 +485,20 @@ function renderProducts(products) {
         }
     }
 
-    for (let i = 0; i < Math.min(totalPages, 3); i++) {
+    paginatedPages = [];
+    for (let i = 0; i < totalPages; i++) {
         const isLastPage = i === totalPages - 1;
         const start = i * productsPerPage;
         const end = isLastPage ? products.length : (i + 1) * productsPerPage;
-        const pageProducts = products.slice(start, end);
-        renderProductsToPage(pageProducts, i + 1);
+        paginatedPages.push(products.slice(start, end));
     }
 
+    // 篩選/搜尋/視窗大小改變後重新分頁時，儘量留在原本瀏覽的頁數；
+    // 如果新的結果頁數比較少，就退到最後一頁，而不是頁碼可能失效
+    currentPageNum = Math.min(Math.max(currentPageNum, 1), totalPages);
+
     updatePaginationButtons(totalPages);
+    renderCurrentPage(currentPageNum);
 }
 
 // 目前畫面實際會顯示的商品格數（需與 css/style.css 的 .product-grid 中斷點對應）
@@ -536,57 +527,70 @@ function getProductsPerPage() {
     }
 }
 
-// 渲染產品到指定頁面
-function renderProductsToPage(products, pageNumber) {
-    const productGrid = document.getElementById(`page-${pageNumber}`);
-    if (!productGrid) return;
-    
-    let productsHTML = '';
+// 產生單張商品卡片的 HTML
+function buildProductCardHTML(product) {
     window.__productDataCache = window.__productDataCache || {};
+    window.__productDataCache[product.id] = product;
 
-    products.forEach(product => {
-        window.__productDataCache[product.id] = product;
-        const tagHTML = product.tags?.length > 0 ? `<span class="product-tag">${escapeHtml(product.tags[0])}</span>` : '';
-        const stockText = product.stock > 0 ? `(庫存: ${product.stock} 份)` : '(無庫存)';
-        const stockClass = product.stock < 5 ? 'low-stock' : '';
+    const tagHTML = product.tags?.length > 0 ? `<span class="product-tag">${escapeHtml(product.tags[0])}</span>` : '';
+    const stockText = product.stock > 0 ? `(庫存: ${product.stock} 份)` : '(無庫存)';
+    const stockClass = product.stock < 5 ? 'low-stock' : '';
 
-        // 已下架的商品仍然顯示出來（讓顧客知道曾經有這項商品），
-        // 但用灰階＋標籤標示、加入購物車按鈕停用，並排到清單最後面（見 sortProducts）
-        const isAvailable = product.status === 'active';
-        const cardClass = isAvailable ? 'product-card' : 'product-card unavailable';
-        const unavailableBadge = isAvailable ? '' : '<span class="unavailable-badge">已下架</span>';
-        const addToCartDisabled = (!isAvailable || product.stock <= 0) ? 'disabled' : '';
+    // 已下架的商品仍然顯示出來（讓顧客知道曾經有這項商品），
+    // 但用灰階＋標籤標示、加入購物車按鈕停用，並排到清單最後面（見 sortProducts）
+    const isAvailable = product.status === 'active';
+    const cardClass = isAvailable ? 'product-card' : 'product-card unavailable';
+    const unavailableBadge = isAvailable ? '' : '<span class="unavailable-badge">已下架</span>';
+    const addToCartDisabled = (!isAvailable || product.stock <= 0) ? 'disabled' : '';
 
-        productsHTML += `
-            <div class="${cardClass}"
-                data-product-id="${product.id}"
-                data-product-name="${escapeHtml(product.name)}"
-                data-product-price="${product.price}"
-                data-product-stock="${product.stock}"
-                data-category="${product.category}">
-                <div class="product-image">
-                    ${tagHTML}
-                    ${unavailableBadge}
-                    <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
+    return `
+        <div class="${cardClass}"
+            data-product-id="${product.id}"
+            data-product-name="${escapeHtml(product.name)}"
+            data-product-price="${product.price}"
+            data-product-stock="${product.stock}"
+            data-category="${product.category}">
+            <div class="product-image">
+                ${tagHTML}
+                ${unavailableBadge}
+                <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
+            </div>
+            <div class="product-info">
+                <div class="product-content">
+                    <h3>${escapeHtml(product.name)}</h3>
+                    <p class="product-desc">${escapeHtml(product.description)}</p>
+                    <p class="product-detail-hint"><i class="fas fa-search"></i> 查看詳細介紹</p>
+                    <p class="product-price">$${product.price}/${product.unit}</p>
+                    <p class="stock-info ${stockClass}">${stockText}</p>
                 </div>
-                <div class="product-info">
-                    <div class="product-content">
-                        <h3>${escapeHtml(product.name)}</h3>
-                        <p class="product-desc">${escapeHtml(product.description)}</p>
-                        <p class="product-detail-hint"><i class="fas fa-search"></i> 查看詳細介紹</p>
-                        <p class="product-price">$${product.price}/${product.unit}</p>
-                        <p class="stock-info ${stockClass}">${stockText}</p>
-                    </div>
-                    <div class="product-actions">
-                        <button class="add-to-cart-btn" ${addToCartDisabled}>加入購物車</button>
-                        <button class="wish-btn"><i class="far fa-heart"></i></button>
-                    </div>
+                <div class="product-actions">
+                    <button class="add-to-cart-btn" ${addToCartDisabled}>加入購物車</button>
+                    <button class="wish-btn"><i class="far fa-heart"></i></button>
                 </div>
             </div>
-        `;
+        </div>
+    `;
+}
+
+// 把指定頁碼的商品渲染進唯一的商品格容器，並同步分頁按鈕的 active 狀態
+function renderCurrentPage(pageNum) {
+    const productGrid = document.getElementById('products-grid');
+    if (!productGrid) return;
+
+    currentPageNum = pageNum;
+    const pageProducts = paginatedPages[pageNum - 1] || [];
+
+    productGrid.innerHTML = pageProducts.length > 0
+        ? pageProducts.map(buildProductCardHTML).join('')
+        : '<div class="no-products">目前沒有可用的商品</div>';
+
+    document.querySelectorAll('.pagination-btn').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.page === String(pageNum));
     });
-    
-    productGrid.innerHTML = productsHTML;
+
+    initAddToCartButtons();
+    initWishlistButtons();
+    updateWishlistButtons();
 }
 
 // 初始化篩選功能
@@ -727,26 +731,26 @@ function performSearch(searchTerm) {
     updateWishlistButtons();
 }
 
-// 更新分頁按鈕
+// 更新分頁按鈕：依實際頁數全部產生，沒有頁數上限
 function updatePaginationButtons(totalPages) {
     const paginationContainer = document.querySelector('.pagination');
     if (!paginationContainer) return;
-    
+
     paginationContainer.innerHTML = '';
-    
-    for (let i = 1; i <= Math.min(totalPages, 3); i++) {
-        const activeClass = i === 1 ? 'active' : '';
+
+    for (let i = 1; i <= totalPages; i++) {
+        const activeClass = i === currentPageNum ? 'active' : '';
         paginationContainer.innerHTML += `
             <button class="pagination-btn ${activeClass}" data-page="${i}">${i}</button>
         `;
     }
-    
+
     if (totalPages > 1) {
         paginationContainer.innerHTML += `
             <button class="pagination-btn next" data-page="next">下一頁 <i class="fas fa-chevron-right"></i></button>
         `;
     }
-    
+
     // 重新綁定分頁按鈕事件
     const paginationBtns = document.querySelectorAll('.pagination-btn');
     paginationBtns.forEach(btn => {
@@ -756,7 +760,7 @@ function updatePaginationButtons(totalPages) {
 
 // 處理分頁按鈕點擊
 function handlePaginationClick() {
-    // 商品還在載入時，第 2、3 頁還是空的，先擋下避免使用者看到一片空白
+    // 商品還在載入時還沒有分頁資料，先擋下避免使用者看到一片空白
     // 誤以為沒有商品
     if (!productsLoaded) {
         if (typeof showToast === 'function') {
@@ -772,7 +776,7 @@ function handlePaginationClick() {
         const activePage = document.querySelector('.pagination-btn.active');
         const currentPage = parseInt(activePage.dataset.page);
         targetPage = currentPage + 1;
-        
+
         const maxPage = document.querySelectorAll('.pagination-btn:not(.next)').length;
         if (targetPage > maxPage) {
             targetPage = 1;
@@ -780,29 +784,19 @@ function handlePaginationClick() {
     } else {
         targetPage = parseInt(pageData);
     }
-    
+
     switchToPage(targetPage);
 }
 
 // 切換到指定頁面
 function switchToPage(pageNum) {
-    document.querySelectorAll('.product-grid').forEach(grid => {
-        grid.style.display = 'none';
-    });
-    
-    const targetGrid = document.getElementById(`page-${pageNum}`);
-    if (targetGrid) {
-        targetGrid.style.display = 'grid';
-    }
-    
-    document.querySelectorAll('.pagination-btn').forEach(btn => {
-        if (btn.dataset.page === String(pageNum)) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    
+    // 商品還沒載入完成時 paginatedPages 是空的，維持畫面目前顯示的載入指示，
+    // 不要用空內容把它蓋掉
+    if (!paginatedPages.length) return;
+
+    pageNum = Math.min(Math.max(pageNum, 1), paginatedPages.length);
+    renderCurrentPage(pageNum);
+
     const productsSection = document.querySelector('.products-display');
     productsSection.scrollIntoView({ behavior: 'smooth' });
 }
@@ -813,8 +807,6 @@ function initPagination() {
     paginationBtns.forEach(btn => {
         btn.addEventListener('click', handlePaginationClick);
     });
-    
-    switchToPage(1);
 }
 
 // 初始化收藏功能
