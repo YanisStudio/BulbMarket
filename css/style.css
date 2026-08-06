@@ -939,8 +939,10 @@ nav ul li a:hover::after {
 .add-to-cart-btn:hover {
     background-color: #4caf50;
     color: white;
-    transform: translateY(-0.1em); 
-    box-shadow: 0 0.2em 0.4em rgba(76, 175, 80, 0.3); 
+    /* 這顆按鈕本身不再額外位移：卡片整張已經有 hover 上浮效果了，
+       按鈕自己再疊加一次位移，滑鼠停在按鈕邊緣時視覺上的按鈕位置會跟著跳開，
+       導致滑鼠時而在按鈕內、時而在外，hover 狀態一直閃爍、按鈕跟著亂跳 */
+    box-shadow: 0 0.2em 0.4em rgba(76, 175, 80, 0.3);
 }
 
 .add-to-cart-btn:hover:before {
@@ -1093,7 +1095,7 @@ body.modal-open-noscroll {
 .product-detail-image img {
     width: 100%;
     height: 100%;
-    object-fit: cover;
+    object-fit: contain; /* 詳細介紹要看清楚完整商品照，不能像卡片縮圖一樣裁切掉邊緣 */
 }
 
 .product-detail-info {
