@@ -544,12 +544,24 @@
                                 <h4>匯款確認</h4>
                                 <form id="payment-confirm-form">
                                     <div class="form-group">
-                                        <label for="transfer-last-5-digits">轉帳末5碼</label>
-                                        <input type="text" id="transfer-last-5-digits" placeholder="請輸入轉帳末5碼" maxlength="5" pattern="[0-9]{5}" required>
+                                        <label for="transfer-remitter-name">匯款人姓名</label>
+                                        <input type="text" id="transfer-remitter-name" placeholder="請輸入匯款人姓名" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="transfer-bank">匯款銀行</label>
+                                        <input type="text" id="transfer-bank" placeholder="例：玉山銀行" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="transfer-amount-input">匯款金額</label>
+                                        <input type="number" id="transfer-amount-input" placeholder="請輸入實際匯款金額" min="1" required>
+                                    </div>
+                                    <div class="form-group">
+                                        <label for="transfer-last-5-digits">對帳後五碼</label>
+                                        <input type="text" id="transfer-last-5-digits" placeholder="請輸入匯款帳號後五碼" maxlength="5" pattern="[0-9]{5}" required>
                                         <div class="form-hint">例：如帳號為 01234567890，請輸入 67890</div>
                                     </div>
                                     <div class="form-group">
-                                        <label for="transfer-date">匯款日期</label>
+                                        <label for="transfer-date">匯款時間</label>
                                         <input type="date" id="transfer-date" required>
                                     </div>
                                     <div class="form-group">
@@ -919,6 +931,9 @@
                     e.preventDefault();
                     
                     // 獲取表單數據
+                    const remitterName = document.getElementById('transfer-remitter-name').value;
+                    const transferBank = document.getElementById('transfer-bank').value;
+                    const transferAmountInput = document.getElementById('transfer-amount-input').value;
                     const lastFiveDigits = document.getElementById('transfer-last-5-digits').value;
                     const transferDate = document.getElementById('transfer-date').value;
                     const transferNote = document.getElementById('transfer-note').value;
@@ -936,8 +951,11 @@
                         // 顯示確認信息摘要
                         const confirmedHTML = `
                             <div class="confirmed-info">
-                                <p><strong>匯款末5碼:</strong> ${lastFiveDigits}</p>
-                                <p><strong>匯款日期:</strong> ${transferDate}</p>
+                                <p><strong>匯款人姓名:</strong> ${escapeHtml(remitterName)}</p>
+                                <p><strong>匯款銀行:</strong> ${escapeHtml(transferBank)}</p>
+                                <p><strong>匯款金額:</strong> ${transferAmountInput}</p>
+                                <p><strong>對帳後五碼:</strong> ${lastFiveDigits}</p>
+                                <p><strong>匯款時間:</strong> ${transferDate}</p>
                                 ${transferNote ? `<p><strong>備註:</strong> ${escapeHtml(transferNote)}</p>` : ''}
                                 <p><strong>確認時間:</strong> ${new Date().toLocaleString()}</p>
                                 <p class="confirmation-thankyou">感謝您的匯款確認，我們將盡快處理您的訂單！</p>
@@ -958,6 +976,9 @@
                             // 創建匯款記錄對象
                             const transferRecord = {
                                 orderNumber: orderNumber,
+                                remitterName: remitterName,
+                                transferBank: transferBank,
+                                transferAmount: transferAmountInput,
                                 lastFiveDigits: lastFiveDigits,
                                 transferDate: transferDate,
                                 transferNote: transferNote,
@@ -978,7 +999,7 @@
                                 
                                 if (orderId && window.firebaseServices) {
                                     // 生成匯款備註訊息
-                                    const paymentNote = `【匯款確認】末5碼: ${lastFiveDigits}, 日期: ${transferDate}, 備註: ${transferNote || '無'}, 確認時間: ${new Date().toLocaleString()}`;
+                                    const paymentNote = `【匯款確認】匯款人姓名: ${remitterName}, 匯款銀行: ${transferBank}, 匯款金額: ${transferAmountInput}, 對帳後五碼: ${lastFiveDigits}, 匯款時間: ${transferDate}, 備註: ${transferNote || '無'}, 確認時間: ${new Date().toLocaleString()}`;
                                     
                                     // 獲取現有備註 (如果有)
                                     window.firebaseServices.getDoc(window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId))
