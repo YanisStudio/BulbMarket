@@ -704,6 +704,28 @@ nav ul li a:hover::after {
     z-index: 2;
 }
 
+/* 已下架商品：整張卡片降低透明度、圖片灰階，讓顧客知道曾經有這項商品，
+   但不會誤以為現在還能買。跟 .product-tag 分開放在左上角，避免兩個標籤疊在一起 */
+.product-card.unavailable {
+    opacity: 0.55;
+}
+
+.product-card.unavailable .product-image img {
+    filter: grayscale(70%);
+}
+
+.unavailable-badge {
+    position: absolute;
+    top: 0.625em;
+    left: 0.625em;
+    padding: 0.25em 0.625em;
+    background-color: rgba(0, 0, 0, 0.75);
+    color: #fff;
+    font-size: 0.75em;
+    border-radius: 0.25em;
+    z-index: 2;
+}
+
 /* 商品信息區域 - 全部靠左對齊版本 */
 .product-info {
     padding: 0.5em 0.5em 1.2em 1em; /* 左邊距調整為 0.8em，增加一些美觀的間距 */

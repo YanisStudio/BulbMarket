@@ -524,29 +524,33 @@ function handleWindowResize() {
 const FirebaseUtils = {
     /**
      * 載入商品數據
+     * @param {function} filterCallback 篩選回調函數
+     * @param {{includeInactive?: boolean}} options includeInactive 預設 false，
+     *        只有商品列表頁主動要求才會連下架商品一起抓回來，避免影響到
+     *        結帳驗證、首頁精選商品等其他呼叫這個函數的地方
      */
-    async loadProducts(filterCallback = null) {
+    async loadProducts(filterCallback = null, options = {}) {
         if (!CommonModule.firebase) {
             throw new Error('Firebase 服務未初始化');
         }
-        
+
         const db = CommonModule.firebase.db;
         const collection = CommonModule.firebase.collection;
         const getDocs = CommonModule.firebase.getDocs;
         const query = CommonModule.firebase.query;
         const where = CommonModule.firebase.where;
-        
-        const productsQuery = query(
-            collection(db, "products"),
-            where("status", "==", "active")
-        );
-        
+
+        const includeInactive = options.includeInactive === true;
+        const productsQuery = includeInactive
+            ? collection(db, "products")
+            : query(collection(db, "products"), where("status", "==", "active"));
+
         const productsSnapshot = await getDocs(productsQuery);
-        
+
         if (productsSnapshot.empty) {
             return [];
         }
-        
+
         const products = [];
         productsSnapshot.forEach(doc => {
             const data = doc.data();
@@ -560,15 +564,16 @@ const FirebaseUtils = {
                 imageUrl: data.imageUrl || '/images/placeholder.jpg',
                 tags: Array.isArray(data.tags) ? data.tags : [],
                 stock: data.stock || 0,
-                isFeaturedOffer: data.isFeaturedOffer || false
+                isFeaturedOffer: data.isFeaturedOffer || false,
+                status: data.status || 'inactive'
             };
-            
+
             // 如果有過濾回調函數，則使用它
             if (!filterCallback || filterCallback(product)) {
                 products.push(product);
             }
         });
-        
+
         return products;
     },
     

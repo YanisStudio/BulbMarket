@@ -405,8 +405,14 @@ async function loadProducts() {
         productGrid.innerHTML = '<div class="loading-indicator">載入商品中...</div>';
         
         // 使用 common.js 的 FirebaseUtils 載入產品
-        const products = await FirebaseUtils.loadProducts();
-        
+        // 連已下架的商品也一起抓回來（includeInactive），下架商品會用
+        // 灰階＋標籤顯示、按鈕不能按，讓顧客知道曾經有這項商品，而不是
+        // 直接整個消失。sortProducts() 會確保下架商品永遠排在最後面。
+        const products = sortProducts(
+            await FirebaseUtils.loadProducts(null, { includeInactive: true }),
+            currentFilters.sort
+        );
+
         if (products.length === 0) {
             productGrid.innerHTML = '<div class="no-products">目前沒有可用的商品</div>';
             // HTML 裡的「1 2 3 下一頁」是寫死的預設樣板，平常靠 updatePaginationButtons()
@@ -415,7 +421,7 @@ async function loadProducts() {
             if (paginationContainer) paginationContainer.innerHTML = '';
             return;
         }
-        
+
         currentProducts = products;
         console.log(`成功載入 ${products.length} 個商品`);
         
@@ -498,8 +504,15 @@ function renderProductsToPage(products, pageNumber) {
         const stockText = product.stock > 0 ? `(庫存: ${product.stock} 份)` : '(無庫存)';
         const stockClass = product.stock < 5 ? 'low-stock' : '';
 
+        // 已下架的商品仍然顯示出來（讓顧客知道曾經有這項商品），
+        // 但用灰階＋標籤標示、加入購物車按鈕停用，並排到清單最後面（見 sortProducts）
+        const isAvailable = product.status === 'active';
+        const cardClass = isAvailable ? 'product-card' : 'product-card unavailable';
+        const unavailableBadge = isAvailable ? '' : '<span class="unavailable-badge">已下架</span>';
+        const addToCartDisabled = (!isAvailable || product.stock <= 0) ? 'disabled' : '';
+
         productsHTML += `
-            <div class="product-card"
+            <div class="${cardClass}"
                 data-product-id="${product.id}"
                 data-product-name="${escapeHtml(product.name)}"
                 data-product-price="${product.price}"
@@ -507,6 +520,7 @@ function renderProductsToPage(products, pageNumber) {
                 data-category="${product.category}">
                 <div class="product-image">
                     ${tagHTML}
+                    ${unavailableBadge}
                     <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
                 </div>
                 <div class="product-info">
@@ -517,7 +531,7 @@ function renderProductsToPage(products, pageNumber) {
                         <p class="stock-info ${stockClass}">${stockText}</p>
                     </div>
                     <div class="product-actions">
-                        <button class="add-to-cart-btn" ${product.stock <= 0 ? 'disabled' : ''}>加入購物車</button>
+                        <button class="add-to-cart-btn" ${addToCartDisabled}>加入購物車</button>
                         <button class="wish-btn"><i class="far fa-heart"></i></button>
                     </div>
                 </div>
@@ -586,14 +600,21 @@ function filterByPrice(products, priceRange) {
 function sortProducts(products, sortType) {
     switch(sortType) {
         case 'price-low':
-            return products.sort((a, b) => a.price - b.price);
+            products.sort((a, b) => a.price - b.price);
+            break;
         case 'price-high':
-            return products.sort((a, b) => b.price - a.price);
+            products.sort((a, b) => b.price - a.price);
+            break;
         case 'name':
-            return products.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'));
-        default:
-            return products;
+            products.sort((a, b) => a.name.localeCompare(b.name, 'zh-TW'));
+            break;
     }
+
+    // 已下架商品一律排到最後面，不管選哪種排序方式；
+    // Array.sort 是穩定排序，這裡只比較上架狀態，同一組內原本的順序不會被打亂
+    products.sort((a, b) => (a.status === 'active' ? 0 : 1) - (b.status === 'active' ? 0 : 1));
+
+    return products;
 }
 
 // 更新區段標題
