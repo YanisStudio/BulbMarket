@@ -870,6 +870,10 @@
             // 獲取購物車數據
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
+            // 會員資料裡存的住家地址，只在「宅配到府」模式下才會填進 address 欄位；
+            // 「7-11取貨」模式下 address 欄位是門市名稱，跟住家地址無關
+            let profileHomeAddress = '';
+
             // 送出訂單時，用這份「向 Firestore 驗證過」的商品明細（id/name/price）
             // 取代購物車裡使用者端可任意竄改的資料，由 validateCartStock() 填入
             let verifiedCartItems = null;
@@ -1067,7 +1071,14 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                             document.getElementById('name').value = userData.name || '';
                             document.getElementById('phone').value = userData.phone || '';
                             if (twDistrictSelect) twDistrictSelect.setValue(userData.city, userData.district);
-                            document.getElementById('address').value = userData.address || '';
+
+                            // address 欄位在「7-11取貨」模式下代表門市名稱，跟會員的住家
+                            // 地址無關，只有目前選的是「宅配到府」時才把住家地址填進去
+                            profileHomeAddress = userData.address || '';
+                            const currentShippingMethod = document.querySelector('input[name="shipping"]:checked')?.value;
+                            if (currentShippingMethod === 'home') {
+                                document.getElementById('address').value = profileHomeAddress;
+                            }
                         } else {
                             // 使用默認值
                             document.getElementById('name').value = user.email.split('@')[0];
@@ -1167,27 +1178,39 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                     // 7-11取貨模式
                     addressLabel.innerHTML = '7-11門市名稱 <span class="required">*</span>';
                     addressField.placeholder = '例：台北車站門市';
-                    
+
                     // 隱藏縣市和鄉鎮市區欄位
                     cityGroup.style.display = 'none';
                     districtGroup.style.display = 'none';
-                    
+
                     // 清空非必要欄位的 required 屬性
                     cityField.removeAttribute('required');
                     districtField.removeAttribute('required');
-                    
+
+                    // 如果欄位裡目前是「宅配到府」模式自動填入的住家地址，
+                    // 切回 7-11 取貨時要清掉，不然會被誤當成門市名稱送出
+                    if (profileHomeAddress && addressField.value === profileHomeAddress) {
+                        addressField.value = '';
+                    }
+
                 } else {
                     // 宅配到府模式
                     addressLabel.innerHTML = '詳細地址 <span class="required">*</span>';
                     addressField.placeholder = '例：中山路123號';
-                    
+
                     // 顯示縣市和鄉鎮市區欄位
                     cityGroup.style.display = 'block';
                     districtGroup.style.display = 'block';
-                    
+
                     // 恢復必要欄位的 required 屬性
                     cityField.setAttribute('required', '');
                     districtField.setAttribute('required', '');
+
+                    // 欄位目前是空的（例如剛從 7-11 取貨模式切過來）才補上會員的住家地址，
+                    // 避免蓋掉使用者已經手動輸入的內容
+                    if (!addressField.value && profileHomeAddress) {
+                        addressField.value = profileHomeAddress;
+                    }
                 }
             }
             
