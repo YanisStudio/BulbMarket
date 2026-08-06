@@ -406,6 +406,13 @@ async function loadBulletin() {
     const container = document.getElementById('bulletin-content');
     if (!container) return;
 
+    // 兩則公告都關閉（或從沒設定過）的話，整個「最新公告」區塊
+    // （包含標題）都不顯示，不佔版面；不是顯示「目前沒有最新公告」的空狀態
+    const section = container.closest('section.bulletin-board');
+    const hideSection = function() {
+        if (section) section.style.display = 'none';
+    };
+
     try {
         const db = window.firebaseServices.db;
         const doc = window.firebaseServices.doc;
@@ -415,34 +422,47 @@ async function loadBulletin() {
         const bulletinSnap = await getDoc(bulletinRef);
 
         if (!bulletinSnap.exists()) {
-            container.innerHTML = '<div class="bulletin-empty">目前沒有最新公告</div>';
+            hideSection();
             return;
         }
 
         const data = bulletinSnap.data();
-        const text = (data.text || '').trim();
-        const imageUrl = data.imageUrl || '';
+        let items = Array.isArray(data.items) ? data.items : [];
 
-        if (!text && !imageUrl) {
-            container.innerHTML = '<div class="bulletin-empty">目前沒有最新公告</div>';
+        // 相容舊格式：沒有 items 陣列但有舊的 text/imageUrl 欄位，就當成一則公告
+        if (items.length === 0 && (data.text || data.imageUrl)) {
+            items = [{ text: data.text || '', imageUrl: data.imageUrl || '' }];
+        }
+
+        items = items
+            .map(item => ({ text: (item.text || '').trim(), imageUrl: item.imageUrl || '' }))
+            .filter(item => item.text || item.imageUrl)
+            .slice(0, 2);
+
+        if (items.length === 0) {
+            hideSection();
             return;
         }
 
-        const textHTML = text ? `<div class="bulletin-text">${escapeHtml(text)}</div>` : '';
-        const imageHTML = imageUrl ? `<div class="bulletin-image"><img src="${imageUrl}" alt="公告圖片"></div>` : '';
-
-        container.innerHTML = `
-            <div class="bulletin-card">
-                <div class="bulletin-body">
-                    <i class="fas fa-bullhorn bulletin-icon"></i>
-                    ${textHTML}
+        const cardsHTML = items.map(item => {
+            const textHTML = item.text ? `<div class="bulletin-text">${escapeHtml(item.text)}</div>` : '';
+            const imageHTML = item.imageUrl ? `<div class="bulletin-image"><img src="${item.imageUrl}" alt="公告圖片"></div>` : '';
+            return `
+                <div class="bulletin-card">
+                    <div class="bulletin-body">
+                        <i class="fas fa-bullhorn bulletin-icon"></i>
+                        ${textHTML}
+                    </div>
+                    ${imageHTML}
                 </div>
-                ${imageHTML}
-            </div>
-        `;
+            `;
+        }).join('');
+
+        const gridClass = items.length === 2 ? 'bulletin-grid bulletin-grid-2' : 'bulletin-grid';
+        container.innerHTML = `<div class="${gridClass}">${cardsHTML}</div>`;
     } catch (error) {
         console.error('載入公告失敗:', error);
-        container.innerHTML = '<div class="bulletin-empty">目前沒有最新公告</div>';
+        hideSection();
     }
 }
 

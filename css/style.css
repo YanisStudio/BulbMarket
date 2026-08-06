@@ -478,16 +478,27 @@ nav ul li a:hover::after {
     text-shadow: 0 0.1em 0.2em rgba(0, 0, 0, 0.5);
 }
 
-/* 布告欄 */
+/* 布告欄：1 則置中單卡，2 則並排格線，手機一律單欄 */
 .bulletin-board {
     padding: 3.75em 0;
     background-color: #fff;
     margin-bottom: 3.75em;
 }
 
-.bulletin-card {
+.bulletin-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 1.75em;
     max-width: 45em;
     margin: 0 auto;
+}
+
+.bulletin-grid.bulletin-grid-2 {
+    max-width: 67.5em;
+    grid-template-columns: 1fr 1fr;
+}
+
+.bulletin-card {
     background: #fff;
     border-radius: 1em;
     box-shadow: 0 0.625em 2.1875em rgba(0, 0, 0, 0.08);
@@ -519,9 +530,9 @@ nav ul li a:hover::after {
 }
 
 .bulletin-card .bulletin-image img {
+    /* 不裁切，依原始比例縮放，避免把公告圖片重要內容切掉 */
     width: 100%;
-    max-height: 26.25em;
-    object-fit: cover;
+    height: auto;
     display: block;
 }
 
@@ -2304,6 +2315,10 @@ footer {
     
     .section-title {
         font-size: 1.8em;
+    }
+
+    .bulletin-grid.bulletin-grid-2 {
+        grid-template-columns: 1fr;
     }
 
     .bulletin-card .bulletin-body {
