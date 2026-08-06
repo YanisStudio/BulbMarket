@@ -1034,10 +1034,11 @@
                                                 const existingNotes = orderData.notes || '';
                                                 const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
                                                 
-                                                // 更新訂單備註
+                                                // 更新訂單備註，並標記已完成匯款確認
+                                                // （不然訂單記錄那邊會一直顯示「未付款」，即使客戶已經填過這裡的表單）
                                                 return window.firebaseServices.updateDoc(
                                                     window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId),
-                                                    { notes: updatedNotes }
+                                                    { notes: updatedNotes, paymentConfirmed: true }
                                                 );
                                             } else {
                                                 console.error('找不到訂單文檔:', orderId);
