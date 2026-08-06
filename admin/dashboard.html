@@ -27,19 +27,18 @@
           getFirestore,
           collection,
           getDocs,
-          getCountFromServer,
           query,
           orderBy,
           where,
           limit
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
-      
+
         const firebaseConfig = window.FIREBASE_CONFIG;
-        
+
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        
+
         window.firebaseServices = {
           auth: auth,
           db: db,
@@ -47,7 +46,6 @@
           onAuthStateChanged,
           collection,
           getDocs,
-          getCountFromServer,
           query,
           orderBy,
           where,
@@ -321,28 +319,30 @@
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
                 const query = window.firebaseServices.query;
-                const getCountFromServer = window.firebaseServices.getCountFromServer;
+                const getDocs = window.firebaseServices.getDocs;
                 const where = window.firebaseServices.where;
 
-                // 原本 4 個統計數字都是把整個 collection 抓下來只為了讀 .size，
-                // 訂單/會員/商品一多，每次打開後台首頁都要下載整個資料庫。
-                // 改用 getCountFromServer 做純計數查詢，不下載文件內容，四個一起平行查
+                // 用 getDocs() 抓文件再用 .size 算數量，四個一起平行查。
+                // 原本改用過 getCountFromServer 做純計數查詢想省流量，但聚合查詢在
+                // Firestore 安全規則以 resource.data 判斷讀取權限時會被直接拒絕
+                // （聚合查詢不會真的抓文件內容，規則沒東西可以判斷），導致這四個
+                // 數字全部卡在 "--"。改回 getDocs() 保證不受這個限制影響。
                 const [
-                    pendingOrdersCount,
-                    completedOrdersCount,
-                    usersCount,
-                    productsCount
+                    pendingOrdersSnap,
+                    completedOrdersSnap,
+                    usersSnap,
+                    productsSnap
                 ] = await Promise.all([
-                    getCountFromServer(query(collection(db, "orders"), where("status", "==", "pending"))),
-                    getCountFromServer(query(collection(db, "orders"), where("status", "==", "completed"))),
-                    getCountFromServer(collection(db, "users")),
-                    getCountFromServer(collection(db, "products"))
+                    getDocs(query(collection(db, "orders"), where("status", "==", "pending"))),
+                    getDocs(query(collection(db, "orders"), where("status", "==", "completed"))),
+                    getDocs(collection(db, "users")),
+                    getDocs(collection(db, "products"))
                 ]);
 
-                document.getElementById('pending-orders').textContent = pendingOrdersCount.data().count;
-                document.getElementById('completed-orders').textContent = completedOrdersCount.data().count;
-                document.getElementById('total-users').textContent = usersCount.data().count;
-                document.getElementById('total-products').textContent = productsCount.data().count;
+                document.getElementById('pending-orders').textContent = pendingOrdersSnap.size;
+                document.getElementById('completed-orders').textContent = completedOrdersSnap.size;
+                document.getElementById('total-users').textContent = usersSnap.size;
+                document.getElementById('total-products').textContent = productsSnap.size;
 
             } catch (error) {
                 console.error("獲取統計數據失敗:", error);
