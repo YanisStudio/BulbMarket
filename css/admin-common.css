@@ -186,6 +186,26 @@
 }
 
 /* ===== 導航相關樣式 ===== */
+
+/* 後台導覽列項目比前台多（管理首頁、訂單管理、商品管理、會員管理、
+   訊息管理、運費設定、布告欄管理...），桌面版寬度不夠時，style.css
+   共用的 nav ul（不換行、允許整個 nav 縮到 min-width:0）會讓文字被
+   硬擠到單一項目內部斷行，很難看。只在後台生效：允許整排換到第二行，
+   不要讓字硬擠斷行 */
+@media (min-width: 769px) {
+    #main-nav ul {
+        flex-wrap: wrap;
+        row-gap: 0.4em;
+    }
+    #main-nav ul li {
+        margin: 0.2em 0.6em;
+    }
+    #main-nav ul li a {
+        font-size: 1em;
+        white-space: nowrap;
+    }
+}
+
 .menu-toggle {
     display: none;
     background: none;
