@@ -620,6 +620,14 @@
                                             <span class="radio-desc">請於訂單成立後24小時內完成付款</span>
                                         </div>
                                     </label>
+                                    <label class="radio-label">
+                                        <input type="radio" name="payment" value="transfer_later">
+                                        <span class="custom-radio"></span>
+                                        <div class="radio-info">
+                                            <span class="radio-title">稍後轉帳</span>
+                                            <span class="radio-desc">先成立訂單，之後登入會員中心的「訂單記錄」完成匯款（可與其他未付款訂單合併一起匯款），需要先登入會員才能使用</span>
+                                        </div>
+                                    </label>
                                 </div>
                             </div>
                             
@@ -1565,7 +1573,18 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                     showToast('請填寫所有必填欄位');
                     return;
                 }
-                
+
+                // 「稍後轉帳」需要先登入，之後才能在訂單記錄裡找到、合併付款；
+                // 訪客結帳的訂單沒有 userId，訂單記錄查不到，會變成孤兒訂單
+                const selectedPayment = document.querySelector('input[name="payment"]:checked').value;
+                if (selectedPayment === 'transfer_later' && !firebaseServices.auth.currentUser) {
+                    showToast('「稍後轉帳」需要先登入會員才能使用，請先登入');
+                    if (typeof window.showLoginModal === 'function') {
+                        window.showLoginModal();
+                    }
+                    return;
+                }
+
                 // 禁用提交按鈕，防止重複提交
                 if (submitOrderBtn) {
                     submitOrderBtn.disabled = true;
@@ -1659,7 +1678,10 @@ if (shipping === 'store') {
                         notes: notes,
                         orderDate: firebaseServices.serverTimestamp(),
                         status: 'pending',
-                        orderNumber: orderNumber
+                        orderNumber: orderNumber,
+                        // 是否已經完成匯款確認（不論是 ATM 轉帳當下填、還是稍後轉帳合併付款），
+                        // 訂單記錄頁面靠這個欄位判斷要不要顯示「未付款」標記、能不能勾選去合併付款
+                        paymentConfirmed: false
                     };
                     
                     // 如果用戶已登入，記錄用戶ID
@@ -1715,7 +1737,7 @@ if (shipping === 'store') {
                     
                     // 3秒後跳轉到成功頁面
                     setTimeout(() => {
-                        window.location.href = '/order-success.html';
+                        window.location.href = '/order-success.html?payment=' + encodeURIComponent(payment);
                     }, 3000);
                     
                 } catch (error) {

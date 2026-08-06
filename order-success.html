@@ -573,8 +573,17 @@
                                 <div id="transfer-confirmation-message" style="display: none;"></div>
                             </div>
                         </div>
+
+                        <!-- 稍後轉帳：訂單先成立，付款留到會員中心的訂單記錄再處理 -->
+                        <div id="transfer-later-notice" style="display: none;">
+                            <p>訂單已經成立，<strong>還不用現在付款</strong>。請登入會員中心，到「訂單記錄」找到這筆訂單完成匯款確認（也可以跟其他未付款的訂單一起合併匯款）。</p>
+                            <div id="transfer-later-login-warning" class="important-note" style="display: none;">
+                                <p>您目前<strong>尚未登入</strong>，這筆訂單將無法在訂單記錄裡查到、也無法完成付款確認，請盡快登入或註冊會員（使用結帳時填寫的姓名或電話核對），避免無法對帳。</p>
+                            </div>
+                            <a href="/orders.html" class="btn btn-primary">前往訂單記錄付款</a>
+                        </div>
                     </div>
-                    
+
                     <div class="shipping-info">
                         <h3>配送資訊</h3>
                         <p>我們會在確認您的付款後，於 1-3 個工作天內安排出貨。</p>
@@ -827,7 +836,8 @@
             // 檢查用戶是否已登入，並更新帳戶關聯提示
             function checkLoginStatus() {
                 const accountReminderContent = document.getElementById('account-reminder-content');
-                
+                const transferLaterLoginWarning = document.getElementById('transfer-later-login-warning');
+
                 if (window.firebaseServices && window.firebaseServices.auth) {
                     window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, function(user) {
                         if (user) {
@@ -835,12 +845,18 @@
                             accountReminderContent.innerHTML = `
                                 <p>您可以在<a href="/orders.html">訂單記錄</a>頁面隨時查看此訂單的處理進度。</p>
                             `;
+                            if (transferLaterLoginWarning) transferLaterLoginWarning.style.display = 'none';
                         } else {
                             // 用戶未登入
                             accountReminderContent.innerHTML = `
                                 <p>建議您<a href="#" id="remind-login-btn">登入會員帳戶</a>以便追蹤訂單進度。</p>
                             `;
-                            
+
+                            // 選了「稍後轉帳」但沒登入，訂單記錄查不到這筆訂單，要特別強調
+                            if (paymentMethod === 'transfer_later' && transferLaterLoginWarning) {
+                                transferLaterLoginWarning.style.display = 'block';
+                            }
+
                             // 添加提醒登入按鈕事件
                             setTimeout(() => {
                                 const remindLoginBtn = document.getElementById('remind-login-btn');
@@ -894,17 +910,25 @@
             isTransferPayment = (paymentMethod === 'transfer');
             
             // 更新付款方式信息
-            const paymentMethodText = paymentMethod === 'credit' ? '信用卡' : 'ATM轉帳';
+            const paymentMethodText = paymentMethod === 'credit' ? '信用卡'
+                : paymentMethod === 'transfer_later' ? '稍後轉帳'
+                : 'ATM轉帳';
             document.getElementById('payment-method').textContent = paymentMethodText;
 
-            // 如果是轉帳，顯示轉帳信息和金額
+            // 如果是ATM轉帳，顯示轉帳信息、金額跟現在就填的匯款確認表單
             if (paymentMethod === 'transfer') {
                 document.getElementById('transfer-notice').style.display = 'block';
-                
+
                 const transferAmountElement = document.getElementById('transfer-amount');
                 if (transferAmountElement && lastOrder.total) {
                     transferAmountElement.textContent = `${lastOrder.total}`;
                 }
+            }
+
+            // 如果是稍後轉帳，訂單先成立就好，付款留到訂單記錄頁面再處理，
+            // 沒登入的話要特別提醒（訪客訂單沒有 userId，之後在訂單記錄裡找不到）
+            if (paymentMethod === 'transfer_later') {
+                document.getElementById('transfer-later-notice').style.display = 'block';
             }
             
             // 顯示歡迎訊息

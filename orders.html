@@ -197,6 +197,77 @@
     color: #666;
 }
 
+/* 未付款標記、勾選合併匯款 */
+.order-header-badges {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.unpaid-badge {
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-size: 0.8em;
+    font-weight: bold;
+    background-color: #FFEBEE;
+    color: #C62828;
+}
+
+.order-select-wrap {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+.order-select-checkbox {
+    margin-top: 4px;
+    width: auto;
+    flex-shrink: 0;
+}
+
+.order-select-body {
+    flex: 1;
+    min-width: 0;
+}
+
+/* 合併匯款 */
+.merge-payment-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    background-color: #f1f8e9;
+    border: 1px solid #c8e6c9;
+    border-radius: 8px;
+    padding: 12px 20px;
+    margin-bottom: 20px;
+}
+
+.transfer-confirmation {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 24px;
+    margin-bottom: 20px;
+}
+
+.transfer-confirmation h4 {
+    margin-top: 0;
+}
+
+.transfer-confirmation .form-hint {
+    font-size: 0.85em;
+    color: #888;
+    margin-top: 4px;
+}
+
+.transfer-confirmation .form-actions {
+    display: flex;
+    gap: 10px;
+    padding-top: 8px;
+}
+
 .order-total {
     font-weight: bold;
     color: #333;
@@ -519,18 +590,19 @@
             PhoneAuthProvider,
             signInWithCredential
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
-            doc, 
-            setDoc, 
+        import {
+            getFirestore,
+            collection,
+            doc,
+            setDoc,
             getDoc,
             getDocs,
             updateDoc,
+            writeBatch,
             query,
             orderBy,
             where,
-            serverTimestamp 
+            serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
         
         // Firebase配置 - 統一使用與其他頁面相同的配置
@@ -552,6 +624,7 @@
             setDoc,
             getDoc,
             updateDoc,
+            writeBatch,
             collection,
             getDocs,
             query,
@@ -706,13 +779,56 @@
                     </div>
                     
                     <div class="orders-main">
+                        <!-- 合併匯款：勾選未付款的訂單後出現 -->
+                        <div class="merge-payment-bar" id="merge-payment-bar" style="display: none;">
+                            <span>已選 <strong id="merge-selected-count">0</strong> 筆訂單，共 $<strong id="merge-selected-total">0</strong></span>
+                            <button type="button" class="btn btn-primary" id="open-merge-payment-btn">確認匯款</button>
+                        </div>
+
+                        <div class="transfer-confirmation" id="merge-payment-form-wrap" style="display: none;">
+                            <h4>合併匯款確認</h4>
+                            <p class="form-hint">本次會為已選的 <strong id="merge-form-count">0</strong> 筆訂單一起登記匯款資訊</p>
+                            <form id="merge-payment-form">
+                                <div class="form-group">
+                                    <label for="merge-remitter-name">匯款人姓名</label>
+                                    <input type="text" id="merge-remitter-name" placeholder="請輸入匯款人姓名" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="merge-bank">匯款銀行</label>
+                                    <input type="text" id="merge-bank" placeholder="例：玉山銀行" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="merge-amount">匯款金額</label>
+                                    <input type="number" id="merge-amount" min="1" required>
+                                    <div class="form-hint">已依勾選訂單自動加總，若實際匯款金額不同請自行修改</div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="merge-last-5-digits">對帳後五碼</label>
+                                    <input type="text" id="merge-last-5-digits" placeholder="請輸入匯款帳號後五碼" maxlength="5" pattern="[0-9]{5}" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="merge-date">匯款時間</label>
+                                    <input type="date" id="merge-date" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="merge-note">備註（選填）</label>
+                                    <textarea id="merge-note" placeholder="其他匯款相關資訊"></textarea>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="submit" class="btn btn-primary" id="merge-payment-submit-btn">確認提交</button>
+                                    <button type="button" class="btn btn-outline" id="merge-payment-cancel-btn">取消</button>
+                                </div>
+                            </form>
+                            <div id="merge-payment-message" style="display: none;"></div>
+                        </div>
+
                         <div class="orders-main-content">
                             <div class="order-list" id="order-list">
                                 <div class="loading">
                                     <p>載入訂單中...</p>
                                 </div>
                             </div>
-                            
+
                             <div class="order-detail" id="order-detail">
                                 <div class="no-order-selected">
                                     <div class="no-order-selected">
@@ -1029,45 +1145,69 @@ async function loadUserOrders(user) {
             }
             
             const { statusText, statusClass } = getOrderStatusInfo(order.status);
-            
+
+            // 待處理、還沒完成匯款確認的訂單才顯示「未付款」標記、可以勾選去合併匯款
+            const isUnpaid = order.status === 'pending' && order.paymentConfirmed !== true;
+            const unpaidBadgeHTML = isUnpaid ? '<span class="unpaid-badge">未付款</span>' : '';
+            const checkboxHTML = isUnpaid
+                ? `<input type="checkbox" class="order-select-checkbox" data-id="${order.id}" data-total="${order.total || 0}">`
+                : '';
+
             ordersHTML += `
                 <div class="order-item" data-id="${order.id}">
-                    <div class="order-header">
-                        <span class="order-number">${escapeHtml(order.orderNumber) || '未知訂單'}</span>
-                        <span class="order-status ${statusClass}">${statusText}</span>
-                    </div>
-                    <div class="order-info">
-                        <p>收件人: ${escapeHtml(order.customer?.name) || '未知'}</p>
-                        <p>商品數量: ${order.items?.length || 0} 件</p>
-                        <p class="order-total">總金額: ${order.total || 0}</p>
-                        <p class="order-date">${orderDate}</p>
+                    <div class="order-select-wrap">
+                        ${checkboxHTML}
+                        <div class="order-select-body">
+                            <div class="order-header">
+                                <span class="order-number">${escapeHtml(order.orderNumber) || '未知訂單'}</span>
+                                <div class="order-header-badges">
+                                    ${unpaidBadgeHTML}
+                                    <span class="order-status ${statusClass}">${statusText}</span>
+                                </div>
+                            </div>
+                            <div class="order-info">
+                                <p>收件人: ${escapeHtml(order.customer?.name) || '未知'}</p>
+                                <p>商品數量: ${order.items?.length || 0} 件</p>
+                                <p class="order-total">總金額: ${order.total || 0}</p>
+                                <p class="order-date">${orderDate}</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
             `;
         });
-        
+
         orderListContainer.innerHTML = ordersHTML;
-        
-        // 添加點擊事件
+
+        // 添加點擊事件（勾選框自己有 stopPropagation，不會誤觸這裡）
         const orderItems = document.querySelectorAll('.order-item');
         orderItems.forEach(item => {
             item.addEventListener('click', function() {
                 orderItems.forEach(orderItem => {
                     orderItem.classList.remove('active');
                 });
-                
+
                 this.classList.add('active');
-                
+
                 const orderId = this.getAttribute('data-id');
                 showOrderDetail(orderId);
             });
         });
-        
+
+        // 合併匯款勾選框
+        document.querySelectorAll('.order-select-checkbox').forEach(cb => {
+            cb.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+            cb.addEventListener('change', updateMergePaymentBar);
+        });
+        updateMergePaymentBar();
+
         // 預設選中第一個訂單
         if (orderItems.length > 0) {
             orderItems[0].click();
         }
-        
+
     } catch (error) {
         console.error('獲取訂單時出錯:', error);
         orderListContainer.innerHTML = `
@@ -1077,6 +1217,141 @@ async function loadUserOrders(user) {
             </div>`;
     }
 }
+
+// ===== 合併匯款 =====
+
+// 更新「已選 N 筆，共 $X」提示列；沒有勾選任何一筆就整個收起來（含表單）
+function updateMergePaymentBar() {
+    const checked = document.querySelectorAll('.order-select-checkbox:checked');
+    const bar = document.getElementById('merge-payment-bar');
+    if (!bar) return;
+
+    if (checked.length === 0) {
+        bar.style.display = 'none';
+        const formWrap = document.getElementById('merge-payment-form-wrap');
+        if (formWrap) formWrap.style.display = 'none';
+        return;
+    }
+
+    let total = 0;
+    checked.forEach(cb => { total += parseFloat(cb.dataset.total) || 0; });
+
+    document.getElementById('merge-selected-count').textContent = checked.length;
+    document.getElementById('merge-selected-total').textContent = total;
+    bar.style.display = 'flex';
+}
+
+// 打開合併匯款表單：金額自動加總所選訂單，日期預設今天
+function openMergePaymentForm() {
+    const checked = document.querySelectorAll('.order-select-checkbox:checked');
+    if (checked.length === 0) return;
+
+    let total = 0;
+    checked.forEach(cb => { total += parseFloat(cb.dataset.total) || 0; });
+
+    document.getElementById('merge-form-count').textContent = checked.length;
+    document.getElementById('merge-amount').value = total;
+
+    const dateInput = document.getElementById('merge-date');
+    const today = new Date().toISOString().split('T')[0];
+    dateInput.value = today;
+    dateInput.max = today;
+
+    const formWrap = document.getElementById('merge-payment-form-wrap');
+    const messageEl = document.getElementById('merge-payment-message');
+    const form = document.getElementById('merge-payment-form');
+    if (messageEl) messageEl.style.display = 'none';
+    if (form) form.style.display = 'block';
+    formWrap.style.display = 'block';
+    formWrap.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// 送出合併匯款：幫所有勾選的訂單一起寫入同一則匯款備註、標記為已付款
+async function submitMergePayment(e) {
+    e.preventDefault();
+
+    const checked = Array.from(document.querySelectorAll('.order-select-checkbox:checked'));
+    if (checked.length === 0) {
+        alert('請至少勾選一筆訂單');
+        return;
+    }
+
+    const remitterName = document.getElementById('merge-remitter-name').value;
+    const transferBank = document.getElementById('merge-bank').value;
+    const transferAmount = document.getElementById('merge-amount').value;
+    const lastFiveDigits = document.getElementById('merge-last-5-digits').value;
+    const transferDate = document.getElementById('merge-date').value;
+    const transferNote = document.getElementById('merge-note').value;
+
+    const orderIds = checked.map(cb => cb.dataset.id);
+    const orderNumbers = checked
+        .map(cb => {
+            const numberEl = cb.closest('.order-item')?.querySelector('.order-number');
+            return numberEl ? numberEl.textContent : '';
+        })
+        .filter(Boolean);
+
+    const submitBtn = document.getElementById('merge-payment-submit-btn');
+    const originalBtnText = submitBtn.textContent;
+    submitBtn.disabled = true;
+    submitBtn.textContent = '送出中...';
+
+    try {
+        const db = window.firebaseServices.db;
+        const doc = window.firebaseServices.doc;
+        const getDoc = window.firebaseServices.getDoc;
+        const writeBatch = window.firebaseServices.writeBatch;
+
+        const paymentNote = `【合併匯款確認】匯款人姓名: ${remitterName}, 匯款銀行: ${transferBank}, 匯款金額: ${transferAmount}, 對帳後五碼: ${lastFiveDigits}, 匯款時間: ${transferDate}, 合併訂單: ${orderNumbers.join('、') || '無'}, 備註: ${transferNote || '無'}, 確認時間: ${new Date().toLocaleString()}`;
+
+        // notes 是既有欄位內容的接續，要先個別讀出來才能算出新的完整文字，
+        // 寫入的部分再用 batch 一次送出、確保這幾筆訂單一起成功或一起失敗
+        const batch = writeBatch(db);
+        for (const orderId of orderIds) {
+            const orderRef = doc(db, 'orders', orderId);
+            const orderSnap = await getDoc(orderRef);
+            const existingNotes = orderSnap.exists() ? (orderSnap.data().notes || '') : '';
+            const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
+            batch.update(orderRef, {
+                notes: updatedNotes,
+                paymentConfirmed: true
+            });
+        }
+        await batch.commit();
+
+        const messageEl = document.getElementById('merge-payment-message');
+        messageEl.innerHTML = `<p style="color:#2e7d32;"><i class="fas fa-check-circle"></i> 已為 ${orderIds.length} 筆訂單登記匯款資訊，我們將盡快為您確認付款。</p>`;
+        messageEl.style.display = 'block';
+        document.getElementById('merge-payment-form').style.display = 'none';
+
+        // 重新載入訂單列表，已付款的訂單就不會再顯示未付款標記、也不能再勾選
+        const currentUser = window.firebaseServices.auth.currentUser;
+        if (currentUser) {
+            setTimeout(() => loadUserOrders(currentUser), 1500);
+        }
+    } catch (error) {
+        console.error('送出合併匯款失敗:', error);
+        alert('送出失敗，請稍後再試：' + error.message);
+    } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = originalBtnText;
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    const openBtn = document.getElementById('open-merge-payment-btn');
+    if (openBtn) openBtn.addEventListener('click', openMergePaymentForm);
+
+    const cancelBtn = document.getElementById('merge-payment-cancel-btn');
+    if (cancelBtn) {
+        cancelBtn.addEventListener('click', function() {
+            document.getElementById('merge-payment-form-wrap').style.display = 'none';
+        });
+    }
+
+    const mergeForm = document.getElementById('merge-payment-form');
+    if (mergeForm) mergeForm.addEventListener('submit', submitMergePayment);
+});
 
 async function showOrderDetail(orderId) {
     const orderDetailContainer = document.getElementById('order-detail');
