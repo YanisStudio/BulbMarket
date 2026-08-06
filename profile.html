@@ -152,7 +152,8 @@
     color: #333;
 }
 
-.form-group input {
+.form-group input,
+.form-group select {
     width: 100%;
     padding: 12px;
     border: 1px solid #ddd;
@@ -162,7 +163,14 @@
     box-sizing: border-box;
 }
 
-.form-group input:focus {
+/* 保留右側空間放下拉箭頭（style.css 的 .form-group select 畫在這裡），
+   否則會被這裡覆蓋掉的 padding: 12px 蓋住 */
+.form-group select {
+    padding-right: 34px;
+}
+
+.form-group input:focus,
+.form-group select:focus {
     border-color: #2e7d32;
     outline: none;
 }
@@ -548,13 +556,13 @@
                                 
                                 <div class="form-group">
                                     <label for="city">縣市</label>
-                                    <input type="text" id="city" name="city" placeholder="例：台北市、新北市">
+                                    <select id="city" name="city"></select>
                                 </div>
                                 
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="district">鄉鎮市區</label>
-                                        <input type="text" id="district" name="district" placeholder="例：大安區、中正區">
+                                        <select id="district" name="district"></select>
                                     </div>
                                     <div class="form-group">
                                         <label for="address">詳細地址</label>
@@ -612,6 +620,7 @@
     <script src="/js/auth-modals.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/cart.js"></script>
+    <script src="/js/tw-districts.js"></script>
 
     <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -629,6 +638,9 @@
         const profileForm = document.getElementById('profile-form');
         const profileMessage = document.getElementById('profile-message');
         const sidebarLogoutBtn = document.getElementById('sidebar-logout-btn');
+
+        // 縣市／鄉鎮市區連動下拉選單
+        const twDistrictSelect = window.initTWDistrictSelect('city', 'district');
         
         // 強化版欄位權限設定
         function setFieldPermissions(provider) {
@@ -792,8 +804,7 @@
                         const userData = docSnap.data();
                         document.getElementById('name').value = userData.name || '';
                         document.getElementById('phone').value = userData.phone || '';
-                        document.getElementById('city').value = userData.city || '';
-                        document.getElementById('district').value = userData.district || '';
+                        if (twDistrictSelect) twDistrictSelect.setValue(userData.city, userData.district);
                         document.getElementById('address').value = userData.address || '';
                         
                         // 使用資料庫中保存的提供者類型，如果沒有則使用檢測到的

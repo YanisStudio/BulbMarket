@@ -586,11 +586,11 @@
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label for="city">縣市 <span class="required">*</span></label>
-                                        <input type="text" id="city" name="city" placeholder="例：台北市、新北市" required>
+                                        <select id="city" name="city" required></select>
                                     </div>
                                     <div class="form-group">
                                         <label for="district">鄉鎮市區 <span class="required">*</span></label>
-                                        <input type="text" id="district" name="district" placeholder="例：大安區、中正區" required>
+                                        <select id="district" name="district" required></select>
                                     </div>
                                 </div>
                                 
@@ -712,6 +712,7 @@
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/cart.js"></script>
+    <script src="/js/tw-districts.js"></script>
 
     <!-- 結帳頁面功能 - 含載入動畫 -->
     <script>
@@ -854,7 +855,10 @@
             const mobileSubmitOrderBtn = document.getElementById('mobile-submit-order');
             const checkoutForm = document.getElementById('checkout-form');
             const shippingOptionsContainer = document.getElementById('shipping-options');
-            
+
+            // 縣市／鄉鎮市區連動下拉選單
+            const twDistrictSelect = window.initTWDistrictSelect('city', 'district');
+
             // 獲取購物車數據
             let cart = JSON.parse(localStorage.getItem('cart')) || [];
 
@@ -1052,8 +1056,7 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                             // 填充收件人資料
                             document.getElementById('name').value = userData.name || '';
                             document.getElementById('phone').value = userData.phone || '';
-                            document.getElementById('city').value = userData.city || '';
-                            document.getElementById('district').value = userData.district || '';
+                            if (twDistrictSelect) twDistrictSelect.setValue(userData.city, userData.district);
                             document.getElementById('address').value = userData.address || '';
                         } else {
                             // 使用默認值
