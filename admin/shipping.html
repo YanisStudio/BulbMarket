@@ -635,8 +635,11 @@
                 const getDocs = window.firebaseServices.getDocs;
                 
                 const fixedRef = doc(db, 'shippingRates', 'fixedRates');
-                const fixedSnap = await getDoc(fixedRef);
-                
+                const [fixedSnap, tieredSnap] = await Promise.all([
+                    getDoc(fixedRef),
+                    getDocs(collection(db, 'tieredRates'))
+                ]);
+
                 if (fixedSnap.exists()) {
                     const data = fixedSnap.data();
                     // 處理舊格式兼容性
@@ -647,10 +650,9 @@
                         fixedRates = data;
                     }
                 }
-                
+
                 updateFixedRatesUI();
-                
-                const tieredSnap = await getDocs(collection(db, 'tieredRates'));
+
                 const homeRates = [];
                 const storeRates = [];
                 

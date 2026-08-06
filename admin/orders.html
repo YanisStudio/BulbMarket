@@ -1270,29 +1270,37 @@
                     
                     const orderDocRef = window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId);
                     
-                    async function getProductImages() {
+                    // 這個函式每點一筆訂單就會跑一次，原本抓整個商品目錄太浪費，
+                    // 改成只查這張訂單實際用到的商品 ID，平行查詢
+                    async function getProductImages(items) {
                         try {
-                            const productsCollection = window.firebaseServices.collection(window.firebaseServices.db, "products");
-                            const productsSnapshot = await window.firebaseServices.getDocs(productsCollection);
-                            
+                            const db = window.firebaseServices.db;
+                            const doc = window.firebaseServices.doc;
+                            const getDoc = window.firebaseServices.getDoc;
+
+                            const uniqueIds = [...new Set((items || []).map(item => item.id).filter(Boolean))];
+                            const snapshots = await Promise.all(
+                                uniqueIds.map(id => getDoc(doc(db, 'products', id)))
+                            );
+
                             const productImages = {};
-                            productsSnapshot.forEach(doc => {
-                                const data = doc.data();
-                                productImages[doc.id] = data.imageUrl || '/images/placeholder.jpg';
+                            snapshots.forEach((snap, index) => {
+                                if (!snap.exists()) return;
+                                productImages[uniqueIds[index]] = snap.data().imageUrl || '/images/placeholder.jpg';
                             });
-                            
+
                             return productImages;
                         } catch (error) {
                             console.error('獲取產品圖片失敗:', error);
                             return {};
                         }
                     }
-                    
+
                     window.firebaseServices.getDoc(orderDocRef)
                         .then(async (docSnap) => {
                             if (docSnap.exists()) {
                                 const order = docSnap.data();
-                                const productImages = await getProductImages();
+                                const productImages = await getProductImages(order.items);
                                 
                                 const orderDate = window.AdminCommon.formatDate(order.orderDate, 'full');
                                 

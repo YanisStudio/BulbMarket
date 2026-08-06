@@ -23,10 +23,11 @@
           getAuth, 
           onAuthStateChanged
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
-        import { 
+        import {
           getFirestore,
           collection,
           getDocs,
+          getCountFromServer,
           query,
           orderBy,
           where,
@@ -46,6 +47,7 @@
           onAuthStateChanged,
           collection,
           getDocs,
+          getCountFromServer,
           query,
           orderBy,
           where,
@@ -319,28 +321,28 @@
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
                 const query = window.firebaseServices.query;
-                const getDocs = window.firebaseServices.getDocs;
+                const getCountFromServer = window.firebaseServices.getCountFromServer;
                 const where = window.firebaseServices.where;
 
-                const pendingOrdersQuery = query(
-                    collection(db, "orders"),
-                    where("status", "==", "pending")
-                );
-                const pendingOrdersSnapshot = await getDocs(pendingOrdersQuery);
-                document.getElementById('pending-orders').textContent = pendingOrdersSnapshot.size;
+                // 原本 4 個統計數字都是把整個 collection 抓下來只為了讀 .size，
+                // 訂單/會員/商品一多，每次打開後台首頁都要下載整個資料庫。
+                // 改用 getCountFromServer 做純計數查詢，不下載文件內容，四個一起平行查
+                const [
+                    pendingOrdersCount,
+                    completedOrdersCount,
+                    usersCount,
+                    productsCount
+                ] = await Promise.all([
+                    getCountFromServer(query(collection(db, "orders"), where("status", "==", "pending"))),
+                    getCountFromServer(query(collection(db, "orders"), where("status", "==", "completed"))),
+                    getCountFromServer(collection(db, "users")),
+                    getCountFromServer(collection(db, "products"))
+                ]);
 
-                const completedOrdersQuery = query(
-                    collection(db, "orders"),
-                    where("status", "==", "completed")
-                );
-                const completedOrdersSnapshot = await getDocs(completedOrdersQuery);
-                document.getElementById('completed-orders').textContent = completedOrdersSnapshot.size;
-
-                const usersSnapshot = await getDocs(collection(db, "users"));
-                document.getElementById('total-users').textContent = usersSnapshot.size;
-
-                const productsSnapshot = await getDocs(collection(db, "products"));
-                document.getElementById('total-products').textContent = productsSnapshot.size;
+                document.getElementById('pending-orders').textContent = pendingOrdersCount.data().count;
+                document.getElementById('completed-orders').textContent = completedOrdersCount.data().count;
+                document.getElementById('total-users').textContent = usersCount.data().count;
+                document.getElementById('total-products').textContent = productsCount.data().count;
 
             } catch (error) {
                 console.error("獲取統計數據失敗:", error);
