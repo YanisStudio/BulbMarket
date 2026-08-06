@@ -50,6 +50,13 @@
     flex: 3;
 }
 
+/* 訊息卡片本身就是完整內容，不像訂單記錄需要「清單+詳情」兩欄，
+   但整欄全寬顯示太寬鬆、跟訂單記錄的視覺密度不一致，
+   所以限制寬度，大致對齊訂單記錄右側詳情欄的比例 */
+#message-list {
+    max-width: 480px;
+}
+
 .profile-menu {
     background-color: #f8f8f8;
     border-radius: 8px;
