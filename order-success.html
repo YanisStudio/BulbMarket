@@ -923,6 +923,13 @@
                 if (transferAmountElement && lastOrder.total) {
                     transferAmountElement.textContent = `${lastOrder.total}`;
                 }
+
+                // 應付金額已經算好了，表單裡的匯款金額欄位直接帶入，
+                // 使用者還是可以自己改（例如實際匯款金額不同時）
+                const transferAmountInputEl = document.getElementById('transfer-amount-input');
+                if (transferAmountInputEl && lastOrder.total) {
+                    transferAmountInputEl.value = lastOrder.total;
+                }
             }
 
             // 如果是稍後轉帳，訂單先成立就好，付款留到訂單記錄頁面再處理，
