@@ -278,10 +278,14 @@
                 </div>
                 
                 <!-- 第二頁產品 -->
-                <div class="product-grid" id="page-2" style="display: none;"></div>
-                
+                <div class="product-grid" id="page-2" style="display: none;">
+                    <div class="loading-indicator">載入商品中...</div>
+                </div>
+
                 <!-- 第三頁產品 -->
-                <div class="product-grid" id="page-3" style="display: none;"></div>
+                <div class="product-grid" id="page-3" style="display: none;">
+                    <div class="loading-indicator">載入商品中...</div>
+                </div>
                 
                 <!-- 分頁控制 -->
                 <div class="pagination">
@@ -362,6 +366,10 @@ let currentFilters = {
     sort: 'default',
     search: ''
 };
+// 商品還在從 Firestore 載入時，第 2、3 頁的格子其實是空的（只有第 1 頁
+// 有寫「載入商品中...」）。如果使用者在這時候點分頁按鈕切過去，會看到
+// 一片空白，很容易誤以為「沒有商品」。用這個旗標擋下載入完成前的分頁點擊
+let productsLoaded = false;
 
 // DOM 載入完成後初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -419,17 +427,19 @@ async function loadProducts() {
             // 依實際商品數量覆蓋掉；沒有商品時要清空，避免留下不存在的分頁按鈕誤導使用者
             const paginationContainer = document.querySelector('.pagination');
             if (paginationContainer) paginationContainer.innerHTML = '';
+            productsLoaded = true;
             return;
         }
 
         currentProducts = products;
         console.log(`成功載入 ${products.length} 個商品`);
-        
+
         renderProducts(products);
         initAddToCartButtons(); // 使用 common.js 的函數
         initWishlistButtons();
         updateWishlistButtons();
-        
+        productsLoaded = true;
+
     } catch (error) {
         console.error("載入商品失敗:", error);
         const productGrid = document.getElementById('page-1');
@@ -709,9 +719,18 @@ function updatePaginationButtons(totalPages) {
 
 // 處理分頁按鈕點擊
 function handlePaginationClick() {
+    // 商品還在載入時，第 2、3 頁還是空的，先擋下避免使用者看到一片空白
+    // 誤以為沒有商品
+    if (!productsLoaded) {
+        if (typeof showToast === 'function') {
+            showToast('商品載入中，請稍候');
+        }
+        return;
+    }
+
     const pageData = this.dataset.page;
     let targetPage;
-    
+
     if (pageData === 'next') {
         const activePage = document.querySelector('.pagination-btn.active');
         const currentPage = parseInt(activePage.dataset.page);
