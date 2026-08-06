@@ -909,24 +909,27 @@
                     const getDoc = window.firebaseServices.getDoc;
                     const collection = window.firebaseServices.collection;
                     const getDocs = window.firebaseServices.getDocs;
-                    
+
+                    // 這 4 筆讀取互相獨立，原本一個一個 await 會把 4 趟網路來回時間疊加起來；
+                    // 改用 Promise.all 平行送出，結帳頁載入時間大約只要最慢那一筆的時間
+                    const [freeShippingSnap, calculationModeSnap, fixedRatesSnap, tieredSnap] = await Promise.all([
+                        getDoc(doc(db, 'shippingSettings', 'freeShipping')),
+                        getDoc(doc(db, 'shippingSettings', 'calculationMode')),
+                        getDoc(doc(db, 'shippingRates', 'fixedRates')),
+                        getDocs(collection(db, 'tieredRates'))
+                    ]);
+
                     // 載入免運設定
-                    const freeShippingRef = doc(db, 'shippingSettings', 'freeShipping');
-                    const freeShippingSnap = await getDoc(freeShippingRef);
                     if (freeShippingSnap.exists()) {
                         shippingSettings.freeShipping = freeShippingSnap.data();
                     }
-                    
+
                     // 載入計算模式
-                    const calculationModeRef = doc(db, 'shippingSettings', 'calculationMode');
-                    const calculationModeSnap = await getDoc(calculationModeRef);
                     if (calculationModeSnap.exists()) {
                         shippingSettings.calculationMode = calculationModeSnap.data().mode || 'fixed';
                     }
-                    
+
                     // 載入固定運費
-                    const fixedRatesRef = doc(db, 'shippingRates', 'fixedRates');
-                    const fixedRatesSnap = await getDoc(fixedRatesRef);
                     if (fixedRatesSnap.exists()) {
                         const data = fixedRatesSnap.data();
                         // 處理舊格式兼容性
@@ -937,15 +940,14 @@
                         }
                         shippingRates.home = data.home || 130;
                     }
-                    
+
                     // 載入階梯運費（包含宅配和超商）
-const tieredSnap = await getDocs(collection(db, 'tieredRates'));
-const allRates = [];
-tieredSnap.forEach(doc => {
-    const data = doc.data();
-    allRates.push({ id: doc.id, ...data });
-});
-tieredRates = allRates.sort((a, b) => a.minQuantity - b.minQuantity);
+                    const allRates = [];
+                    tieredSnap.forEach(docSnap => {
+                        const data = docSnap.data();
+                        allRates.push({ id: docSnap.id, ...data });
+                    });
+                    tieredRates = allRates.sort((a, b) => a.minQuantity - b.minQuantity);
                     
                 } catch (error) {
                     console.error('載入運費設定失敗:', error);
@@ -1197,27 +1199,36 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                 let subtotal = 0;
                 
                 // 從 Firestore 獲取產品資訊
+                // 只抓購物車裡實際用得到的商品，不要把整個商品目錄都下載下來
+                // ——賣場商品一多，結帳頁的載入速度會被拖慢，購物車通常只有
+                // 幾樣商品，逐一查詢再平行送出反而快很多
                 const getProductDetails = async () => {
                     try {
                         if (!window.firebaseServices) {
                             console.error('Firebase 服務未初始化');
                             return {};
                         }
-                        
+
                         const db = window.firebaseServices.db;
-                        const productsCollection = window.firebaseServices.collection(db, "products");
-                        const productsSnapshot = await window.firebaseServices.getDocs(productsCollection);
-                        
+                        const doc = window.firebaseServices.doc;
+                        const getDoc = window.firebaseServices.getDoc;
+
+                        const uniqueIds = [...new Set(cart.map(item => item.id))];
+                        const snapshots = await Promise.all(
+                            uniqueIds.map(id => getDoc(doc(db, 'products', id)))
+                        );
+
                         const productDetails = {};
-                        productsSnapshot.forEach(doc => {
-                            const data = doc.data();
-                            productDetails[doc.id] = {
+                        snapshots.forEach((snap, index) => {
+                            if (!snap.exists()) return;
+                            const data = snap.data();
+                            productDetails[uniqueIds[index]] = {
                                 imageUrl: data.imageUrl || '/images/placeholder.jpg',
                                 stock: data.stock || 0,
                                 category: data.category || 'other'
                             };
                         });
-                        
+
                         return productDetails;
                     } catch (error) {
                         console.error('獲取產品資訊失敗:', error);
@@ -1342,10 +1353,9 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                     checkLoginStatus();
                     
                     // 第六步：完成載入
+                    // 資料都準備好了就直接結束載入畫面，不用刻意再等一下
                     updateLoadingText('載入完成', '準備結帳頁面...');
-                    setTimeout(() => {
-                        finishLoading();
-                    }, 500);
+                    finishLoading();
                     
                 } catch (error) {
                     console.error('初始化結帳頁面失敗:', error);
