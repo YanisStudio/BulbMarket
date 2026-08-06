@@ -1328,9 +1328,10 @@ async function submitMergePayment(e) {
         document.getElementById('merge-payment-form').style.display = 'none';
 
         // 重新載入訂單列表，已付款的訂單就不會再顯示未付款標記、也不能再勾選
+        // batch.commit() 已經 await 過，伺服器已確認寫入，不需要再額外等待
         const currentUser = window.firebaseServices.auth.currentUser;
         if (currentUser) {
-            setTimeout(() => loadUserOrders(currentUser), 1500);
+            loadUserOrders(currentUser);
         }
     } catch (error) {
         console.error('送出合併匯款失敗:', error);
@@ -1393,16 +1394,24 @@ async function showOrderDetail(orderId) {
         const { statusText, statusClass } = getOrderStatusInfo(order.status);
         
         // 從 Firebase 獲取產品圖片
+        // 這個函式每點一筆訂單就會跑一次，原本抓整個商品目錄太浪費，
+        // 改成只查這張訂單實際用到的商品 ID，平行查詢
         let productDetails = {};
         try {
-            if (window.firebaseServices) {
+            if (window.firebaseServices && order.items && order.items.length > 0) {
                 const db = window.firebaseServices.db;
-                const productsCollection = window.firebaseServices.collection(db, "products");
-                const productsSnapshot = await window.firebaseServices.getDocs(productsCollection);
-                
-                productsSnapshot.forEach(doc => {
-                    const data = doc.data();
-                    productDetails[doc.id] = {
+                const doc = window.firebaseServices.doc;
+                const getDoc = window.firebaseServices.getDoc;
+
+                const uniqueIds = [...new Set(order.items.map(item => item.id).filter(Boolean))];
+                const snapshots = await Promise.all(
+                    uniqueIds.map(id => getDoc(doc(db, 'products', id)))
+                );
+
+                snapshots.forEach((snap, index) => {
+                    if (!snap.exists()) return;
+                    const data = snap.data();
+                    productDetails[uniqueIds[index]] = {
                         imageUrl: data.imageUrl || '/images/placeholder.jpg',
                         stock: data.stock || 0
                     };

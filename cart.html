@@ -925,18 +925,15 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始加載檢查
     function initialLoadCheck() {
-        // 如果購物車為空，快速完成加載
+        // 如果購物車為空，直接顯示空購物車狀態，不用刻意延遲
         if (cart.length === 0) {
-            // 延遲一點時間讓用戶看到加載效果
-            setTimeout(() => {
-                if (emptyCart) emptyCart.style.display = 'flex';
-                if (cartSummary) cartSummary.style.display = 'none';
-                // 購物車為空時也要檢查免運通知 (顯示免運門檻)
-                if (shippingSettings.freeShipping.enabled) {
-                    updateFreeShippingNotification(0);
-                }
-                finishLoading();
-            }, 800);
+            if (emptyCart) emptyCart.style.display = 'flex';
+            if (cartSummary) cartSummary.style.display = 'none';
+            // 購物車為空時也要檢查免運通知 (顯示免運門檻)
+            if (shippingSettings.freeShipping.enabled) {
+                updateFreeShippingNotification(0);
+            }
+            finishLoading();
             return false;
         }
         
@@ -964,24 +961,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const getDoc = window.firebaseServices.getDoc;
             const collection = window.firebaseServices.collection;
             const getDocs = window.firebaseServices.getDocs;
-            
+
+            // 這 4 筆讀取互相獨立，平行送出比一個一個 await 快
+            const [freeShippingSnap, calculationModeSnap, fixedRatesSnap, tieredSnap] = await Promise.all([
+                getDoc(doc(db, 'shippingSettings', 'freeShipping')),
+                getDoc(doc(db, 'shippingSettings', 'calculationMode')),
+                getDoc(doc(db, 'shippingRates', 'fixedRates')),
+                getDocs(collection(db, 'tieredRates'))
+            ]);
+
             // 載入免運設定
-            const freeShippingRef = doc(db, 'shippingSettings', 'freeShipping');
-            const freeShippingSnap = await getDoc(freeShippingRef);
             if (freeShippingSnap.exists()) {
                 shippingSettings.freeShipping = freeShippingSnap.data();
             }
-            
+
             // 載入計算模式
-            const calculationModeRef = doc(db, 'shippingSettings', 'calculationMode');
-            const calculationModeSnap = await getDoc(calculationModeRef);
             if (calculationModeSnap.exists()) {
                 shippingSettings.calculationMode = calculationModeSnap.data().mode || 'fixed';
             }
-            
+
             // 載入固定運費
-            const fixedRatesRef = doc(db, 'shippingRates', 'fixedRates');
-            const fixedRatesSnap = await getDoc(fixedRatesRef);
             if (fixedRatesSnap.exists()) {
                 const data = fixedRatesSnap.data();
                 // 處理舊格式兼容性
@@ -991,14 +990,13 @@ document.addEventListener('DOMContentLoaded', function() {
                     shippingRates.store = data.store || 0;
                 }
             }
-            
+
             // 載入階梯運費（僅超商取貨）
-            const tieredSnap = await getDocs(collection(db, 'tieredRates'));
             const storeRates = [];
-            tieredSnap.forEach(doc => {
-                const data = doc.data();
+            tieredSnap.forEach(docSnap => {
+                const data = docSnap.data();
                 if (data.method === 'store') {
-                    storeRates.push({ id: doc.id, ...data });
+                    storeRates.push({ id: docSnap.id, ...data });
                 }
             });
             tieredRates = storeRates.sort((a, b) => a.minQuantity - b.minQuantity);
@@ -1091,28 +1089,36 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 從Firebase獲取產品圖片、庫存和狀態
+    // 只查購物車裡實際有的商品，不要把整個商品目錄都下載下來
+    // ——賣場商品一多，購物車頁的載入速度會被拖慢
     async function getProductDetails() {
         try {
             if (!window.firebaseServices) {
                 console.error('Firebase 服務未初始化');
                 return {};
             }
-            
+
             const db = window.firebaseServices.db;
-            const productsCollection = window.firebaseServices.collection(db, "products");
-            const productsSnapshot = await window.firebaseServices.getDocs(productsCollection);
-            
+            const doc = window.firebaseServices.doc;
+            const getDoc = window.firebaseServices.getDoc;
+
+            const uniqueIds = [...new Set(cart.map(item => item.id))];
+            const snapshots = await Promise.all(
+                uniqueIds.map(id => getDoc(doc(db, 'products', id)))
+            );
+
             const productDetails = {};
-            productsSnapshot.forEach(doc => {
-                const data = doc.data();
-                productDetails[doc.id] = {
+            snapshots.forEach((snap, index) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                productDetails[uniqueIds[index]] = {
                     imageUrl: data.imageUrl || '/images/placeholder.jpg',
                     stock: data.stock || 0,
                     category: data.category || 'other',
                     status: data.status || 'inactive' // 新增：獲取商品狀態
                 };
             });
-            
+
             return productDetails;
         } catch (error) {
             console.error('獲取產品資訊失敗:', error);
@@ -1275,12 +1281,10 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 添加移除商品功能
             bindRemoveButtons();
-            
-            // 完成加載
-            setTimeout(() => {
-                finishLoading();
-            }, 300);
-            
+
+            // 資料都準備好了，直接結束載入畫面
+            finishLoading();
+
         } catch (error) {
             console.error('渲染購物車時出錯:', error);
             // 即使出錯也要隱藏加載動畫
@@ -1408,46 +1412,45 @@ document.addEventListener('DOMContentLoaded', function() {
     // 綁定移除按鈕事件
     function bindRemoveButtons() {
         document.querySelectorAll('.remove-item').forEach(btn => {
-            btn.addEventListener('click', function() {
+            btn.addEventListener('click', async function() {
                 const index = parseInt(this.getAttribute('data-index'));
-                
+
                 if (confirm('確定要移除此商品嗎？')) {
                     // 顯示移除加載效果
                     showRemoveItemLoading();
-                    
+
                     // 禁用所有操作按鈕
                     disableCartActions();
-                    
-                    // 模擬移除處理時間
-                    setTimeout(async () => {
-                        try {
-                            cart.splice(index, 1);
-                            localStorage.setItem('cart', JSON.stringify(cart));
-                            
-                            if (cart.length === 0) {
-                                hideRemoveItemLoading();
-                                if (emptyCart) emptyCart.style.display = 'flex';
-                                if (cartSummary) cartSummary.style.display = 'none';
-                                cartContainer.innerHTML = '';
-                                // 購物車清空時也更新免運通知
-                                updateFreeShippingNotification(0);
-                                finishLoading();
-                            } else {
-                                // 重新渲染購物車
-                                await renderCartAfterRemove();
-                            }
-                            
-                            showToast('商品已從購物車中移除');
-                            updateCartCount(true);
-                            enableCartActions();
-                            
-                        } catch (error) {
-                            console.error('移除商品時出錯:', error);
+
+                    // 移除本身只是本機操作（陣列 + localStorage），不用刻意加延遲；
+                    // 真正花時間的是下面 renderCartAfterRemove() 要重新查詢商品資訊
+                    try {
+                        cart.splice(index, 1);
+                        localStorage.setItem('cart', JSON.stringify(cart));
+
+                        if (cart.length === 0) {
                             hideRemoveItemLoading();
-                            enableCartActions();
-                            showToast('移除商品時發生錯誤，請重試');
+                            if (emptyCart) emptyCart.style.display = 'flex';
+                            if (cartSummary) cartSummary.style.display = 'none';
+                            cartContainer.innerHTML = '';
+                            // 購物車清空時也更新免運通知
+                            updateFreeShippingNotification(0);
+                            finishLoading();
+                        } else {
+                            // 重新渲染購物車
+                            await renderCartAfterRemove();
                         }
-                    }, 500);
+
+                        showToast('商品已從購物車中移除');
+                        updateCartCount(true);
+                        enableCartActions();
+
+                    } catch (error) {
+                        console.error('移除商品時出錯:', error);
+                        hideRemoveItemLoading();
+                        enableCartActions();
+                        showToast('移除商品時發生錯誤，請重試');
+                    }
                 }
             });
         });
