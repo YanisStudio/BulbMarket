@@ -403,7 +403,7 @@ nav ul li a:hover::after {
     background-position: center;
     background-attachment: fixed; /* 視差滾動效果 */
     color: white;
-    padding: 7.5em 0; /* 改用em */
+    padding: 5em 0; /* 原本 7.5em 太高，下方又要加布告欄，縮小一點 */
     text-align: center;
     margin-bottom: 3.75em; /* 改用em */
     position: relative;
@@ -434,15 +434,15 @@ nav ul li a:hover::after {
 }
 
 .hero h2 {
-    font-size: 3em; /* 改用em */
+    font-size: 2.2em; /* 原本 3em 比例太大，縮小一點 */
     margin-bottom: 0.6em; /* 改用em */
     text-shadow: 0.0625em 0.0625em 0.1875em rgba(0, 0, 0, 0.7); /* 增強文字陰影 */
     font-weight: 700;
 }
 
 .hero p {
-    font-size: 1.3em; /* 改用em */
-    margin-bottom: 1.5em; /* 改用em */
+    font-size: 1.1em; /* 原本 1.3em，跟著標題一起縮小 */
+    margin-bottom: 1.2em; /* 改用em */
     text-shadow: 0.0625em 0.0625em 0.1875em rgba(0, 0, 0, 0.7); /* 增強文字陰影 */
     line-height: 1.6;
 }
@@ -452,15 +452,15 @@ nav ul li a:hover::after {
     background: rgba(255, 255, 255, 0.1); /* 半透明白色背景 */
     backdrop-filter: blur(10px); /* 毛玻璃效果 */
     border-radius: 1em;
-    padding: 1.5em;
-    margin: 2em 0;
+    padding: 1.2em;
+    margin: 1.5em 0;
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 0.5em 1.5em rgba(0, 0, 0, 0.2);
 }
 
 .hero-highlight p {
     margin-bottom: 0.8em;
-    font-size: 1.1em;
+    font-size: 1em;
     display: flex;
     align-items: center;
     justify-content: flex-start;
@@ -476,6 +476,59 @@ nav ul li a:hover::after {
     color: #4caf50;
     font-size: 1.2em;
     text-shadow: 0 0.1em 0.2em rgba(0, 0, 0, 0.5);
+}
+
+/* 布告欄 */
+.bulletin-board {
+    padding: 3.75em 0;
+    background-color: #fff;
+    margin-bottom: 3.75em;
+}
+
+.bulletin-card {
+    max-width: 45em;
+    margin: 0 auto;
+    background: #fff;
+    border-radius: 1em;
+    box-shadow: 0 0.625em 2.1875em rgba(0, 0, 0, 0.08);
+    overflow: hidden;
+    border: 1px solid #f0f0f0;
+}
+
+.bulletin-card .bulletin-body {
+    padding: 2.25em 2.5em;
+}
+
+.bulletin-card .bulletin-body i.bulletin-icon {
+    font-size: 1.3em;
+    color: #4caf50;
+    display: block;
+    margin-bottom: 0.9em;
+}
+
+.bulletin-card .bulletin-text {
+    font-size: 1.15em;
+    line-height: 1.9;
+    color: #444;
+    white-space: pre-line;
+}
+
+.bulletin-card .bulletin-image {
+    width: 100%;
+    line-height: 0;
+}
+
+.bulletin-card .bulletin-image img {
+    width: 100%;
+    max-height: 26.25em;
+    object-fit: cover;
+    display: block;
+}
+
+.bulletin-empty {
+    text-align: center;
+    color: #999;
+    padding: 2em;
 }
 
 /* 頁面橫幅樣式 */
@@ -2252,7 +2305,16 @@ footer {
     .section-title {
         font-size: 1.8em;
     }
-    
+
+    .bulletin-card .bulletin-body {
+        padding: 1.5em 1.25em;
+    }
+
+    .bulletin-card .bulletin-text {
+        font-size: 1em;
+        line-height: 1.7;
+    }
+
     /* 手機版商品卡片調整 - 垂直佈局版本 */
 .product-grid {
     grid-template-columns: repeat(1, 1fr);

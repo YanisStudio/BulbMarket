@@ -26,11 +26,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     
     <style>
-    /* 首頁特有樣式 - 首頁標題比其他頁面大 */
+    /* 首頁特有樣式 - 原本比 css/style.css 的 .hero h2 還大，
+       字述占比太重，縮小到跟其他頁面標題比較接近的比例 */
     .hero h2 {
-        font-size: clamp(2.5rem, 6vw, 4rem); /* 首頁標題比較大 */
+        font-size: clamp(1.8rem, 3.5vw, 2.6rem);
     }
-    
+
     .hero .btn {
         font-size: clamp(1rem, 2.5vw, 1.2rem);
         padding: 0.8em 2em;
@@ -237,7 +238,17 @@
                 </div>
             </div>
         </section>
-        
+
+        <!-- 布告欄 - 顯示後台設定的最新公告 -->
+        <section class="bulletin-board">
+            <div class="container">
+                <h2 class="section-title">最新公告</h2>
+                <div id="bulletin-content">
+                    <div class="loading-indicator">載入中...</div>
+                </div>
+            </div>
+        </section>
+
         <!-- 精選產品區域 - 顯示後台選擇的精選商品 -->
         <section class="featured-products">
             <div class="container">
@@ -382,10 +393,58 @@
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化共用功能
     initCommonFeatures();
-    
+
+    // 加載布告欄公告
+    loadBulletin();
+
     // 加載精選商品
     loadFeaturedProducts();
 });
+
+// 從 Firebase 加載布告欄公告（settings/bulletin 這份固定文件，不是清單）
+async function loadBulletin() {
+    const container = document.getElementById('bulletin-content');
+    if (!container) return;
+
+    try {
+        const db = window.firebaseServices.db;
+        const doc = window.firebaseServices.doc;
+        const getDoc = window.firebaseServices.getDoc;
+
+        const bulletinRef = doc(db, 'settings', 'bulletin');
+        const bulletinSnap = await getDoc(bulletinRef);
+
+        if (!bulletinSnap.exists()) {
+            container.innerHTML = '<div class="bulletin-empty">目前沒有最新公告</div>';
+            return;
+        }
+
+        const data = bulletinSnap.data();
+        const text = (data.text || '').trim();
+        const imageUrl = data.imageUrl || '';
+
+        if (!text && !imageUrl) {
+            container.innerHTML = '<div class="bulletin-empty">目前沒有最新公告</div>';
+            return;
+        }
+
+        const textHTML = text ? `<div class="bulletin-text">${escapeHtml(text)}</div>` : '';
+        const imageHTML = imageUrl ? `<div class="bulletin-image"><img src="${imageUrl}" alt="公告圖片"></div>` : '';
+
+        container.innerHTML = `
+            <div class="bulletin-card">
+                <div class="bulletin-body">
+                    <i class="fas fa-bullhorn bulletin-icon"></i>
+                    ${textHTML}
+                </div>
+                ${imageHTML}
+            </div>
+        `;
+    } catch (error) {
+        console.error('載入公告失敗:', error);
+        container.innerHTML = '<div class="bulletin-empty">目前沒有最新公告</div>';
+    }
+}
 
 // 從 Firebase 加載精選商品
 async function loadFeaturedProducts() {

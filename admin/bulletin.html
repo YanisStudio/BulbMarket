@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>布告欄管理 - 球根花卉團購</title>
+    <meta name="robots" content="noindex, follow">
+    <meta name="description" content="球根花卉團購提供各式球根花卉、繡球花苗、進口球根、花卉種子及園藝資材。香水百合、孤挺花、鳶尾、睡蓮、鬱金香等，品質保證。">
+    <meta name="keywords" content="花卉,球根,球根花卉,進口球根,花卉盆栽,種子,香水百合,孤挺花,鳶尾,睡蓮,鬱金香,繡球花苗,園藝資材,球根花卉團購,團購">
+    <meta name="author" content="球根花卉團購">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/logo.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/images/logo.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/images/logo.png">
+<link rel="shortcut icon" href="/images/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/admin-common.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <!-- 保持原版的 Firebase 初始化方式以確保兼容性 -->
+    <script src="/js/firebase-config.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import {
+          getAuth,
+          onAuthStateChanged,
+          signOut
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import {
+          getFirestore,
+          doc,
+          getDoc,
+          setDoc,
+          serverTimestamp,
+          deleteField
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import {
+          getStorage,
+          ref,
+          uploadBytes
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
+
+        const firebaseConfig = window.FIREBASE_CONFIG;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const storage = getStorage(app);
+
+        window.firebaseServices = {
+          auth: auth,
+          db: db,
+          storage: storage,
+          getAuth,
+          signOut,
+          onAuthStateChanged,
+          doc,
+          getDoc,
+          setDoc,
+          serverTimestamp,
+          deleteField,
+          storageRef: ref,
+          uploadBytes
+        };
+    </script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" id="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <a href="/index.html" class="logo-container">
+                <img src="/images/logo.jpg" alt="球根花卉團購 logo" class="logo-image" width="520" height="730">
+                <div class="logo">
+                    <h1>球根花卉團購</h1>
+                    <p>管理系統</p>
+                </div>
+            </a>
+
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/index.html">返回網站</a></li>
+                    <li><a href="/admin/dashboard.html">管理首頁</a></li>
+                    <li><a href="/admin/orders.html">訂單管理</a></li>
+                    <li><a href="/admin/products.html">商品管理</a></li>
+                    <li><a href="/admin/users.html">會員管理</a></li>
+                    <li><a href="/admin/messages.html">訊息管理</a></li>
+                    <li><a href="/admin/shipping.html">運費設定</a></li>
+                    <li><a href="/admin/bulletin.html" class="active">布告欄管理</a></li>
+                </ul>
+            </nav>
+
+            <div class="header-right">
+                <div class="user-profile" id="user-profile">
+                    <div class="user-name" id="user-dropdown-btn">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="username-display">管理員</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="user-menu" id="user-menu">
+                        <a href="/index.html"><i class="fas fa-home"></i> 返回網站</a>
+                        <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="menu-overlay" id="menu-overlay"></div>
+
+    <main>
+        <div class="admin-container">
+            <h1 class="admin-title">布告欄管理</h1>
+
+            <!-- 布告欄編輯區塊 -->
+            <div id="bulletin-section" style="display: none;">
+                <div class="bulletin-form-card">
+                    <div class="form-group">
+                        <label for="bulletin-text">公告文字</label>
+                        <textarea id="bulletin-text" rows="6" placeholder="輸入要顯示在首頁的公告內容..."></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="bulletin-image-input">公告圖片（選填）</label>
+                        <input type="file" id="bulletin-image-input" accept="image/*">
+                        <div id="bulletin-image-preview-wrap" style="display: none;">
+                            <img id="bulletin-image-preview" src="" alt="公告圖片預覽">
+                            <button type="button" id="remove-bulletin-image-btn" class="btn btn-outline">
+                                <i class="fas fa-trash"></i> 移除圖片
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="button" id="save-bulletin-btn" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 儲存公告
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 未授權提示 -->
+            <div id="unauthorized-section" style="display: none;">
+                <div class="unauthorized-content">
+                    <i class="fas fa-exclamation-triangle auth-icon"></i>
+                    <h2>您沒有權限訪問此頁面</h2>
+                    <p>只有管理員可以訪問布告欄管理。</p>
+                    <p id="current-user-email"></p>
+                    <a href="/index.html" class="btn btn-primary">
+                        <i class="fas fa-home"></i> 返回首頁
+                    </a>
+                </div>
+            </div>
+
+            <!-- 未登入提示 -->
+            <div id="not-logged-in-section" style="display: none;">
+                <div class="unauthorized-content">
+                    <i class="fas fa-user-lock auth-icon"></i>
+                    <h2>請先登入</h2>
+                    <p>您需要先登入才能訪問布告欄管理。</p>
+                    <a href="/index.html" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> 返回首頁登入
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content admin-footer">
+                <p>&copy; 2025 球根花卉團購管理系統。僅限授權人員使用。</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/member.js"></script>
+    <script src="/js/admin-common.js"></script>
+
+    <style>
+        /* 布告欄管理特定樣式 */
+        .bulletin-form-card {
+            max-width: 700px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+        }
+
+        .bulletin-form-card .form-group {
+            margin-bottom: 20px;
+        }
+
+        .bulletin-form-card label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .bulletin-form-card textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            box-sizing: border-box;
+        }
+
+        .bulletin-form-card textarea:focus {
+            border-color: #4caf50;
+            outline: none;
+        }
+
+        #bulletin-image-preview-wrap {
+            margin-top: 12px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        #bulletin-image-preview {
+            max-width: 240px;
+            max-height: 160px;
+            object-fit: cover;
+            border-radius: 6px;
+            border: 1px solid #eee;
+        }
+
+        .form-actions {
+            padding-top: 8px;
+            border-top: 1px solid #eee;
+        }
+
+        /* 未授權與未登入頁面樣式 */
+        .unauthorized-content {
+            text-align: center;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-icon {
+            font-size: 48px;
+            color: #f39c12;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        #not-logged-in-section .auth-icon {
+            color: #3498db;
+        }
+
+        .unauthorized-content h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .unauthorized-content p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        #current-user-email {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            display: inline-block;
+            color: #333;
+        }
+    </style>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 等待 AdminCommon 載入完成
+        const waitForAdminCommon = function() {
+            if (window.AdminCommon) {
+                checkAdminAccess();
+            } else {
+                setTimeout(waitForAdminCommon, 100);
+            }
+        };
+
+        // 目前公告的既有圖片網址、使用者是否按了移除圖片
+        let existingImageUrl = '';
+        let imageRemoved = false;
+
+        const checkAdminAccess = function() {
+            window.AdminCommon.checkAdminAccess(
+                function(user) {
+                    showBulletinSection();
+                    loadBulletin();
+                },
+                function(error) {
+                    if (error === '未登入') {
+                        showNotLoggedInSection();
+                    } else {
+                        showUnauthorizedSection(error);
+                    }
+                }
+            );
+        };
+
+        const showBulletinSection = function() {
+            document.getElementById('bulletin-section').style.display = 'block';
+            document.getElementById('unauthorized-section').style.display = 'none';
+            document.getElementById('not-logged-in-section').style.display = 'none';
+        };
+
+        const showUnauthorizedSection = function(error) {
+            document.getElementById('bulletin-section').style.display = 'none';
+            document.getElementById('unauthorized-section').style.display = 'block';
+            document.getElementById('not-logged-in-section').style.display = 'none';
+
+            const currentUser = window.AdminCommon.getCurrentUser();
+            const currentUserEmail = document.getElementById('current-user-email');
+            if (currentUserEmail && currentUser) {
+                currentUserEmail.textContent = `當前登入帳號: ${currentUser.email}`;
+            }
+        };
+
+        const showNotLoggedInSection = function() {
+            document.getElementById('bulletin-section').style.display = 'none';
+            document.getElementById('unauthorized-section').style.display = 'none';
+            document.getElementById('not-logged-in-section').style.display = 'block';
+        };
+
+        // 讀取現有公告，填入表單
+        const loadBulletin = async function() {
+            window.AdminCommon.showLoading('載入公告中...');
+            try {
+                const db = window.firebaseServices.db;
+                const doc = window.firebaseServices.doc;
+                const getDoc = window.firebaseServices.getDoc;
+
+                const bulletinRef = doc(db, 'settings', 'bulletin');
+                const bulletinSnap = await getDoc(bulletinRef);
+
+                if (bulletinSnap.exists()) {
+                    const data = bulletinSnap.data();
+                    document.getElementById('bulletin-text').value = data.text || '';
+
+                    if (data.imageUrl) {
+                        existingImageUrl = data.imageUrl;
+                        showImagePreview(data.imageUrl);
+                    }
+                }
+            } catch (error) {
+                console.error('載入公告失敗:', error);
+                window.AdminCommon.handleError(error, '載入公告');
+            } finally {
+                window.AdminCommon.hideLoading();
+            }
+        };
+
+        const showImagePreview = function(src) {
+            document.getElementById('bulletin-image-preview').src = src;
+            document.getElementById('bulletin-image-preview-wrap').style.display = 'flex';
+        };
+
+        const hideImagePreview = function() {
+            document.getElementById('bulletin-image-preview').src = '';
+            document.getElementById('bulletin-image-preview-wrap').style.display = 'none';
+        };
+
+        // 選擇新圖片時，立即在畫面上預覽
+        const imageInput = document.getElementById('bulletin-image-input');
+        imageInput.addEventListener('change', function() {
+            const file = imageInput.files[0];
+            if (!file) return;
+            imageRemoved = false;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                showImagePreview(e.target.result);
+            };
+            reader.readAsDataURL(file);
+        });
+
+        // 移除圖片：清掉預覽跟已選檔案，存檔時會把 imageUrl 欄位整個刪掉
+        document.getElementById('remove-bulletin-image-btn').addEventListener('click', function() {
+            imageInput.value = '';
+            imageRemoved = true;
+            hideImagePreview();
+        });
+
+        // 儲存公告
+        document.getElementById('save-bulletin-btn').addEventListener('click', async function() {
+            const text = document.getElementById('bulletin-text').value.trim();
+            const imageFile = imageInput.files[0] || null;
+
+            if (!text && !imageFile && (imageRemoved || !existingImageUrl)) {
+                window.AdminCommon.showToast('請至少輸入公告文字或選擇一張圖片', 'warning');
+                return;
+            }
+
+            window.AdminCommon.showLoading('儲存中...');
+            try {
+                const db = window.firebaseServices.db;
+                const doc = window.firebaseServices.doc;
+                const setDoc = window.firebaseServices.setDoc;
+                const serverTimestamp = window.firebaseServices.serverTimestamp;
+                const deleteField = window.firebaseServices.deleteField;
+
+                let imageUrl = imageRemoved ? '' : existingImageUrl;
+
+                if (imageFile) {
+                    const storage = window.firebaseServices.storage;
+                    const storageRef = window.firebaseServices.storageRef;
+                    const uploadBytes = window.firebaseServices.uploadBytes;
+
+                    const timestamp = Date.now();
+                    const imagePath = `bulletin/${timestamp}_${imageFile.name}`;
+                    const imageRef = storageRef(storage, imagePath);
+
+                    await uploadBytes(imageRef, imageFile);
+
+                    // 直接構造 URL，跟商品管理頁面用同一套做法
+                    const bucketName = "bulb-market-217c4.firebasestorage.app";
+                    const encodedPath = encodeURIComponent(imagePath);
+                    imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media`;
+                }
+
+                await setDoc(doc(db, 'settings', 'bulletin'), {
+                    text: text,
+                    imageUrl: imageUrl || deleteField(),
+                    updatedAt: serverTimestamp()
+                }, { merge: true });
+
+                existingImageUrl = imageUrl;
+                imageRemoved = false;
+                imageInput.value = '';
+
+                window.AdminCommon.showToast('公告已儲存', 'success');
+            } catch (error) {
+                console.error('儲存公告失敗:', error);
+                window.AdminCommon.handleError(error, '儲存公告');
+            } finally {
+                window.AdminCommon.hideLoading();
+            }
+        });
+
+        waitForAdminCommon();
+    });
+    </script>
+</body>
+</html>
