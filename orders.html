@@ -1146,9 +1146,13 @@ async function loadUserOrders(user) {
             
             const { statusText, statusClass } = getOrderStatusInfo(order.status);
 
-            // 待處理、還沒完成匯款確認的訂單才顯示「未付款」標記、可以勾選去合併匯款
+            // 還沒付款的訂單，對客戶來說重點是「要去付款」，不是「待處理」
+            // （待處理是指我們收到款項後才會開始處理），所以未付款時只顯示
+            // 「未付款」，不要跟訂單處理狀態同時出現、造成兩個狀態並存的錯覺
             const isUnpaid = order.status === 'pending' && order.paymentConfirmed !== true;
-            const unpaidBadgeHTML = isUnpaid ? '<span class="unpaid-badge">未付款</span>' : '';
+            const badgeHTML = isUnpaid
+                ? '<span class="unpaid-badge">未付款</span>'
+                : `<span class="order-status ${statusClass}">${statusText}</span>`;
             const checkboxHTML = isUnpaid
                 ? `<input type="checkbox" class="order-select-checkbox" data-id="${order.id}" data-total="${order.total || 0}">`
                 : '';
@@ -1161,8 +1165,7 @@ async function loadUserOrders(user) {
                             <div class="order-header">
                                 <span class="order-number">${escapeHtml(order.orderNumber) || '未知訂單'}</span>
                                 <div class="order-header-badges">
-                                    ${unpaidBadgeHTML}
-                                    <span class="order-status ${statusClass}">${statusText}</span>
+                                    ${badgeHTML}
                                 </div>
                             </div>
                             <div class="order-info">
@@ -1449,15 +1452,24 @@ async function showOrderDetail(orderId) {
             orderItemsHTML = '<p>此訂單沒有商品資料</p>';
         }
         
+        // 未付款時提醒重點是「請去付款」，跟訂單處理狀態分開判斷
+        const isOrderUnpaid = order.status === 'pending' && order.paymentConfirmed !== true;
+
         let paymentReminderHTML = '';
-        if (order.status === 'pending' && order.payment === 'transfer') {
+        if (isOrderUnpaid && order.payment === 'transfer') {
             paymentReminderHTML = `
                 <div class="section-alert">
-                    <p><strong>等待付款確認：</strong> 請完成ATM轉帳，並在備註欄填寫轉帳末5碼。我們將在確認付款後處理您的訂單。</p>
+                    <p><strong>等待付款確認：</strong> 請完成ATM轉帳，並在下方表單填寫匯款資訊。我們將在確認付款後處理您的訂單。</p>
+                </div>
+            `;
+        } else if (isOrderUnpaid && order.payment === 'transfer_later') {
+            paymentReminderHTML = `
+                <div class="section-alert">
+                    <p><strong>尚未付款：</strong> 請回到<a href="/orders.html">訂單記錄</a>列表勾選這筆訂單，完成匯款確認（可與其他未付款訂單合併一起匯款）。</p>
                 </div>
             `;
         }
-        
+
         const notesFormHTML = `
             <div class="notes-form">
                 <label for="order-notes">新增備註：</label>
@@ -1465,17 +1477,23 @@ async function showOrderDetail(orderId) {
                 <button id="update-notes-btn" data-id="${order.id}">新增備註</button>
             </div>
         `;
-        
+
         const shippingMethodText = order.shipping === 'home' ? '宅配到府' : '7-11取貨';
-        const paymentMethodText = order.payment === 'transfer' ? 'ATM轉帳' : '信用卡付款';
-        
+        const paymentMethodText = order.payment === 'transfer' ? 'ATM轉帳'
+            : order.payment === 'transfer_later' ? '稍後轉帳'
+            : '信用卡付款';
+
         // 根據配送方式決定地址標籤 - 這是主要修改點
         const addressLabel = order.shipping === 'home' ? '地址' : '7-11門市';
-        
+
+        const detailStatusBadgeHTML = isOrderUnpaid
+            ? '<span class="unpaid-badge">未付款</span>'
+            : `<span class="order-detail-status ${statusClass}">${statusText}</span>`;
+
         const detailHTML = `
             <div class="order-detail-header">
                 <h2>訂單 ${escapeHtml(order.orderNumber) || '未知訂單'}</h2>
-                <span class="order-detail-status ${statusClass}">${statusText}</span>
+                ${detailStatusBadgeHTML}
             </div>
             
             ${paymentReminderHTML}
