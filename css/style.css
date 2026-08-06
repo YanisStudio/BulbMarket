@@ -2041,43 +2041,58 @@ footer {
         padding: 0 20px;
     }
 
-    /* 手機版選單裡的會員資訊區塊：原本會員資料/訂單記錄/我的訊息
-       是預設的行內連結排版，擠成一團不好按也不好讀，改成跟桌面版
-       下拉選單一樣的直向清單 */
+    /* 手機版選單：已登入狀態的會員資訊卡片。原本會員資料/訂單記錄/
+       我的訊息是預設的行內連結排版，擠成一團不好按也不好讀，改成
+       淺灰底卡片＋直向清單，每個連結有 icon 間距、點擊會反白 */
+    .user-profile-mobile {
+        background-color: #f9f9f9;
+        border-radius: 0.5em;
+        padding: 0.75em 0.9em;
+        margin-top: 0.625em;
+    }
+
     .user-profile-mobile .user-info {
         display: flex;
         align-items: center;
-        gap: 0.5em;
-        padding: 0.75em 0.25em;
+        gap: 0.625em;
+        padding-bottom: 0.75em;
+        margin-bottom: 0.5em;
+        border-bottom: 1px solid #e0e0e0;
         font-weight: 600;
         color: #333;
-        border-top: 1px solid #eee;
+    }
+
+    .user-profile-mobile .user-info i {
+        font-size: 1.4em;
+        color: #4caf50;
     }
 
     .user-profile-mobile .user-links {
         display: flex;
         flex-direction: column;
+        gap: 0.25em;
     }
 
     .user-profile-mobile .user-links a {
         display: flex;
         align-items: center;
-        gap: 0.6em;
-        padding: 0.75em 0.25em;
+        gap: 0.625em;
+        padding: 0.625em 0.5em;
         color: #333;
         text-decoration: none;
-        border-top: 1px solid #eee;
+        border-radius: 0.375em;
         transition: background-color 0.2s ease;
     }
 
     .user-profile-mobile .user-links a:hover,
     .user-profile-mobile .user-links a:active {
-        background-color: #f5f5f5;
+        background-color: #eee;
     }
 
     .user-profile-mobile .user-links a i {
-        width: 1.1em;
+        width: 1.2em;
         text-align: center;
+        color: #666;
     }
 
     /* 遮罩層樣式 */
@@ -2446,11 +2461,14 @@ footer {
     margin-right: 5px;
 }
 
-/* 確保手機版也有相同樣式 */
+/* 確保手機版也有相同樣式。
+   注意：display 沒有覆蓋成 flex——js/member.js 顯示這顆按鈕時是用
+   adminBtnMobile.style.display = 'block'（inline style），永遠會蓋掉
+   這裡的 CSS，所以維持預設的 block 排版，icon 用 margin-right 保留間距
+   （不能改用 .user-links 其他項目那種 gap 對齊，block 底下 gap 不會生效）*/
 .user-profile-mobile .admin-link {
-    display: block;
     text-align: left;
-    margin: 8px 0;
+    margin: 4px 0 0;
 }
 
 /* 使管理按鈕在選單中更突出 */
