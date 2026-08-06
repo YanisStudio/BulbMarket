@@ -380,7 +380,40 @@
             </div>
         </div>
     </footer>
-    
+
+    <!-- 商品詳細介紹彈跳視窗 -->
+    <div id="product-detail-modal" class="product-detail-modal">
+        <div class="product-detail-backdrop"></div>
+        <div class="product-detail-panel">
+            <button type="button" class="product-detail-close" aria-label="關閉"><i class="fas fa-times"></i></button>
+            <div class="product-detail-body">
+                <div class="product-detail-image">
+                    <span id="pd-tag" class="product-tag" style="display:none;"></span>
+                    <span id="pd-unavailable" class="unavailable-badge" style="display:none;">已下架</span>
+                    <img id="pd-image" src="" alt="">
+                </div>
+                <div class="product-detail-info">
+                    <h2 id="pd-name"></h2>
+                    <p class="product-detail-price" id="pd-price"></p>
+                    <p class="product-detail-stock" id="pd-stock"></p>
+
+                    <p class="product-detail-section-label">商品描述</p>
+                    <p class="product-detail-desc-text" id="pd-desc"></p>
+
+                    <div id="pd-detail-desc-wrap" style="display:none;">
+                        <p class="product-detail-section-label">詳細介紹</p>
+                        <p class="product-detail-desc-text" id="pd-detail-desc"></p>
+                    </div>
+
+                    <div class="product-detail-actions">
+                        <button class="add-to-cart-btn" id="pd-add-to-cart">加入購物車</button>
+                        <button class="wish-btn" id="pd-wish-btn"><i class="far fa-heart"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- 引入彈窗管理器 -->
     <script src="/js/auth-modals.js"></script>
     <script src="/js/common.js"></script>
@@ -482,7 +515,8 @@ async function loadFeaturedProducts() {
         initAddToCartButtons();
         initWishlistButtons();
         updateWishlistButtons();
-        
+        initProductDetailModal(); // 只需綁定一次，靠事件代理處理
+
     } catch (error) {
         console.error("加載精選商品失敗:", error);
         showErrorMessage(error.message);
@@ -523,8 +557,10 @@ function renderProducts(products) {
     if (!productGrid) return;
     
     let productsHTML = '';
-    
+    window.__productDataCache = window.__productDataCache || {};
+
     products.forEach(product => {
+        window.__productDataCache[product.id] = product;
         let tagHTML = '';
         if (product.tags && product.tags.length > 0) {
             tagHTML = `<span class="product-tag">${escapeHtml(product.tags[0])}</span>`;
@@ -549,6 +585,7 @@ function renderProducts(products) {
                     <div class="product-content">
                         <h3>${escapeHtml(product.name)}</h3>
                         <p class="product-desc">${escapeHtml(product.description)}</p>
+                        <p class="product-detail-hint"><i class="fas fa-search"></i> 查看詳細介紹</p>
                         <p class="product-price">$${product.price}/${product.unit}</p>
                         <p class="stock-info ${stockClass}">${stockText}</p>
                     </div>

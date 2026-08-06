@@ -719,14 +719,15 @@ nav ul li a:hover::after {
 /* 商品卡片容器 - 垂直佈局版本 */
 .product-card {
     background-color: #fff;
-    border-radius: 0.625em; 
+    border-radius: 0.625em;
     overflow: hidden;
-    box-shadow: 0 0.1875em 0.625em rgba(0, 0, 0, 0.1); 
+    box-shadow: 0 0.1875em 0.625em rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     border: 1px solid #f0f0f0;
     display: flex;
     flex-direction: column;
     height: 100%; /* 確保所有卡片等高 */
+    cursor: pointer; /* 整張卡片可點擊，開啟商品詳細介紹彈跳視窗 */
 }
 
 .product-card:hover {
@@ -825,16 +826,34 @@ nav ul li a:hover::after {
     display: block; /* 確保是塊級元素 */
 }
 
-/* 商品描述 */
+/* 商品描述 - 卡片上只顯示 2 行，完整內容點卡片後在彈跳視窗看 */
 .product-desc {
     color: #666;
-    margin-bottom: 0.8em; 
-    font-size: 0.9em; 
+    margin-bottom: 0.4em;
+    font-size: 0.9em;
     line-height: 1.4;
     text-align: left !important; /* 強制靠左對齊 */
     margin-left: 0; /* 移除負值，自然靠左 */
     width: 100%; /* 佔滿寬度 */
-    display: block; /* 確保是塊級元素 */
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+/* 「查看詳細介紹」提示 - 讓外人一眼就看得出卡片可以點進去看更多 */
+.product-detail-hint {
+    color: #4caf50;
+    font-size: 0.8em;
+    font-weight: 600;
+    margin: 0 0 0.8em;
+    display: flex;
+    align-items: center;
+    gap: 0.3em;
+}
+
+.product-detail-hint i {
+    font-size: 0.85em;
 }
 
 /* 商品價格 */
@@ -991,6 +1010,163 @@ nav ul li a:hover::after {
 
 .wish-btn.active .fa-heart {
     transform: scale(1);
+}
+
+/* ========== 商品詳細介紹彈跳視窗 ========== */
+body.modal-open-noscroll {
+    overflow: hidden;
+}
+
+.product-detail-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+    padding: 1.5em;
+}
+
+.product-detail-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.55);
+}
+
+.product-detail-panel {
+    position: relative;
+    background: #fff;
+    border-radius: 1em;
+    max-width: 50em;
+    width: 100%;
+    max-height: 88vh;
+    overflow-y: auto;
+    box-shadow: 0 1.5em 3em rgba(0, 0, 0, 0.25);
+    animation: productDetailPopIn 0.25s ease;
+}
+
+@keyframes productDetailPopIn {
+    from { opacity: 0; transform: translateY(0.8em) scale(0.98); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.product-detail-close {
+    position: absolute;
+    top: 0.8em;
+    right: 0.8em;
+    width: 2.2em;
+    height: 2.2em;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.9);
+    color: #333;
+    font-size: 1em;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 0.125em 0.5em rgba(0, 0, 0, 0.15);
+    z-index: 2;
+    transition: all 0.2s ease;
+}
+
+.product-detail-close:hover {
+    background: #ff6b6b;
+    color: #fff;
+    transform: rotate(90deg);
+}
+
+.product-detail-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.product-detail-image {
+    position: relative;
+    height: 16em;
+    flex-shrink: 0;
+    background-color: #f8f8f8;
+    border-radius: 1em 1em 0 0;
+    overflow: hidden;
+}
+
+.product-detail-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.product-detail-info {
+    padding: 1.5em;
+}
+
+.product-detail-info h2 {
+    font-size: 1.5em;
+    color: #333;
+    margin-bottom: 0.5em;
+    line-height: 1.4;
+}
+
+.product-detail-price {
+    font-size: 1.6em;
+    font-weight: 700;
+    color: #ff6b6b;
+    margin-bottom: 0.3em;
+}
+
+.product-detail-stock {
+    font-size: 0.9em;
+    color: #777;
+    font-weight: 500;
+    margin-bottom: 1em;
+}
+
+.product-detail-section-label {
+    font-size: 0.85em;
+    font-weight: 700;
+    color: #4caf50;
+    margin: 1.2em 0 0.4em;
+}
+
+.product-detail-section-label:first-of-type {
+    margin-top: 0;
+}
+
+.product-detail-desc-text {
+    color: #555;
+    font-size: 0.95em;
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+.product-detail-actions {
+    display: flex;
+    align-items: center;
+    gap: 0.8em;
+    margin-top: 1.5em;
+    padding-top: 1.2em;
+    border-top: 1px solid #f0f0f0;
+}
+
+.product-detail-actions .add-to-cart-btn {
+    max-width: none;
+}
+
+@media (min-width: 700px) {
+    .product-detail-body {
+        flex-direction: row;
+    }
+
+    .product-detail-image {
+        height: auto;
+        width: 45%;
+        border-radius: 1em 0 0 1em;
+    }
+
+    .product-detail-info {
+        width: 55%;
+        overflow-y: auto;
+    }
 }
 
 /* 加入購物車按鈕動畫 */

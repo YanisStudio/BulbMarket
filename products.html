@@ -348,14 +348,47 @@
             </div>
         </div>
     </footer>
-    
+
+    <!-- 商品詳細介紹彈跳視窗 -->
+    <div id="product-detail-modal" class="product-detail-modal">
+        <div class="product-detail-backdrop"></div>
+        <div class="product-detail-panel">
+            <button type="button" class="product-detail-close" aria-label="關閉"><i class="fas fa-times"></i></button>
+            <div class="product-detail-body">
+                <div class="product-detail-image">
+                    <span id="pd-tag" class="product-tag" style="display:none;"></span>
+                    <span id="pd-unavailable" class="unavailable-badge" style="display:none;">已下架</span>
+                    <img id="pd-image" src="" alt="">
+                </div>
+                <div class="product-detail-info">
+                    <h2 id="pd-name"></h2>
+                    <p class="product-detail-price" id="pd-price"></p>
+                    <p class="product-detail-stock" id="pd-stock"></p>
+
+                    <p class="product-detail-section-label">商品描述</p>
+                    <p class="product-detail-desc-text" id="pd-desc"></p>
+
+                    <div id="pd-detail-desc-wrap" style="display:none;">
+                        <p class="product-detail-section-label">詳細介紹</p>
+                        <p class="product-detail-desc-text" id="pd-detail-desc"></p>
+                    </div>
+
+                    <div class="product-detail-actions">
+                        <button class="add-to-cart-btn" id="pd-add-to-cart">加入購物車</button>
+                        <button class="wish-btn" id="pd-wish-btn"><i class="far fa-heart"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- JavaScript 文件 -->
     <!-- 引入彈窗管理器 -->
     <script src="/js/auth-modals.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/cart.js"></script>
-    
+
     <!-- 產品頁面專用 JavaScript -->
     <script>
 // 產品頁面專用變數
@@ -438,6 +471,7 @@ async function loadProducts() {
         initAddToCartButtons(); // 使用 common.js 的函數
         initWishlistButtons();
         updateWishlistButtons();
+        initProductDetailModal(); // 只需綁定一次，靠事件代理處理換頁/篩選後的新卡片
         productsLoaded = true;
 
     } catch (error) {
@@ -508,8 +542,10 @@ function renderProductsToPage(products, pageNumber) {
     if (!productGrid) return;
     
     let productsHTML = '';
-    
+    window.__productDataCache = window.__productDataCache || {};
+
     products.forEach(product => {
+        window.__productDataCache[product.id] = product;
         const tagHTML = product.tags?.length > 0 ? `<span class="product-tag">${escapeHtml(product.tags[0])}</span>` : '';
         const stockText = product.stock > 0 ? `(庫存: ${product.stock} 份)` : '(無庫存)';
         const stockClass = product.stock < 5 ? 'low-stock' : '';
@@ -537,6 +573,7 @@ function renderProductsToPage(products, pageNumber) {
                     <div class="product-content">
                         <h3>${escapeHtml(product.name)}</h3>
                         <p class="product-desc">${escapeHtml(product.description)}</p>
+                        <p class="product-detail-hint"><i class="fas fa-search"></i> 查看詳細介紹</p>
                         <p class="product-price">$${product.price}/${product.unit}</p>
                         <p class="stock-info ${stockClass}">${stockText}</p>
                     </div>

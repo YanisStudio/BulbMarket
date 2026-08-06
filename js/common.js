@@ -502,6 +502,121 @@ function initAddToCartButtons() {
 }
 
 /**
+ * 商品詳細介紹彈跳視窗
+ * 商品卡片描述太長會被 CSS 截斷成 2 行，完整描述 + 選填的詳細介紹要點卡片才看得到。
+ * 卡片資料在各頁面自己的 renderProducts()/renderProductsToPage() 裡寫進
+ * window.__productDataCache，這裡只負責讀取、開關彈窗。
+ */
+function openProductDetailModal(productId) {
+    const product = window.__productDataCache && window.__productDataCache[productId];
+    const modal = document.getElementById('product-detail-modal');
+    if (!product || !modal) return;
+
+    const isAvailable = product.status === 'active';
+
+    document.getElementById('pd-image').src = product.imageUrl || '/images/placeholder.jpg';
+    document.getElementById('pd-name').textContent = product.name;
+    document.getElementById('pd-price').textContent = `$${product.price}/${product.unit}`;
+
+    const stockEl = document.getElementById('pd-stock');
+    stockEl.textContent = product.stock > 0 ? `庫存: ${product.stock} 份` : '無庫存';
+    stockEl.classList.toggle('low-stock', product.stock > 0 && product.stock < 5);
+
+    document.getElementById('pd-desc').textContent = product.description || '';
+
+    const extraWrap = document.getElementById('pd-detail-desc-wrap');
+    const extraEl = document.getElementById('pd-detail-desc');
+    if (product.detailDescription && product.detailDescription.trim()) {
+        extraEl.textContent = product.detailDescription;
+        extraWrap.style.display = 'block';
+    } else {
+        extraWrap.style.display = 'none';
+    }
+
+    const tagEl = document.getElementById('pd-tag');
+    if (product.tags && product.tags.length > 0) {
+        tagEl.textContent = product.tags[0];
+        tagEl.style.display = 'inline-block';
+    } else {
+        tagEl.style.display = 'none';
+    }
+
+    document.getElementById('pd-unavailable').style.display = isAvailable ? 'none' : 'inline-block';
+
+    // 彈跳視窗不是 .product-card，沒辦法直接套用 common.js 既有那套「找最近的
+    // .product-card 讀 data-* 屬性」的加入購物車/收藏邏輯，這裡直接用 onclick
+    // 綁定，每次開窗都會用新商品的資料覆蓋掉上一次的綁定
+    const addBtn = document.getElementById('pd-add-to-cart');
+    addBtn.disabled = !isAvailable || product.stock <= 0;
+    addBtn.onclick = function() {
+        if (addBtn.disabled) return;
+        const cart = JSON.parse(localStorage.getItem('cart')) || [];
+        const existingItem = cart.find(item => item.id === product.id);
+        const currentQty = existingItem ? existingItem.quantity : 0;
+        if (currentQty >= product.stock) {
+            showToast(`庫存不足，最多可購買 ${product.stock} 份`);
+            return;
+        }
+        addToCart(product.id, product.name, product.price, 1, product.stock);
+        addBtn.classList.add('added');
+        setTimeout(() => addBtn.classList.remove('added'), 1000);
+    };
+
+    const wishBtn = document.getElementById('pd-wish-btn');
+    const wishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+    wishBtn.classList.toggle('active', wishlist.some(item => item.id === product.id));
+    wishBtn.onclick = function() {
+        const currentWishlist = JSON.parse(localStorage.getItem('wishlist')) || [];
+        const index = currentWishlist.findIndex(item => item.id === product.id);
+        if (index > -1) {
+            currentWishlist.splice(index, 1);
+            wishBtn.classList.remove('active');
+            showToast(`已取消註記 ${product.name}`);
+        } else {
+            currentWishlist.push({ id: product.id, name: product.name, addedAt: new Date().toISOString() });
+            wishBtn.classList.add('active');
+            showToast(`已註記 ${product.name}`);
+        }
+        localStorage.setItem('wishlist', JSON.stringify(currentWishlist));
+        if (typeof updateWishlistButtons === 'function') updateWishlistButtons();
+    };
+
+    modal.style.display = 'flex';
+    document.body.classList.add('modal-open-noscroll');
+}
+
+function closeProductDetailModal() {
+    const modal = document.getElementById('product-detail-modal');
+    if (modal) modal.style.display = 'none';
+    document.body.classList.remove('modal-open-noscroll');
+}
+
+function initProductDetailModal() {
+    const modal = document.getElementById('product-detail-modal');
+    if (!modal || modal.dataset.bound === 'true') return;
+    modal.dataset.bound = 'true';
+
+    // 用事件代理綁在 document 上，商品格子重新渲染（換頁/篩選/搜尋）也不用重新綁定
+    document.addEventListener('click', function(e) {
+        const card = e.target.closest('.product-card');
+        if (!card || card.closest('#product-detail-modal')) return;
+        if (e.target.closest('.add-to-cart-btn, .wish-btn')) return;
+        const productId = card.dataset.productId;
+        if (productId) openProductDetailModal(productId);
+    });
+
+    const closeBtn = modal.querySelector('.product-detail-close');
+    if (closeBtn) closeBtn.addEventListener('click', closeProductDetailModal);
+
+    const backdrop = modal.querySelector('.product-detail-backdrop');
+    if (backdrop) backdrop.addEventListener('click', closeProductDetailModal);
+
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && modal.style.display !== 'none') closeProductDetailModal();
+    });
+}
+
+/**
  * 窗口大小變化處理
  */
 function handleWindowResize() {
