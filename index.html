@@ -500,21 +500,16 @@ async function loadBulletin() {
 }
 
 // 從 Firebase 加載精選商品
-// 跟 products.html 一樣，「連線失敗」跟「真的沒有設定精選商品」分成兩條路徑：
-// 拋出例外才會一直自動重試，不會顯示沒商品；查詢成功但陣列是空的，大多數
-// 情況代表真的沒設定精選商品，但剛進站就立刻查詢時連線可能還沒完全穩定，
-// 空結果不會第一時間就相信，會先短暫延遲重新確認幾次
-async function loadFeaturedProducts(attempt = 1, emptyRecheckCount = 0) {
+// 跟 products.html 一樣，拋出例外才會一直自動重試，不會顯示沒商品。
+// FirebaseUtils.loadFeaturedProducts() 內部（透過 loadProducts）已經會先等
+// Auth 狀態確定（見 common.js 的 waitForAuthReady）才送出查詢，所以查詢成功
+// 但陣列是空的，就直接代表真的沒設定精選商品，不需要再額外重試確認。
+async function loadFeaturedProducts(attempt = 1) {
     try {
         showLoadingProducts(attempt);
         const featuredProducts = await FirebaseUtils.loadFeaturedProducts();
 
         if (featuredProducts.length === 0) {
-            const MAX_EMPTY_RECHECKS = 2;
-            if (emptyRecheckCount < MAX_EMPTY_RECHECKS) {
-                setTimeout(() => loadFeaturedProducts(attempt, emptyRecheckCount + 1), 700);
-                return;
-            }
             showNoProducts();
             return;
         }
@@ -530,7 +525,7 @@ async function loadFeaturedProducts(attempt = 1, emptyRecheckCount = 0) {
         console.error(`加載精選商品失敗（第 ${attempt} 次嘗試）:`, error);
         // 不設重試上限，間隔漸增封頂在 8 秒，網路一恢復就會自動抓到商品
         const retryDelay = Math.min(attempt * 1000, 8000);
-        setTimeout(() => loadFeaturedProducts(attempt + 1, emptyRecheckCount), retryDelay);
+        setTimeout(() => loadFeaturedProducts(attempt + 1), retryDelay);
     }
 }
 

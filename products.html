@@ -431,14 +431,11 @@ function autoScrollToProducts() {
 
 // 從 Firebase 載入產品（使用 common.js 的 FirebaseUtils）
 // attempt 用來做自動重試：網路不穩、或 Firebase SDK 剛好還沒初始化完成時，
-// getDocs() 會拋錯。這裡刻意「連線失敗」跟「真的沒有商品」分成兩條不同路徑：
-// - 拋出例外 → 進到 catch，判定是連線問題，一直自動重試，不會顯示沒有商品
-// - 沒有拋錯、但查回來的陣列是空的 → 大多數情況代表 Firestore 真的回應
-//   「這個 collection 沒有文件」，但剛進站就立刻點商品頁時，Firebase 連線
-//   可能還沒完全穩定，查詢有機會「沒拋錯但其實查得不準」而回傳空結果。
-//   所以空結果不會第一時間就相信：前 2 次遇到空結果會先短暫延遲再查一次
-//   確認，連續 3 次都是空的才真的判定是沒有商品，避免誤判
-async function loadProducts(attempt = 1, emptyRecheckCount = 0) {
+// getDocs() 會拋錯，進到 catch 判定是連線問題，自動重試。
+// FirebaseUtils.loadProducts() 內部已經會先等 Auth 狀態確定
+// （見 common.js 的 waitForAuthReady）才送出查詢，避免查詢在 Auth 狀態
+// 還沒確定前就送出，所以這裡不需要再對「查回來是空陣列」額外重試確認。
+async function loadProducts(attempt = 1) {
     try {
         const productGrid = document.getElementById('products-grid');
         // 前兩次失敗前的畫面維持原本安靜的「載入商品中」，避免網路只是短暫
@@ -463,15 +460,6 @@ async function loadProducts(attempt = 1, emptyRecheckCount = 0) {
         );
 
         if (products.length === 0) {
-            // 空結果先不急著相信，短暫延遲後再查一次確認，最多重新確認 2 次
-            // （跟上面拋例外的重試是分開計數的，不會因為連線曾經失敗過就跳過
-            // 這層確認，也不會因為這層確認而拖到連線失敗的無限重試邏輯）
-            const MAX_EMPTY_RECHECKS = 2;
-            if (emptyRecheckCount < MAX_EMPTY_RECHECKS) {
-                setTimeout(() => loadProducts(attempt, emptyRecheckCount + 1), 700);
-                return;
-            }
-
             productGrid.innerHTML = '<div class="no-products">目前沒有可用的商品</div>';
             // 分頁按鈕平常靠 updatePaginationButtons() 依實際商品數量產生；
             // 沒有商品時要清空，避免留下不存在的分頁按鈕誤導使用者
@@ -497,7 +485,7 @@ async function loadProducts(attempt = 1, emptyRecheckCount = 0) {
         // 商品，不用使用者自己重新整理頁面；封頂是避免真的長時間斷線時
         // 一直高頻重試
         const retryDelay = Math.min(attempt * 1000, 8000);
-        setTimeout(() => loadProducts(attempt + 1, emptyRecheckCount), retryDelay);
+        setTimeout(() => loadProducts(attempt + 1), retryDelay);
     }
 }
 

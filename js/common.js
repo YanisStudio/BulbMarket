@@ -633,6 +633,28 @@ function handleWindowResize() {
     }
 }
 
+// onAuthStateChanged 第一次回呼前才代表 Auth 狀態（有無登入）已經確定；
+// 快取成單一 promise，第一次呼叫才真的去等，之後（含重試）直接沿用同一個
+// 已解決的 promise，不會每次查詢都重新等一次
+let authReadyPromise = null;
+function waitForAuthReady() {
+    if (!CommonModule.firebase) {
+        throw new Error('Firebase 服務未初始化');
+    }
+    if (!authReadyPromise) {
+        authReadyPromise = new Promise((resolve) => {
+            const unsubscribe = CommonModule.firebase.onAuthStateChanged(
+                CommonModule.firebase.auth,
+                () => {
+                    unsubscribe();
+                    resolve();
+                }
+            );
+        });
+    }
+    return authReadyPromise;
+}
+
 /**
  * Firebase 相關工具函數
  */
@@ -648,6 +670,10 @@ const FirebaseUtils = {
         if (!CommonModule.firebase) {
             throw new Error('Firebase 服務未初始化');
         }
+
+        // 確保 Auth 狀態（登入與否）已經確定，再送出查詢，避免 Firestore
+        // 規則若有限制登入才能讀取時，查詢在 Auth 狀態還沒確定前就送出
+        await waitForAuthReady();
 
         const db = CommonModule.firebase.db;
         const collection = CommonModule.firebase.collection;
