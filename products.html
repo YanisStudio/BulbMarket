@@ -430,11 +430,16 @@ function autoScrollToProducts() {
 }
 
 // 從 Firebase 載入產品（使用 common.js 的 FirebaseUtils）
-async function loadProducts() {
+// attempt 用來做自動重試：網路不穩、或 Firebase SDK 剛好還沒初始化完成時，
+// getDocs() 會拋錯，以前這種暫時性的失敗會直接顯示錯誤訊息卡住，
+// 使用者要自己重新整理頁面才會好。現在改成自動重試最多 3 次，
+// 中間用漸增的等待時間（1秒、2秒），讓使用者不用自己動手就能恢復正常
+async function loadProducts(attempt = 1) {
+    const MAX_ATTEMPTS = 3;
     try {
         const productGrid = document.getElementById('products-grid');
         productGrid.innerHTML = '<div class="loading-indicator">載入商品中...</div>';
-        
+
         // 使用 common.js 的 FirebaseUtils 載入產品
         // 連已下架的商品也一起抓回來（includeInactive），下架商品會用
         // 灰階＋標籤顯示、按鈕不能按，讓顧客知道曾經有這項商品，而不是
@@ -465,9 +470,27 @@ async function loadProducts() {
         productsLoaded = true;
 
     } catch (error) {
-        console.error("載入商品失敗:", error);
+        console.error(`載入商品失敗（第 ${attempt} 次嘗試）:`, error);
+
+        if (attempt < MAX_ATTEMPTS) {
+            const retryDelay = attempt * 1000; // 1秒、2秒漸增
+            setTimeout(() => loadProducts(attempt + 1), retryDelay);
+            return;
+        }
+
+        // 重試 3 次都還是失敗，才真的顯示錯誤畫面，並提供重新載入按鈕，
+        // 不用逼使用者自己重新整理整個頁面
         const productGrid = document.getElementById('products-grid');
-        productGrid.innerHTML = `<div class="error-message">載入商品時出錯：${error.message}</div>`;
+        productGrid.innerHTML = `
+            <div class="error-message">
+                載入商品時出錯，請檢查網路連線後再試一次。<br>
+                <button type="button" id="retry-load-products-btn" class="btn btn-primary" style="margin-top:0.8em;">重新載入商品</button>
+            </div>`;
+        const retryBtn = document.getElementById('retry-load-products-btn');
+        if (retryBtn) {
+            retryBtn.addEventListener('click', () => loadProducts(1));
+        }
+        productsLoaded = true;
     }
 }
 

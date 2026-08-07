@@ -500,16 +500,19 @@ async function loadBulletin() {
 }
 
 // 從 Firebase 加載精選商品
-async function loadFeaturedProducts() {
+// 跟 products.html 一樣加上自動重試：網路不穩或 Firebase SDK 還沒初始化完成時
+// 會暫時性失敗，以前要使用者自己重新整理才會好，現在自動重試最多 3 次
+async function loadFeaturedProducts(attempt = 1) {
+    const MAX_ATTEMPTS = 3;
     try {
         showLoadingProducts();
         const featuredProducts = await FirebaseUtils.loadFeaturedProducts();
-        
+
         if (featuredProducts.length === 0) {
             showNoProducts();
             return;
         }
-        
+
         console.log(`載入精選商品數量: ${featuredProducts.length}`);
         renderProducts(featuredProducts);
         initAddToCartButtons();
@@ -518,7 +521,14 @@ async function loadFeaturedProducts() {
         initProductDetailModal(); // 只需綁定一次，靠事件代理處理
 
     } catch (error) {
-        console.error("加載精選商品失敗:", error);
+        console.error(`加載精選商品失敗（第 ${attempt} 次嘗試）:`, error);
+
+        if (attempt < MAX_ATTEMPTS) {
+            const retryDelay = attempt * 1000;
+            setTimeout(() => loadFeaturedProducts(attempt + 1), retryDelay);
+            return;
+        }
+
         showErrorMessage(error.message);
     }
 }
