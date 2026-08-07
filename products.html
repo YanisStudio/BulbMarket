@@ -439,18 +439,15 @@ async function loadProducts(attempt = 1) {
     try {
         const productGrid = document.getElementById('products-grid');
         // 前兩次失敗前的畫面維持原本安靜的「載入商品中」，避免網路只是短暫
-        // 頓一下就嚇到使用者；從第 3 次開始才明確告知是連線問題，且提供一顆
-        // 「立即重試」按鈕，讓等不及自動重試排程的人可以馬上手動催一次
+        // 頓一下就嚇到使用者；從第 3 次開始才明確告知是連線問題。已經知道要
+        // 重試就直接自動重試，不需要使用者自己按按鈕才願意再試一次
         if (attempt <= 2) {
             productGrid.innerHTML = '<div class="loading-indicator">載入商品中...</div>';
         } else {
             productGrid.innerHTML = `
                 <div class="error-message">
-                    網路連線不穩定，正在自動重新連線中，請稍候⋯⋯<br>
-                    <button type="button" id="retry-load-products-btn" class="btn btn-primary" style="margin-top:0.8em;">立即重試</button>
+                    網路連線不穩定，正在自動重新連線中，請稍候⋯⋯
                 </div>`;
-            const retryBtn = document.getElementById('retry-load-products-btn');
-            if (retryBtn) retryBtn.addEventListener('click', () => loadProducts(1));
         }
 
         // 使用 common.js 的 FirebaseUtils 載入產品

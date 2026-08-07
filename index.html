@@ -528,8 +528,9 @@ async function loadFeaturedProducts(attempt = 1) {
     }
 }
 
-// 顯示載入狀態。attempt 從第 3 次開始改用「連線不穩」的說法 + 手動重試按鈕，
-// 讓使用者知道這是連線問題還在自動處理中，不是頁面卡死
+// 顯示載入狀態。attempt 從第 3 次開始改用「連線不穩」的說法，讓使用者知道
+// 這是連線問題還在自動處理中，不是頁面卡死。已經知道要重試就直接自動重試，
+// 不需要使用者自己按按鈕才願意再試一次
 function showLoadingProducts(attempt = 1) {
     const productGrid = document.getElementById('featured-products-grid');
     if (!productGrid) return;
@@ -541,11 +542,8 @@ function showLoadingProducts(attempt = 1) {
 
     productGrid.innerHTML = `
         <div class="error-message">
-            網路連線不穩定，正在自動重新連線中，請稍候⋯⋯<br>
-            <button type="button" id="retry-load-featured-btn" class="btn btn-primary" style="margin-top:0.8em;">立即重試</button>
+            網路連線不穩定，正在自動重新連線中，請稍候⋯⋯
         </div>`;
-    const retryBtn = document.getElementById('retry-load-featured-btn');
-    if (retryBtn) retryBtn.addEventListener('click', () => loadFeaturedProducts(1));
 }
 
 // 顯示無商品狀態
