@@ -431,14 +431,27 @@ function autoScrollToProducts() {
 
 // 從 Firebase 載入產品（使用 common.js 的 FirebaseUtils）
 // attempt 用來做自動重試：網路不穩、或 Firebase SDK 剛好還沒初始化完成時，
-// getDocs() 會拋錯，以前這種暫時性的失敗會直接顯示錯誤訊息卡住，
-// 使用者要自己重新整理頁面才會好。現在改成自動重試最多 3 次，
-// 中間用漸增的等待時間（1秒、2秒），讓使用者不用自己動手就能恢復正常
+// getDocs() 會拋錯。這裡刻意「連線失敗」跟「真的沒有商品」分成兩條不同路徑：
+// - 拋出例外 → 進到 catch，判定是連線問題，一直自動重試，不會顯示沒有商品
+// - 沒有拋錯、但查回來的陣列是空的 → 是 Firestore 真的回應「這個 collection
+//   沒有文件」，才會顯示「目前沒有可用的商品」，兩種情況不會混在一起判斷
 async function loadProducts(attempt = 1) {
-    const MAX_ATTEMPTS = 3;
     try {
         const productGrid = document.getElementById('products-grid');
-        productGrid.innerHTML = '<div class="loading-indicator">載入商品中...</div>';
+        // 前兩次失敗前的畫面維持原本安靜的「載入商品中」，避免網路只是短暫
+        // 頓一下就嚇到使用者；從第 3 次開始才明確告知是連線問題，且提供一顆
+        // 「立即重試」按鈕，讓等不及自動重試排程的人可以馬上手動催一次
+        if (attempt <= 2) {
+            productGrid.innerHTML = '<div class="loading-indicator">載入商品中...</div>';
+        } else {
+            productGrid.innerHTML = `
+                <div class="error-message">
+                    網路連線不穩定，正在自動重新連線中，請稍候⋯⋯<br>
+                    <button type="button" id="retry-load-products-btn" class="btn btn-primary" style="margin-top:0.8em;">立即重試</button>
+                </div>`;
+            const retryBtn = document.getElementById('retry-load-products-btn');
+            if (retryBtn) retryBtn.addEventListener('click', () => loadProducts(1));
+        }
 
         // 使用 common.js 的 FirebaseUtils 載入產品
         // 連已下架的商品也一起抓回來（includeInactive），下架商品會用
@@ -471,26 +484,11 @@ async function loadProducts(attempt = 1) {
 
     } catch (error) {
         console.error(`載入商品失敗（第 ${attempt} 次嘗試）:`, error);
-
-        if (attempt < MAX_ATTEMPTS) {
-            const retryDelay = attempt * 1000; // 1秒、2秒漸增
-            setTimeout(() => loadProducts(attempt + 1), retryDelay);
-            return;
-        }
-
-        // 重試 3 次都還是失敗，才真的顯示錯誤畫面，並提供重新載入按鈕，
-        // 不用逼使用者自己重新整理整個頁面
-        const productGrid = document.getElementById('products-grid');
-        productGrid.innerHTML = `
-            <div class="error-message">
-                載入商品時出錯，請檢查網路連線後再試一次。<br>
-                <button type="button" id="retry-load-products-btn" class="btn btn-primary" style="margin-top:0.8em;">重新載入商品</button>
-            </div>`;
-        const retryBtn = document.getElementById('retry-load-products-btn');
-        if (retryBtn) {
-            retryBtn.addEventListener('click', () => loadProducts(1));
-        }
-        productsLoaded = true;
+        // 不設重試上限，只把間隔漸增封頂在 8 秒——網路恢復的當下就能自動抓到
+        // 商品，不用使用者自己重新整理頁面；封頂是避免真的長時間斷線時
+        // 一直高頻重試
+        const retryDelay = Math.min(attempt * 1000, 8000);
+        setTimeout(() => loadProducts(attempt + 1), retryDelay);
     }
 }
 
