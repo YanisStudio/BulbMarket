@@ -259,13 +259,13 @@
     </style>
     
     <script>
-    // 使用 admin-common.js 的管理員檢查函數
-    function isAdmin(email) {
+    // 使用 admin-common.js 的管理員檢查函數（讀 Firebase Auth custom claim）
+    async function isAdmin(user) {
         // 如果 AdminCommon 還沒載入，回傳 false
         if (!window.AdminCommon || !window.AdminCommon.isAdmin) {
             return false;
         }
-        return window.AdminCommon.isAdmin(email);
+        return window.AdminCommon.isAdmin(user);
     }
 
     document.addEventListener('DOMContentLoaded', function() {
@@ -286,11 +286,12 @@
         // 權限檢查
         const checkAdminAccess = function() {
             if (window.firebaseServices && window.firebaseServices.auth) {
-                window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, function(user) {
+                window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, async function(user) {
+                    const userIsAdmin = user ? await isAdmin(user) : false;
                     console.log('當前用戶:', user ? user.email : '未登入');
-                    console.log('管理員檢查結果:', user ? isAdmin(user.email) : false);
-                    
-                    if (!user || !isAdmin(user.email)) {
+                    console.log('管理員檢查結果:', userIsAdmin);
+
+                    if (!user || !userIsAdmin) {
                         console.log('非管理員訪問，重定向回首頁');
                         setTimeout(() => {
                             window.location.href = '/index.html';

@@ -7,12 +7,9 @@
 window.CommonModule = {
     // Firebase 服務引用
     firebase: null,
-    
+
     // 當前用戶
-    currentUser: null,
-    
-    // 管理員電子郵件列表（共用設定見 js/firebase-config.js）
-    adminEmails: window.ADMIN_EMAILS
+    currentUser: null
 };
 
 /**
@@ -378,11 +375,11 @@ function updateCartCount(animate = false) {
  */
 function initAdminAccess() {
     if (CommonModule.firebase) {
-        CommonModule.firebase.onAuthStateChanged(CommonModule.firebase.auth, function(user) {
+        CommonModule.firebase.onAuthStateChanged(CommonModule.firebase.auth, async function(user) {
             const adminBtnDesktop = document.getElementById('admin-btn');
             const adminBtnMobile = document.getElementById('admin-btn-mobile');
-            
-            if (user && isAdmin(user.email)) {
+
+            if (user && await isAdmin(user)) {
                 // 顯示管理按鈕
                 if (adminBtnDesktop) adminBtnDesktop.style.display = 'block';
                 if (adminBtnMobile) adminBtnMobile.style.display = 'block';
@@ -397,10 +394,19 @@ function initAdminAccess() {
 }
 
 /**
- * 檢查是否為管理員
+ * 檢查是否為管理員：讀取 Firebase Auth custom claim（admin: true），
+ * 取代舊版比對寫死信箱清單的做法。新增/移除管理員改用
+ * scripts/set-admin-claims 那支腳本設定 claim，不用再改這裡的程式碼。
  */
-function isAdmin(email) {
-    return CommonModule.adminEmails.includes(email?.toLowerCase());
+async function isAdmin(user) {
+    if (!user) return false;
+    try {
+        const tokenResult = await user.getIdTokenResult();
+        return tokenResult.claims.admin === true;
+    } catch (error) {
+        console.error('讀取管理員權限失敗:', error);
+        return false;
+    }
 }
 
 /**

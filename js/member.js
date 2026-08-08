@@ -667,23 +667,27 @@ window.showMemberSuccessModal = showMemberSuccessModal;
 window.showMemberErrorModal = showMemberErrorModal;
 window.showMemberWarningModal = showMemberWarningModal;
 
-// 管理員檢查函數
-function isAdmin(email) {
-    const adminEmails = [
-        'bababa.b810@gmail.com',
-        'vincentsayhello@gmail.com',
-        'yanishuang2000@gmail.com'
-    ];
-    return adminEmails.includes(email);
+// 管理員檢查函數：讀取 Firebase Auth custom claim（admin: true），
+// 取代舊版寫死信箱清單的做法。新增/移除管理員改用
+// scripts/set-admin-claims 那支腳本設定 claim，不用再改這裡的程式碼。
+async function isAdmin(user) {
+    if (!user) return false;
+    try {
+        const tokenResult = await user.getIdTokenResult();
+        return tokenResult.claims.admin === true;
+    } catch (error) {
+        console.error('讀取管理員權限失敗:', error);
+        return false;
+    }
 }
 
 // 用戶登入狀態操作函數
-function saveUserState(user) {
+async function saveUserState(user) {
     if (user) {
         localStorage.setItem('userIsLoggedIn', 'true');
         localStorage.setItem('userEmail', user.email || '');
         // 使用管理員檢查函數
-        if (isAdmin(user.email)) {
+        if (await isAdmin(user)) {
             localStorage.setItem('isAdmin', 'true');
         } else {
             localStorage.removeItem('isAdmin');
@@ -748,8 +752,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let confirmationResult = null;
 
     // 檢查當前登入用戶是否為管理員
-    const checkIfAdmin = function(user) {
-        if (user && isAdmin(user.email)) {
+    const checkIfAdmin = async function(user) {
+        if (user && await isAdmin(user)) {
             console.log('管理員登入:', user.email);
             if (adminBtn) adminBtn.style.display = 'block';
             if (adminBtnMobile) adminBtnMobile.style.display = 'block';

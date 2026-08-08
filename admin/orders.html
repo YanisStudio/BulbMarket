@@ -902,13 +902,13 @@
     </style>
     
     <script>
-        // 使用 admin-common.js 的管理員檢查函數
-        function isAdmin(email) {
+        // 使用 admin-common.js 的管理員檢查函數（讀 Firebase Auth custom claim）
+        async function isAdmin(user) {
             // 如果 AdminCommon 還沒載入，回傳 false
             if (!window.AdminCommon || !window.AdminCommon.isAdmin) {
                 return false;
             }
-            return window.AdminCommon.isAdmin(email);
+            return window.AdminCommon.isAdmin(user);
         }
 
         document.addEventListener('DOMContentLoaded', function() {
@@ -945,9 +945,7 @@
                 // 檢查當前登入狀態
                 window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, async user => {
                     if (user) {
-                        const userEmail = user.email.toLowerCase();
-                        
-                        if (isAdmin(userEmail)) {
+                        if (await isAdmin(user)) {
                             ordersSection.style.display = 'block';
                             unauthorizedSection.style.display = 'none';
                             if (usernameDisplay) {

@@ -12,13 +12,3 @@ window.FIREBASE_CONFIG = {
     appId: "1:829365637409:web:7e1cb6647af154ca9d6e60",
     measurementId: "G-XFJK1JP7TE"
 };
-
-/**
- * 管理員信箱清單（唯一來源）
- * js/admin-common.js、js/common.js 都改為引用這裡，不再各自維護一份
- */
-window.ADMIN_EMAILS = [
-    'bababa.b810@gmail.com',
-    'vincentsayhello@gmail.com',
-    'yanishuang2000@gmail.com'
-];

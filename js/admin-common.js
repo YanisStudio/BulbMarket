@@ -6,20 +6,26 @@
 // Firebase 配置（共用設定見 js/firebase-config.js，須在本檔案之前載入）
 const firebaseConfig = window.FIREBASE_CONFIG;
 
-// 管理員郵箱列表（共用設定見 js/firebase-config.js）
-const ADMIN_EMAILS = window.ADMIN_EMAILS;
-
 // 全局變量
 let firebaseApp = null;
 let currentUser = null;
 
 /**
- * 檢查是否為管理員
- * @param {string} email - 用戶郵箱
- * @returns {boolean} - 是否為管理員
+ * 檢查是否為管理員：讀取 Firebase Auth custom claim（admin: true），
+ * 取代舊版比對寫死信箱清單的做法。新增/移除管理員改用
+ * scripts/set-admin-claims 那支腳本設定 claim，不用再改這裡的程式碼。
+ * @param {object} user - Firebase Auth 的 user 物件
+ * @returns {Promise<boolean>}
  */
-function isAdmin(email) {
-    return ADMIN_EMAILS.includes(email?.toLowerCase());
+async function isAdmin(user) {
+    if (!user) return false;
+    try {
+        const tokenResult = await user.getIdTokenResult();
+        return tokenResult.claims.admin === true;
+    } catch (error) {
+        console.error('讀取管理員權限失敗:', error);
+        return false;
+    }
 }
 
 /**
@@ -135,8 +141,8 @@ function checkAdminAccess(onSuccess = null, onFailed = null) {
         return;
     }
     
-    window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, function(user) {
-        if (!user || !isAdmin(user.email)) {
+    window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, async function(user) {
+        if (!user || !(await isAdmin(user))) {
             console.log('非管理員訪問，重定向回首頁');
             currentUser = null;
             

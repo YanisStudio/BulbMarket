@@ -775,12 +775,12 @@
     // 全局變量：當前精選商品ID列表
     let currentFeaturedProductIds = [];
 
-    // 使用 admin-common.js 的管理員檢查函數
-function isAdmin(email) {
+    // 使用 admin-common.js 的管理員檢查函數（讀 Firebase Auth custom claim）
+async function isAdmin(user) {
     if (!window.AdminCommon || !window.AdminCommon.isAdmin) {
         return false;
     }
-    return window.AdminCommon.isAdmin(email);
+    return window.AdminCommon.isAdmin(user);
 }
 
     // 等待DOM完全加載後執行
@@ -799,8 +799,8 @@ const waitForAdminCommon = function() {
         // 檢查用戶是否為管理員，非管理員重定向回首頁
         const checkAdminAccess = function() {
             if (window.firebaseServices && window.firebaseServices.auth) {
-                window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, function(user) {
-                    if (!user || !isAdmin(user.email)) {
+                window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, async function(user) {
+                    if (!user || !(await isAdmin(user))) {
                         // 不是管理員，重定向到首頁
                         console.log('非管理員訪問，重定向回首頁');
                         window.location.href = '/index.html';
