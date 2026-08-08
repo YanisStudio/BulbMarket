@@ -66,11 +66,11 @@
             PhoneAuthProvider,
             signInWithCredential
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
-            doc, 
-            setDoc, 
+        import {
+            initializeFirestore,
+            collection,
+            doc,
+            setDoc,
             getDoc,
             getDocs,
             getDocsFromServer,
@@ -79,14 +79,18 @@
             where,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
-        
+
         // Firebase配置
         const firebaseConfig = window.FIREBASE_CONFIG;
-        
+
         // 初始化Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
+        // 用 initializeFirestore 開啟 experimentalAutoDetectLongPolling：
+        // 讓 SDK 自動偵測目前網路環境（VPN、防火牆、廣告阻擋擴充功能等）
+        // 是否會擋掉預設的串流連線，會的話自動改用相容性更好的長輪詢，
+        // 降低連線逾時、進而觸發自動重試的機率
+        const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
         
         // 將Firebase服務暴露給全局使用
         window.firebaseServices = {

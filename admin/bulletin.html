@@ -26,7 +26,7 @@
           signOut
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
         import {
-          getFirestore,
+          initializeFirestore,
           doc,
           getDoc,
           setDoc,
@@ -43,7 +43,9 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        const db = getFirestore(app);
+        // 開啟 experimentalAutoDetectLongPolling：自動偵測目前網路環境是否
+        // 會擋掉預設的串流連線，會的話自動改用長輪詢，降低連線逾時機率
+        const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
         const storage = getStorage(app);
 
         window.firebaseServices = {
