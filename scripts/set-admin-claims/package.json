@@ -1,0 +1,12 @@
+{
+  "name": "bulbmarket-set-admin-claims",
+  "private": true,
+  "type": "module",
+  "description": "設定/移除/列出管理員權限（Firebase Auth custom claim: admin），取代寫死在程式碼裡的管理員信箱清單",
+  "scripts": {
+    "start": "node run.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.6.0"
+  }
+}

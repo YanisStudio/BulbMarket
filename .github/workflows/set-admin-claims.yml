@@ -1,0 +1,41 @@
+name: 設定管理員權限
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: '要執行的動作'
+        required: true
+        default: 'add'
+        type: choice
+        options:
+          - add
+          - remove
+          - list
+      emails:
+        description: '要設定/移除的 Email（多個用逗號分隔，list 動作不用填）'
+        required: false
+        default: ''
+
+jobs:
+  set-admin-claims:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scripts/set-admin-claims
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: 執行管理員權限設定
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node run.mjs "${{ github.event.inputs.action }}" "${{ github.event.inputs.emails }}"
