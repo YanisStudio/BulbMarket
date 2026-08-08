@@ -677,16 +677,25 @@ const FirebaseUtils = {
 
         const db = CommonModule.firebase.db;
         const collection = CommonModule.firebase.collection;
-        const getDocs = CommonModule.firebase.getDocs;
+        const getDocsFromServer = CommonModule.firebase.getDocsFromServer;
         const query = CommonModule.firebase.query;
         const where = CommonModule.firebase.where;
+
+        if (!getDocsFromServer) {
+            throw new Error('Firebase 服務缺少 getDocsFromServer，請確認此頁面的 <script type="module"> 有從 firebase-firestore.js import getDocsFromServer 並加進 window.firebaseServices');
+        }
 
         const includeInactive = options.includeInactive === true;
         const productsQuery = includeInactive
             ? collection(db, "products")
             : query(collection(db, "products"), where("status", "==", "active"));
 
-        const productsSnapshot = await getDocs(productsQuery);
+        // 用 getDocsFromServer 而不是 getDocs：getDocs 連不上後端時會悄悄
+        // 退回本地空快取、回傳「技術上成功但是空」的結果，導致真正的連線
+        // 問題被誤判成「真的沒有商品」。getDocsFromServer 強制要求真的連到
+        // 伺服器，連不上就直接 throw，讓外層 catch 走「連線不穩定，自動
+        // 重試」的邏輯，不會顯示沒有商品
+        const productsSnapshot = await getDocsFromServer(productsQuery);
 
         if (productsSnapshot.empty) {
             return [];
