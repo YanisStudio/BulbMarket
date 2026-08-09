@@ -1643,14 +1643,20 @@ if (newUserCreationTime && (now - parseInt(newUserCreationTime)) < 300000) {
                     })
                     .catch((error) => {
                         console.warn('無法連接到數據庫:', error);
-                        const name = user.email?.split('@')[0] || user.phoneNumber || '用戶';
-                        localStorage.setItem('userName', name);
-                        
-                        if (usernameDisplay) {
-                            usernameDisplay.textContent = name;
-                        }
-                        if (usernameDisplayMobile) {
-                            usernameDisplayMobile.textContent = name;
+                        // 畫面上很可能已經用上次登入快取的名字顯示著（見前面
+                        // initializeUI() 的即時墊檔機制），連線失敗時不要用信箱
+                        // 前綴去覆蓋掉一個已經正確顯示的名字；真的完全沒有快取過
+                        // 才退而求其次顯示信箱前綴
+                        if (!localStorage.getItem('userName')) {
+                            const name = user.email?.split('@')[0] || user.phoneNumber || '用戶';
+                            localStorage.setItem('userName', name);
+
+                            if (usernameDisplay) {
+                                usernameDisplay.textContent = name;
+                            }
+                            if (usernameDisplayMobile) {
+                                usernameDisplayMobile.textContent = name;
+                            }
                         }
                     });
             } else {
