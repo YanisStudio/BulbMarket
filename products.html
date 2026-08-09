@@ -495,12 +495,13 @@ async function loadProducts(attempt = 1) {
     } catch (error) {
         console.error(`載入商品失敗（第 ${attempt} 次嘗試）:`, error);
 
-        // 重試到第 4 次還沒成功，很可能是底層連線本身卡在異常狀態，同一個
-        // 連線物件繼續重試往往要等很久才會恢復（跟手動整頁重新整理效果差
-        // 很多是同一個原因）。用 resetFirestoreConnection() 換一個全新的
-        // 連線物件，不用真的重新整理整頁。60 秒節流，避免網路真的斷線
-        // 很久時一直重建連線
-        if (attempt >= 4 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
+        // 第 1 次失敗常常只是瞬間頓一下，重試一次多半會自己恢復，先不出手；
+        // 連第 2 次也失敗，才比較像是底層連線本身卡在異常狀態，同一個連線
+        // 物件繼續重試往往要等很久才會恢復（跟手動整頁重新整理效果差很多
+        // 是同一個原因）。用 resetFirestoreConnection() 換一個全新的連線
+        // 物件，不用真的重新整理整頁。60 秒節流，避免網路真的斷線很久時
+        // 一直重建連線
+        if (attempt >= 2 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
             lastConnectionResetAt = Date.now();
             if (window.resetFirestoreConnection) {
                 await window.resetFirestoreConnection();

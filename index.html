@@ -538,9 +538,10 @@ async function loadFeaturedProducts(attempt = 1) {
     } catch (error) {
         console.error(`加載精選商品失敗（第 ${attempt} 次嘗試）:`, error);
 
-        // 重試到第 4 次還沒成功，換一個全新的 Firestore 連線物件再繼續重試，
-        // 原因見 products.html 的同一段註解。60 秒節流避免無限重建
-        if (attempt >= 4 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
+        // 第 1 次失敗先不出手，連第 2 次也失敗才換一個全新的 Firestore
+        // 連線物件再繼續重試，原因見 products.html 的同一段註解。
+        // 60 秒節流避免無限重建
+        if (attempt >= 2 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
             lastConnectionResetAt = Date.now();
             if (window.resetFirestoreConnection) {
                 await window.resetFirestoreConnection();
