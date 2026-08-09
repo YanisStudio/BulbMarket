@@ -68,6 +68,7 @@
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import {
             initializeFirestore,
+            terminate,
             collection,
             doc,
             setDoc,
@@ -91,11 +92,14 @@
         // 是否會擋掉預設的串流連線，會的話自動改用相容性更好的長輪詢，
         // 降低連線逾時、進而觸發自動重試的機率
         const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
-        
+
         // 將Firebase服務暴露給全局使用
         window.firebaseServices = {
+            app: app,
             auth: auth,
             db: db,
+            initializeFirestore,
+            terminate,
             getAuth,
             createUserWithEmailAndPassword,
             signInWithEmailAndPassword,
@@ -510,6 +514,10 @@ async function loadBulletin() {
 // FirebaseUtils.loadFeaturedProducts() 內部（透過 loadProducts）已經會先等
 // Auth 狀態確定（見 common.js 的 waitForAuthReady）才送出查詢，所以查詢成功
 // 但陣列是空的，就直接代表真的沒設定精選商品，不需要再額外重試確認。
+// 記錄上次自動重建 Firestore 連線的時間，避免網路真的斷線很久時無限重建
+let lastConnectionResetAt = 0;
+const CONNECTION_RESET_COOLDOWN_MS = 60000;
+
 async function loadFeaturedProducts(attempt = 1) {
     try {
         showLoadingProducts(attempt);
@@ -529,6 +537,16 @@ async function loadFeaturedProducts(attempt = 1) {
 
     } catch (error) {
         console.error(`加載精選商品失敗（第 ${attempt} 次嘗試）:`, error);
+
+        // 重試到第 4 次還沒成功，換一個全新的 Firestore 連線物件再繼續重試，
+        // 原因見 products.html 的同一段註解。60 秒節流避免無限重建
+        if (attempt >= 4 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
+            lastConnectionResetAt = Date.now();
+            if (window.resetFirestoreConnection) {
+                await window.resetFirestoreConnection();
+            }
+        }
+
         // 不設重試上限，間隔漸增封頂在 8 秒，網路一恢復就會自動抓到商品
         const retryDelay = Math.min(attempt * 1000, 8000);
         setTimeout(() => loadFeaturedProducts(attempt + 1), retryDelay);

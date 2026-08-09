@@ -410,6 +410,42 @@ async function isAdmin(user) {
 }
 
 /**
+ * 重建 Firestore 連線：把卡在異常狀態的舊連線關掉，換一個全新的連線物件。
+ *
+ * 背景：Firestore 底層的 WebChannel 連線偶爾會卡在錯誤狀態，卡住之後同一個
+ * 連線物件即使重試很多次也要等很久才會自己恢復；換成全新的連線物件通常能
+ * 更快恢復（效果類似使用者手動整頁重新整理，但不用真的重新整理整個頁面）。
+ *
+ * 只把 window.firebaseServices.db 這個「屬性」換掉，不是整個換掉
+ * window.firebaseServices 物件本身，這樣所有原本就是「每次要用才即時讀取
+ * window.firebaseServices.db」的地方，下一次呼叫就會自動用到新連線，
+ * 不需要另外通知它們。
+ *
+ * 只有 products.html / index.html 的商品載入重試邏輯會呼叫這個函數，
+ * 需要頁面自己的 <script type="module"> 有把 app、initializeFirestore、
+ * terminate 這三個一併暴露到 window.firebaseServices 才能用。
+ */
+async function resetFirestoreConnection() {
+    const services = window.firebaseServices;
+    if (!services || !services.app || !services.initializeFirestore || !services.terminate) {
+        console.warn('無法重建 Firestore 連線：這個頁面沒有暴露 app/initializeFirestore/terminate');
+        return false;
+    }
+    try {
+        await services.terminate(services.db);
+        services.db = services.initializeFirestore(services.app, {
+            experimentalAutoDetectLongPolling: true
+        });
+        console.log('Firestore 連線已重建');
+        return true;
+    } catch (error) {
+        console.error('重建 Firestore 連線失敗:', error);
+        return false;
+    }
+}
+window.resetFirestoreConnection = resetFirestoreConnection;
+
+/**
  * 顯示提示消息
  */
 function showToast(message) {
