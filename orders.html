@@ -1148,9 +1148,8 @@ async function loadUserOrders(user) {
             
             const { statusText, statusClass } = getOrderStatusInfo(order.status);
 
-            // 還沒付款的訂單，對客戶來說重點是「要去付款」，不是「待處理」
-            // （待處理是指我們收到款項後才會開始處理），所以未付款時只顯示
-            // 「未付款」，不要跟訂單處理狀態同時出現、造成兩個狀態並存的錯覺
+            // 還沒付款的訂單，對客戶來說重點是「要去付款」，用專屬的紅色徽章
+            // 突顯、並顯示合併匯款用的勾選框，跟一般狀態徽章的樣式分開處理
             const isUnpaid = order.status === 'pending' && order.paymentConfirmed !== true;
             const badgeHTML = isUnpaid
                 ? '<span class="unpaid-badge">未付款</span>'
@@ -1777,11 +1776,11 @@ function getOrderStatusInfo(status) {
    
    switch(status) {
        case 'pending':
-           statusText = '待處理';
+           statusText = '未付款';
            statusClass = 'status-pending';
            break;
        case 'confirmed':
-           statusText = '已確認';
+           statusText = '已付款';
            statusClass = 'status-confirmed';
            break;
        case 'shipped':
@@ -1797,7 +1796,7 @@ function getOrderStatusInfo(status) {
            statusClass = 'status-cancelled';
            break;
        default:
-           statusText = '待處理';
+           statusText = '未付款';
            statusClass = 'status-pending';
    }
    

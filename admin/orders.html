@@ -156,8 +156,8 @@
                             <label for="status-filter">訂單狀態:</label>
                             <select id="status-filter" style="width: 150px; height: 40px; font-size: 15px; padding: 5px;">
                                 <option value="all">全部訂單</option>
-                                <option value="pending">待處理</option>
-                                <option value="confirmed">已確認</option>
+                                <option value="pending">未付款</option>
+                                <option value="confirmed">已付款</option>
                                 <option value="shipped">已出貨</option>
                                 <option value="completed">已完成</option>
                                 <option value="cancelled">已取消</option>
@@ -194,7 +194,7 @@
                     <label>匯出範圍:</label>
                     <div class="radio-group">
                         <label><input type="radio" name="export-range" value="all" checked> 全部訂單</label>
-                        <label><input type="radio" name="export-range" value="confirmed"> 僅已確認訂單</label>
+                        <label><input type="radio" name="export-range" value="confirmed"> 僅已付款訂單</label>
                         <label><input type="radio" name="export-range" value="shipped"> 僅已出貨訂單</label>
                         <label><input type="radio" name="export-range" value="completed"> 僅已完成訂單</label>
                     </div>
@@ -1118,8 +1118,8 @@
                 
                 function getStatusText(status) {
                     const statusMap = {
-                        'pending': '待處理',
-                        'confirmed': '已確認',
+                        'pending': '未付款',
+                        'confirmed': '已付款',
                         'shipped': '已出貨',
                         'completed': '已完成',
                         'cancelled': '已取消'
@@ -1201,11 +1201,11 @@
                                     switch(order.status) {
                                         case 'pending':
                                             statusClass = 'pending';
-                                            statusText = '待處理';
+                                            statusText = '未付款';
                                             break;
                                         case 'confirmed':
                                             statusClass = 'confirmed';
-                                            statusText = '已確認';
+                                            statusText = '已付款';
                                             break;
                                         case 'shipped':
                                             statusClass = 'shipped';
@@ -1221,7 +1221,7 @@
                                             break;
                                         default:
                                             statusClass = 'pending';
-                                            statusText = '待處理';
+                                            statusText = '未付款';
                                     }
                                     
                                     ordersHTML += `
@@ -1338,8 +1338,8 @@
                                 }
                                 
                                 const statusOptions = [
-                                    { value: 'pending', text: '待處理' },
-                                    { value: 'confirmed', text: '已確認' },
+                                    { value: 'pending', text: '未付款' },
+                                    { value: 'confirmed', text: '已付款' },
                                     { value: 'shipped', text: '已出貨' },
                                     { value: 'completed', text: '已完成' },
                                     { value: 'cancelled', text: '已取消' }
@@ -1484,12 +1484,12 @@
                                     
                                     let statusText = '';
                                     switch(newStatus) {
-                                        case 'pending': statusText = '待處理'; break;
-                                        case 'confirmed': statusText = '已確認'; break;
+                                        case 'pending': statusText = '未付款'; break;
+                                        case 'confirmed': statusText = '已付款'; break;
                                         case 'shipped': statusText = '已出貨'; break;
                                         case 'completed': statusText = '已完成'; break;
                                         case 'cancelled': statusText = '已取消'; break;
-                                        default: statusText = '待處理';
+                                        default: statusText = '未付款';
                                     }
                                     statusElement.textContent = statusText;
                                 }

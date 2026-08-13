@@ -22,62 +22,143 @@ function escapeHtml(value) {
         .replace(/'/g, "&#39;");
 }
 
+// 共用的信件外框樣式，避免每個範本重複寫一樣的 CSS
+function emailShell(bodyHtml) {
+    return `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#333;">${bodyHtml}</div>`;
+}
+
+function buildItemsTable(items) {
+    const rows = (items || [])
+        .map(
+            (item) =>
+                `<tr>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml(item.name)}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">x${item.quantity}</td>
+                    <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.price * item.quantity)}</td>
+                </tr>`
+        )
+        .join("");
+
+    return `
+        <table style="width:100%;border-collapse:collapse;margin:12px 0;">
+            <thead>
+                <tr style="background:#f5f5f5;">
+                    <th style="padding:6px 8px;text-align:left;">商品</th>
+                    <th style="padding:6px 8px;text-align:center;">數量</th>
+                    <th style="padding:6px 8px;text-align:right;">小計</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+    `;
+}
+
+// 跟 orders.html 的 paymentReminderHTML 用同一套文案，付款方式不同、提醒內容不同
+function paymentReminderText(payment) {
+    if (payment === "transfer_later") {
+        return "請回到「訂單記錄」列表勾選這筆訂單，完成匯款確認（可與其他未付款訂單合併一起匯款）。";
+    }
+    return "請於訂單成立後 24 小時內完成 ATM 轉帳，我們將在確認付款後盡快為您處理訂單。";
+}
+
+async function sendOrderEmail({ order, subject, bodyHtml, logLabel, orderId }) {
+    if (!order?.customer?.email) {
+        logger.warn(`${logLabel}：訂單缺少顧客信箱，略過寄信`, { orderId });
+        return;
+    }
+    try {
+        await sendEmail({
+            apiKey: BREVO_API_KEY.value(),
+            toEmail: order.customer.email,
+            toName: order.customer.name,
+            subject,
+            html: emailShell(bodyHtml)
+        });
+        logger.info(`${logLabel}已寄出`, { orderId });
+    } catch (error) {
+        logger.error(`${logLabel}寄送失敗`, { orderId, error: error.message });
+    }
+}
+
 /**
- * 訂單建立時，寄送訂單確認信給顧客。
+ * 訂單建立時，寄送訂單明細＋付款提醒信給顧客。
+ * 目前所有付款方式都是先建立訂單、之後才轉帳，所以一律提醒付款。
  */
 exports.sendOrderConfirmationEmail = onDocumentCreated(
     { document: "orders/{orderId}", secrets: [BREVO_API_KEY] },
     async (event) => {
         const order = event.data?.data();
-        if (!order || !order.customer?.email) {
-            logger.warn("訂單缺少顧客信箱，略過寄信", { orderId: event.params.orderId });
-            return;
-        }
+        const orderId = event.params.orderId;
 
-        const itemsHtml = (order.items || [])
-            .map(
-                (item) =>
-                    `<tr>
-                        <td style="padding:6px 8px;border-bottom:1px solid #eee;">${escapeHtml(item.name)}</td>
-                        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:center;">x${item.quantity}</td>
-                        <td style="padding:6px 8px;border-bottom:1px solid #eee;text-align:right;">${formatCurrency(item.price * item.quantity)}</td>
-                    </tr>`
-            )
-            .join("");
-
-        const html = `
-            <div style="font-family:sans-serif;max-width:520px;margin:0 auto;color:#333;">
-                <h2 style="color:#2e7d4f;">感謝您的訂購，${escapeHtml(order.customer.name)}！</h2>
-                <p>我們已經收到您的訂單，以下是訂單明細：</p>
-                <p><b>訂單編號：</b>${escapeHtml(order.orderNumber)}</p>
-                <table style="width:100%;border-collapse:collapse;margin:12px 0;">
-                    <thead>
-                        <tr style="background:#f5f5f5;">
-                            <th style="padding:6px 8px;text-align:left;">商品</th>
-                            <th style="padding:6px 8px;text-align:center;">數量</th>
-                            <th style="padding:6px 8px;text-align:right;">小計</th>
-                        </tr>
-                    </thead>
-                    <tbody>${itemsHtml}</tbody>
-                </table>
-                <p>商品小計：${formatCurrency(order.subtotal)}</p>
-                <p>運費：${formatCurrency(order.shippingFee)}</p>
-                <p style="font-size:1.1em;"><b>訂單總額：${formatCurrency(order.total)}</b></p>
-                <p style="margin-top:24px;color:#777;font-size:0.9em;">如有任何問題，歡迎透過網站的聯絡我們與我們聯繫。</p>
+        const bodyHtml = `
+            <h2 style="color:#2e7d4f;">感謝您的訂購，${escapeHtml(order?.customer?.name)}！</h2>
+            <p>我們已經收到您的訂單，以下是訂單明細：</p>
+            <p><b>訂單編號：</b>${escapeHtml(order?.orderNumber)}</p>
+            ${buildItemsTable(order?.items)}
+            <p>商品小計：${formatCurrency(order?.subtotal)}</p>
+            <p>運費：${formatCurrency(order?.shippingFee)}</p>
+            <p style="font-size:1.1em;"><b>訂單總額：${formatCurrency(order?.total)}</b></p>
+            <div style="background:#fff8e1;padding:12px;border-radius:6px;margin:16px 0;">
+                <p style="margin:0;"><b>尚未付款：</b>${paymentReminderText(order?.payment)}</p>
             </div>
+            <p style="margin-top:24px;color:#777;font-size:0.9em;">如有任何問題，歡迎透過網站的聯絡我們與我們聯繫。</p>
         `;
 
-        try {
-            await sendEmail({
-                apiKey: BREVO_API_KEY.value(),
-                toEmail: order.customer.email,
-                toName: order.customer.name,
-                subject: `【球根花卉團購】訂單確認 - ${order.orderNumber}`,
-                html
+        await sendOrderEmail({
+            order,
+            subject: `【球根花卉團購】訂單成立，請留意付款 - ${order?.orderNumber}`,
+            bodyHtml,
+            logLabel: "訂單成立通知信",
+            orderId
+        });
+    }
+);
+
+/**
+ * 訂單更新時：
+ * - paymentConfirmed 第一次從 false/undefined 變 true → 寄付款確認信
+ * - status 第一次變成 shipped → 寄出貨通知信
+ * 兩個條件各自獨立判斷，同一次更新如果剛好兩個條件都成立，兩封都會寄。
+ */
+exports.sendOrderStatusEmail = onDocumentUpdated(
+    { document: "orders/{orderId}", secrets: [BREVO_API_KEY] },
+    async (event) => {
+        const before = event.data?.before?.data();
+        const after = event.data?.after?.data();
+        const orderId = event.params.orderId;
+        if (!after) return;
+
+        const justPaid = before?.paymentConfirmed !== true && after.paymentConfirmed === true;
+        if (justPaid) {
+            const bodyHtml = `
+                <h2 style="color:#2e7d4f;">我們已收到您的付款</h2>
+                <p>${escapeHtml(after.customer?.name)} 您好，訂單 <b>${escapeHtml(after.orderNumber)}</b> 的款項已確認收到，我們會盡快為您安排出貨，出貨後會再寄信通知您。</p>
+                <p style="font-size:1.1em;"><b>訂單總額：${formatCurrency(after.total)}</b></p>
+            `;
+            await sendOrderEmail({
+                order: after,
+                subject: `【球根花卉團購】付款已確認 - ${after.orderNumber}`,
+                bodyHtml,
+                logLabel: "付款確認信",
+                orderId
             });
-            logger.info("訂單確認信已寄出", { orderId: event.params.orderId });
-        } catch (error) {
-            logger.error("訂單確認信寄送失敗", { orderId: event.params.orderId, error: error.message });
+        }
+
+        const justShipped = before?.status !== "shipped" && after.status === "shipped";
+        if (justShipped) {
+            const bodyHtml = `
+                <h2 style="color:#2e7d4f;">您的訂單已出貨</h2>
+                <p>${escapeHtml(after.customer?.name)} 您好，訂單 <b>${escapeHtml(after.orderNumber)}</b> 已經出貨囉！</p>
+                ${buildItemsTable(after.items)}
+                <p style="margin-top:24px;color:#777;font-size:0.9em;">如有任何問題，歡迎透過網站的聯絡我們與我們聯繫。</p>
+            `;
+            await sendOrderEmail({
+                order: after,
+                subject: `【球根花卉團購】訂單已出貨 - ${after.orderNumber}`,
+                bodyHtml,
+                logLabel: "出貨通知信",
+                orderId
+            });
         }
     }
 );

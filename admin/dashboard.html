@@ -110,7 +110,7 @@
                             <i class="fas fa-shopping-cart"></i>
                         </div>
                         <div class="stat-info">
-                            <h3>待處理訂單</h3>
+                            <h3>未付款訂單</h3>
                             <p class="stat-number" id="pending-orders">--</p>
                         </div>
                     </div>
@@ -394,12 +394,12 @@
                     }
                     
                     let statusClass = 'pending';
-                    let statusText = '待處理';
-                    
+                    let statusText = '未付款';
+
                     switch(order.status) {
                         case 'confirmed':
                             statusClass = 'confirmed';
-                            statusText = '已確認';
+                            statusText = '已付款';
                             break;
                         case 'shipped':
                             statusClass = 'shipped';
