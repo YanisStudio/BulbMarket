@@ -1,3 +1,4 @@
 .claude/settings.local.json
 scripts/product-scheduler/node_modules/
 scripts/reconcile-user-profiles/node_modules/
+functions/node_modules/

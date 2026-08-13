@@ -1,0 +1,13 @@
+{
+  "name": "bulbmarket-functions",
+  "private": true,
+  "description": "訂單建立、訊息回覆時透過 Brevo 寄送通知信",
+  "engines": {
+    "node": "20"
+  },
+  "main": "index.js",
+  "dependencies": {
+    "firebase-admin": "^12.6.0",
+    "firebase-functions": "^5.0.0"
+  }
+}
