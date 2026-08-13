@@ -1467,10 +1467,15 @@
                 // 更新訂單狀態
                 function updateOrderStatus(orderId, newStatus) {
                     const orderDocRef = window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId);
-                    
-                    window.firebaseServices.updateDoc(orderDocRef, {
-                        status: newStatus
-                    })
+
+                    // 已付款/已出貨/已完成邏輯上都代表錢已經收到了，管理員手動改狀態時
+                    // 一併同步 paymentConfirmed，避免跟顧客自己回報匯款那條路徑的資料兜不起來
+                    const updateData = { status: newStatus };
+                    if (['confirmed', 'shipped', 'completed'].includes(newStatus)) {
+                        updateData.paymentConfirmed = true;
+                    }
+
+                    window.firebaseServices.updateDoc(orderDocRef, updateData)
                         .then(() => {
                             const orderItem = document.querySelector(`.order-item[data-id="${orderId}"]`);
                             if (orderItem) {

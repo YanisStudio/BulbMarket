@@ -1318,7 +1318,10 @@ async function submitMergePayment(e) {
             const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
             batch.update(orderRef, {
                 notes: updatedNotes,
-                paymentConfirmed: true
+                paymentConfirmed: true,
+                // 顧客自己回報匯款時一併把狀態推進到「已付款」，畫面才會立刻反映，
+                // 不用等管理員另外手動去後台改狀態
+                status: 'confirmed'
             });
         }
         await batch.commit();
