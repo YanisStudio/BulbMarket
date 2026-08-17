@@ -1599,9 +1599,22 @@ if (newUserCreationTime && (now - parseInt(newUserCreationTime)) < 300000) {
                 getDoc(doc(window.firebaseServices.db, 'users', user.uid))
                     .then((docSnap) => {
                         if (docSnap.exists()) {
+                            const firestoreName = docSnap.data().name;
+
+                            // getDoc() 連線不穩時，有機會悄悄退回本地空快取，回傳
+                            // 「技術上成功、但抓到的資料是空的」的結果（docSnap.metadata.fromCache
+                            // 會是 true）。這種情況下 name 讀到空值不代表使用者真的沒設定名字，
+                            // 只是這次剛好沒抓到最新資料；如果畫面上已經有正確的名字顯示著
+                            // （localStorage 裡有快取值），就不要被這種不可靠的讀取結果蓋掉，
+                            // 不然會變成「有時候顯示名字、有時候顯示信箱」
+                            if (!firestoreName && docSnap.metadata.fromCache && localStorage.getItem('userName')) {
+                                console.log('這次讀取來自本地快取且名字是空的，保留原本顯示的名字');
+                                return;
+                            }
+
                             // Firestore 的 name 欄位可能是空字串或不存在（例如手機號碼註冊、資料尚未填寫），
                             // 沒有這個備援值的話會把 undefined 存進 localStorage，下次讀取會變成字面字串 "undefined"
-                            const name = docSnap.data().name || user.email?.split('@')[0] || user.phoneNumber || '用戶';
+                            const name = firestoreName || user.email?.split('@')[0] || user.phoneNumber || '用戶';
                             console.log("獲取用戶資料:", name);
                             localStorage.setItem('userName', name);
 
@@ -1612,10 +1625,18 @@ if (newUserCreationTime && (now - parseInt(newUserCreationTime)) < 300000) {
                                 usernameDisplayMobile.textContent = name;
                             }
                         } else {
+                            // docSnap.exists() 是 false 也有可能是連線不穩、退回本地空快取
+                            // 造成的假訊號（本地快取根本沒存過這筆資料，不代表 Firestore 上
+                            // 真的沒有），同樣不要因此蓋掉畫面上已經顯示的正確名字
+                            if (docSnap.metadata.fromCache && localStorage.getItem('userName')) {
+                                console.log('這次讀取來自本地快取且查無資料，保留原本顯示的名字');
+                                return;
+                            }
+
                             // 如果找不到用戶資料，使用預設顯示
                             const name = user.email?.split('@')[0] || user.phoneNumber || '用戶';
                             localStorage.setItem('userName', name);
-                            
+
                             if (usernameDisplay) {
                                 usernameDisplay.textContent = name;
                             }
