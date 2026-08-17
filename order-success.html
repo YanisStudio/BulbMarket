@@ -958,9 +958,9 @@
             const confirmationMessage = document.getElementById('transfer-confirmation-message');
 
             if (paymentConfirmForm) {
-                paymentConfirmForm.addEventListener('submit', function(e) {
+                paymentConfirmForm.addEventListener('submit', async function(e) {
                     e.preventDefault();
-                    
+
                     // 獲取表單數據
                     const remitterName = document.getElementById('transfer-remitter-name').value;
                     const transferBank = document.getElementById('transfer-bank').value;
@@ -968,101 +968,99 @@
                     const lastFiveDigits = document.getElementById('transfer-last-5-digits').value;
                     const transferDate = document.getElementById('transfer-date').value;
                     const transferNote = document.getElementById('transfer-note').value;
-                    
-                    // 獲取訂單編號
-                    const orderNumber = document.getElementById('order-number').textContent;
-                    
-                    // 顯示確認信息
-                    const confirmationForm = document.getElementById('transfer-confirmation-form');
-                    
-                    if (confirmationForm) {
-                        confirmationForm.classList.add('transfer-confirmed');
-                        paymentConfirmForm.style.display = 'none';
-                        
-                        // 顯示確認信息摘要
-                        const confirmedHTML = `
-                            <div class="confirmed-info">
-                                <p><strong>匯款人姓名:</strong> ${escapeHtml(remitterName)}</p>
-                                <p><strong>匯款銀行:</strong> ${escapeHtml(transferBank)}</p>
-                                <p><strong>匯款金額:</strong> ${transferAmountInput}</p>
-                                <p><strong>對帳後五碼:</strong> ${lastFiveDigits}</p>
-                                <p><strong>匯款時間:</strong> ${transferDate}</p>
-                                ${transferNote ? `<p><strong>備註:</strong> ${escapeHtml(transferNote)}</p>` : ''}
-                                <p><strong>確認時間:</strong> ${new Date().toLocaleString()}</p>
-                                <p class="confirmation-thankyou">感謝您的匯款確認，我們將盡快處理您的訂單！</p>
-                            </div>
-                        `;
-                        
-                        confirmationMessage.innerHTML = confirmedHTML;
-                        confirmationMessage.style.display = 'block';
-                        
-                        // 設置匯款確認狀態為已完成
+
+                    const submitBtn = paymentConfirmForm.querySelector('button[type="submit"]');
+                    const originalBtnText = submitBtn ? submitBtn.textContent : '';
+                    if (submitBtn) {
+                        submitBtn.disabled = true;
+                        submitBtn.textContent = '送出中...';
+                    }
+
+                    // 先確認 Firestore 真的寫入成功，才顯示「已收到」的成功畫面——
+                    // 之前是先顯示成功、才在背景偷偷寫入，寫入失敗（例如權限被拒）
+                    // 顧客完全不會發現，畫面看起來一切正常但資料其實沒存到
+                    try {
+                        const lastOrderJSON = sessionStorage.getItem('lastOrder');
+                        if (!lastOrderJSON) {
+                            throw new Error('找不到本次訂單資訊，請直接到「訂單記錄」頁面回報匯款');
+                        }
+                        const lastOrder = JSON.parse(lastOrderJSON);
+                        const orderId = lastOrder.id;
+                        if (!orderId || !window.firebaseServices) {
+                            throw new Error('找不到訂單編號，請直接到「訂單記錄」頁面回報匯款');
+                        }
+
+                        const paymentNote = `【匯款確認】匯款人姓名: ${remitterName}, 匯款銀行: ${transferBank}, 匯款金額: ${transferAmountInput}, 對帳後五碼: ${lastFiveDigits}, 匯款時間: ${transferDate}, 備註: ${transferNote || '無'}, 確認時間: ${new Date().toLocaleString()}`;
+
+                        const orderRef = window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId);
+                        const orderSnap = await window.firebaseServices.getDoc(orderRef);
+                        if (!orderSnap.exists()) {
+                            throw new Error('找不到訂單資料，請直接到「訂單記錄」頁面回報匯款');
+                        }
+                        const existingNotes = orderSnap.data().notes || '';
+                        const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
+
+                        // 更新訂單備註，並標記已完成匯款確認、同步推進 status，
+                        // 兩個欄位要一起改，不然訂單記錄那邊會一直顯示「未付款」
+                        await window.firebaseServices.updateDoc(orderRef, {
+                            notes: updatedNotes,
+                            paymentConfirmed: true,
+                            status: 'confirmed'
+                        });
+
+                        // Firestore 確認寫入成功，才顯示確認畫面
+                        const confirmationForm = document.getElementById('transfer-confirmation-form');
+                        if (confirmationForm) {
+                            confirmationForm.classList.add('transfer-confirmed');
+                            paymentConfirmForm.style.display = 'none';
+
+                            const confirmedHTML = `
+                                <div class="confirmed-info">
+                                    <p><strong>匯款人姓名:</strong> ${escapeHtml(remitterName)}</p>
+                                    <p><strong>匯款銀行:</strong> ${escapeHtml(transferBank)}</p>
+                                    <p><strong>匯款金額:</strong> ${transferAmountInput}</p>
+                                    <p><strong>對帳後五碼:</strong> ${lastFiveDigits}</p>
+                                    <p><strong>匯款時間:</strong> ${transferDate}</p>
+                                    ${transferNote ? `<p><strong>備註:</strong> ${escapeHtml(transferNote)}</p>` : ''}
+                                    <p><strong>確認時間:</strong> ${new Date().toLocaleString()}</p>
+                                    <p class="confirmation-thankyou">感謝您的匯款確認，我們將盡快處理您的訂單！</p>
+                                </div>
+                            `;
+                            confirmationMessage.innerHTML = confirmedHTML;
+                            confirmationMessage.style.display = 'block';
+                        }
+
                         isTransferConfirmed = true;
-                        
-                        // 顯示成功彈窗
                         showTransferConfirmationModal();
-                        
-                        // 將匯款信息保存到 localStorage 和 Firestore
+
+                        // 純本機備份用途，不是訂單狀態的判斷依據，失敗也沒關係
                         try {
-                            // 創建匯款記錄對象
                             const transferRecord = {
-                                orderNumber: orderNumber,
-                                remitterName: remitterName,
-                                transferBank: transferBank,
-                                transferAmount: transferAmountInput,
-                                lastFiveDigits: lastFiveDigits,
-                                transferDate: transferDate,
-                                transferNote: transferNote,
+                                orderNumber: document.getElementById('order-number').textContent,
+                                remitterName, transferBank, transferAmount: transferAmountInput,
+                                lastFiveDigits, transferDate, transferNote,
                                 confirmTime: new Date().toISOString()
                             };
-                            
-                            // 將記錄添加到 localStorage
                             let transferRecords = localStorage.getItem('transferRecords') || '[]';
                             transferRecords = JSON.parse(transferRecords);
                             transferRecords.push(transferRecord);
                             localStorage.setItem('transferRecords', JSON.stringify(transferRecords));
-                            
-                            // 從 sessionStorage 獲取訂單 ID
-                            const lastOrderJSON = sessionStorage.getItem('lastOrder');
-                            if (lastOrderJSON) {
-                                const lastOrder = JSON.parse(lastOrderJSON);
-                                const orderId = lastOrder.id;
-                                
-                                if (orderId && window.firebaseServices) {
-                                    // 生成匯款備註訊息
-                                    const paymentNote = `【匯款確認】匯款人姓名: ${remitterName}, 匯款銀行: ${transferBank}, 匯款金額: ${transferAmountInput}, 對帳後五碼: ${lastFiveDigits}, 匯款時間: ${transferDate}, 備註: ${transferNote || '無'}, 確認時間: ${new Date().toLocaleString()}`;
-                                    
-                                    // 獲取現有備註 (如果有)
-                                    window.firebaseServices.getDoc(window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId))
-                                        .then((doc) => {
-                                            if (doc.exists()) {
-                                                const orderData = doc.data();
-                                                // 合併現有備註與新的匯款備註
-                                                const existingNotes = orderData.notes || '';
-                                                const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
-                                                
-                                                // 更新訂單備註，並標記已完成匯款確認、同步推進 status，
-                                                // 兩個欄位要一起改，不然訂單記錄那邊會一直顯示「未付款」，
-                                                // 即使客戶已經填過這裡的表單
-                                                return window.firebaseServices.updateDoc(
-                                                    window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId),
-                                                    { notes: updatedNotes, paymentConfirmed: true, status: 'confirmed' }
-                                                );
-                                            } else {
-                                                console.error('找不到訂單文檔:', orderId);
-                                                throw new Error('訂單文檔不存在');
-                                            }
-                                        })
-                                        .then(() => {
-                                            console.log('匯款確認已成功記錄並更新至訂單備註');
-                                        })
-                                        .catch((error) => {
-                                            console.error('更新訂單備註時出錯:', error);
-                                        });
-                                }
-                            }
-                        } catch (error) {
-                            console.error('儲存匯款記錄時出錯:', error);
+                        } catch (localStorageError) {
+                            console.warn('儲存本機匯款備份失敗（不影響訂單）:', localStorageError);
+                        }
+                    } catch (error) {
+                        console.error('匯款確認寫入失敗:', error);
+                        confirmationMessage.innerHTML = `
+                            <div class="confirmed-info" style="color:#b23a32;">
+                                <p><strong>送出失敗：</strong>${escapeHtml(error.message || '請稍後再試')}</p>
+                                <p>請確認網路連線後重新送出，或直接到「訂單記錄」頁面回報匯款。</p>
+                            </div>
+                        `;
+                        confirmationMessage.style.display = 'block';
+                    } finally {
+                        if (submitBtn) {
+                            submitBtn.disabled = false;
+                            submitBtn.textContent = originalBtnText;
                         }
                     }
                 });

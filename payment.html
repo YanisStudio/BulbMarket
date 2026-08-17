@@ -364,6 +364,7 @@
         addDoc,        // 添加缺失的 addDoc
         updateDoc,     // 添加缺失的 updateDoc
         increment,     // 添加缺失的 increment
+        runTransaction,
         query,
         orderBy,
         where,
@@ -395,6 +396,7 @@
             addDoc,        // 暴露 addDoc
             updateDoc,     // 暴露 updateDoc
             increment,     // 暴露 increment
+            runTransaction,
             query,
             where,
             orderBy,
@@ -1546,62 +1548,6 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                 }
             }
             
-            // 更新商品庫存
-            async function updateProductStock() {
-                try {
-                    console.log('開始更新庫存...');
-                    
-                    // 合併相同商品的數量
-                    const mergedCart = [];
-                    cart.forEach(item => {
-                        const existingItem = mergedCart.find(i => i.id === item.id);
-                        if (existingItem) {
-                            existingItem.quantity += item.quantity;
-                        } else {
-                            mergedCart.push({...item});
-                        }
-                    });
-                    
-                    // 批量更新庫存
-                    const stockUpdatePromises = mergedCart.map(async (item) => {
-                        try {
-                            const productRef = firebaseServices.doc(firebaseServices.db, 'products', item.id);
-                            
-                            // 使用 increment 函數減少庫存
-                            await firebaseServices.updateDoc(productRef, {
-                                stock: firebaseServices.increment(-item.quantity),
-                                lastUpdated: firebaseServices.serverTimestamp()
-                            });
-                            
-                            console.log(`成功更新商品 ${item.name} 庫存，減少 ${item.quantity} 件`);
-                            return { success: true, productId: item.id, name: item.name, quantity: item.quantity };
-                            
-                        } catch (error) {
-                            console.error(`更新商品 ${item.id} 庫存失敗:`, error);
-                            return { success: false, productId: item.id, name: item.name, error: error.message };
-                        }
-                    });
-                    
-                    // 等待所有庫存更新完成
-                    const updateResults = await Promise.all(stockUpdatePromises);
-                    
-                    // 檢查是否有更新失敗的商品
-                    const failedUpdates = updateResults.filter(result => !result.success);
-                    
-                    if (failedUpdates.length > 0) {
-                        console.error('部分商品庫存更新失敗:', failedUpdates);
-                        // 這裡可以選擇是否回滾操作，或者記錄錯誤
-                    }
-                    
-                    console.log('庫存更新完成');
-                    return { success: true, results: updateResults };
-                    
-                } catch (error) {
-                    console.error('批量更新庫存時發生錯誤:', error);
-                    throw error;
-                }
-            }
-            
             // 提交訂單函數
             async function submitOrder() {
                 if (!checkoutForm.checkValidity()) {
@@ -1727,32 +1673,60 @@ if (shipping === 'store') {
                     
                     console.log('準備提交訂單資料:', orderData);
                     
-                    // 第四步：將訂單保存到 Firestore
-                    const ordersCollectionRef = firebaseServices.collection(firebaseServices.db, 'orders');
-                    const docRef = await firebaseServices.addDoc(ordersCollectionRef, orderData);
-                    
-                    console.log('訂單已創建，ID:', docRef.id);
-                    console.log('訂單編號:', orderNumber);
-                    
-                    // 更新按鈕文字
+                    // 第四、五步：建立訂單＋扣庫存，包在同一個 Firestore transaction 裡
+                    // 原子性完成。之前是先查庫存夠不夠、再分開建立訂單、再分開扣庫存，
+                    // 兩個顧客幾乎同時結帳時，有機會兩邊都查到庫存足夠、都成功建立訂單、
+                    // 都扣庫存成功，結果賣超（例如庫存只剩 1 件卻賣出 2 件）。改成
+                    // transaction 之後，Firestore 會保證同一時間只有一個能成功提交，
+                    // 提交當下才重新確認一次庫存是否足夠
                     if (submitOrderBtn) {
-                        submitOrderBtn.textContent = '更新庫存中...';
+                        submitOrderBtn.textContent = '確認庫存並建立訂單中...';
                     }
                     if (mobileSubmitOrderBtn) {
-                        mobileSubmitOrderBtn.textContent = '更新庫存中...';
+                        mobileSubmitOrderBtn.textContent = '確認庫存並建立訂單中...';
                     }
-                    
-                    // 第五步：更新商品庫存
-                    try {
-                        await updateProductStock();
-                        console.log('庫存更新成功');
-                    } catch (stockError) {
-                        console.error('庫存更新失敗:', stockError);
-                        // 即使庫存更新失敗，訂單仍然建立成功
-                        // 可以記錄錯誤，後續手動處理
-                        console.warn('訂單已建立但庫存更新失敗，需要手動處理');
-                    }
-                    
+
+                    const ordersCollectionRef = firebaseServices.collection(firebaseServices.db, 'orders');
+                    const orderRef = firebaseServices.doc(ordersCollectionRef);
+
+                    await firebaseServices.runTransaction(firebaseServices.db, async (transaction) => {
+                        // transaction 規定所有讀取要在所有寫入之前，所以先把訂單會用到的
+                        // 每個商品都讀一次，確認提交這一刻庫存仍然足夠
+                        const productRefs = orderData.items.map(item =>
+                            firebaseServices.doc(firebaseServices.db, 'products', item.id)
+                        );
+                        const productSnaps = await Promise.all(
+                            productRefs.map(ref => transaction.get(ref))
+                        );
+
+                        const insufficientItems = [];
+                        productSnaps.forEach((snap, index) => {
+                            const item = orderData.items[index];
+                            const currentStock = snap.exists() ? (snap.data().stock || 0) : 0;
+                            if (currentStock < item.quantity) {
+                                insufficientItems.push(`${item.name}（剩 ${currentStock} 件）`);
+                            }
+                        });
+
+                        if (insufficientItems.length > 0) {
+                            throw new Error(
+                                `以下商品庫存在您結帳的同時被買完了：${insufficientItems.join('、')}，請返回購物車調整數量`
+                            );
+                        }
+
+                        transaction.set(orderRef, orderData);
+                        productRefs.forEach((ref, index) => {
+                            transaction.update(ref, {
+                                stock: firebaseServices.increment(-orderData.items[index].quantity),
+                                lastUpdated: firebaseServices.serverTimestamp()
+                            });
+                        });
+                    });
+
+                    const docRef = orderRef;
+                    console.log('訂單已創建，ID:', docRef.id);
+                    console.log('訂單編號:', orderNumber);
+
                     // 第六步：清空購物車
                     localStorage.removeItem('cart');
                     

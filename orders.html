@@ -894,6 +894,12 @@
     <script src="/js/cart.js"></script>
 
     <script>
+// loadUserOrders() 找到的「屬於我的訂單」ID 清單，包含訪客訂單（沒有 userId，
+// 靠 email/電話比對找到的）。showOrderDetail()/updateOrderNotes() 用這份清單
+// 判斷能不能看/改，不能只看 order.userId === 自己的 uid，不然訪客訂單登入後
+// 在列表看得到、點進去卻會被判定成「不是自己的」
+let myOrderIds = new Set();
+
 document.addEventListener('DOMContentLoaded', function() {
     // 初始化共用功能
     initCommonFeatures();
@@ -1124,7 +1130,10 @@ async function loadUserOrders(user) {
         }
         
         console.log(`總共找到 ${allOrders.length} 筆訂單`);
-        
+
+        // 更新「屬於我的訂單」清單，讓點進單筆詳情/加備註時能正確判斷訪客訂單
+        myOrderIds = new Set(allOrders.map(order => order.id));
+
         if (allOrders.length === 0) {
             orderListContainer.innerHTML = '<div class="no-orders"><p>您目前沒有任何訂單</p></div>';
             return;
@@ -1382,9 +1391,14 @@ async function showOrderDetail(orderId) {
 
         // 訂單列表本來就只會列出自己的訂單，但這裡是靠 orderId 直接查單筆資料，
         // 沒有這層檢查的話，只要知道別人的 orderId（例如透過瀏覽器紀錄、截圖流出）
-        // 就能繞過列表直接看到對方的姓名/電話/Email/地址/購買明細
+        // 就能繞過列表直接看到對方的姓名/電話/Email/地址/購買明細。
+        // 用 myOrderIds（loadUserOrders 已經確認過的清單）判斷，不能只看
+        // order.userId === 自己的 uid，不然訪客訂單（沒有 userId，靠 email/
+        // 電話比對找到）在列表看得到、點進來卻會被誤判成「不是自己的」
         const currentUser = window.firebaseServices.auth.currentUser;
-        if (!currentUser || order.userId !== currentUser.uid) {
+        const isMyOrder = myOrderIds.has(order.id) ||
+            (!!currentUser && order.userId === currentUser.uid);
+        if (!isMyOrder) {
             orderDetailContainer.innerHTML = '<div class="loading"><p>找不到訂單資料</p></div>';
             return;
         }
@@ -1584,9 +1598,12 @@ async function updateOrderNotes(orderId, notes) {
         );
 
         // 同樣要檢查這筆訂單是不是目前登入的人下的，避免用別人的 orderId
-        // 也能寫入備註到對方的訂單裡
+        // 也能寫入備註到對方的訂單裡。用 myOrderIds 判斷（涵蓋訪客訂單），
+        // 不能只看 userId 是否相符
         const currentUser = window.firebaseServices.auth.currentUser;
-        if (orderDoc.exists() && currentUser && orderDoc.data().userId !== currentUser.uid) {
+        const isMyOrder = myOrderIds.has(orderId) ||
+            (!!currentUser && orderDoc.exists() && orderDoc.data().userId === currentUser.uid);
+        if (orderDoc.exists() && !isMyOrder) {
             showToast('找不到訂單資料');
             updateBtn.disabled = false;
             updateBtn.textContent = originalBtnText;
