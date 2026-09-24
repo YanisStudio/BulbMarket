@@ -39,10 +39,6 @@
         max-width: none;
     }
 
-    header .logo-image {
-        height: 3.2em;
-    }
-
     header .header-right {
         grid-area: right;
         justify-self: end;
@@ -64,6 +60,56 @@
 
     header nav ul li a::after {
         bottom: 0.35em;
+    }
+
+    /* 隨捲動縮放：頁面最上方比較大，往下捲（body.header-compact，由 common.js 切換）縮小 */
+    header,
+    header .logo-image,
+    header .logo h1,
+    header .logo p,
+    header nav ul li a {
+        transition: all 0.3s ease;
+    }
+
+    header .logo-image {
+        height: 4em;
+    }
+
+    header .logo h1 {
+        font-size: 2em;
+    }
+
+    body.header-compact header {
+        padding-top: 0.35em;
+    }
+
+    body.header-compact header .logo-image {
+        height: 2.4em;
+    }
+
+    body.header-compact header .logo h1 {
+        font-size: 1.4em;
+        margin-bottom: 0;
+    }
+
+    body.header-compact header .logo p {
+        font-size: 0;
+        opacity: 0;
+    }
+
+    body.header-compact header nav ul li a {
+        padding: 0.45em 0;
+        font-size: 0.95em;
+    }
+}
+
+@media (min-width: 769px) and (prefers-reduced-motion: reduce) {
+    header,
+    header .logo-image,
+    header .logo h1,
+    header .logo p,
+    header nav ul li a {
+        transition: none;
     }
 }
 
@@ -280,11 +326,12 @@ footer.site-footer {
 }
 
 /* ---------- 首頁：商品分類入口（水滴形圖片） ---------- */
+/* 分類數量由後台決定：桌面一排 6 個、平板 4 個、手機 3 個 */
 .category-tiles {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 2em;
-    max-width: 820px;
+    grid-template-columns: repeat(6, 1fr);
+    gap: 2.25em 1.5em;
+    max-width: 1000px;
     margin: 0 auto;
     /* 水滴尖端轉 45 度後會超出方框，留一點上緣空間不要貼到色帶 */
     padding-top: 1.5em;
@@ -294,10 +341,12 @@ footer.site-footer {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 1.1em;
+    gap: 1em;
     color: #333;
     font-weight: 600;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.05em;
+    text-align: center;
+    line-height: 1.35;
 }
 
 .category-tile:hover {
@@ -305,8 +354,8 @@ footer.site-footer {
 }
 
 .category-tile-shape {
-    width: 8.5em;
-    height: 8.5em;
+    width: 7.5em;
+    height: 7.5em;
     border-radius: 0 50% 50% 50%;
     transform: rotate(45deg);
     overflow: hidden;
@@ -322,8 +371,8 @@ footer.site-footer {
 }
 
 .category-tile-shape img {
-    width: 142%;
-    height: 142%;
+    width: 150%;
+    height: 150%;
     max-width: none;
     object-fit: cover;
     transform: rotate(-45deg);
@@ -332,18 +381,33 @@ footer.site-footer {
 .category-tile-shape i {
     transform: rotate(-45deg);
     color: #fff;
-    font-size: 2.6em;
+    font-size: 2.4em;
+}
+
+@media (max-width: 992px) {
+    .category-tiles {
+        grid-template-columns: repeat(4, 1fr);
+    }
 }
 
 @media (max-width: 600px) {
     .category-tiles {
-        grid-template-columns: repeat(2, 1fr);
-        gap: 1.75em 1em;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 1.6em 0.6em;
+    }
+
+    .category-tile {
+        font-size: 0.9em;
+        gap: 0.8em;
     }
 
     .category-tile-shape {
-        width: 7em;
-        height: 7em;
+        width: 5.6em;
+        height: 5.6em;
+    }
+
+    .category-tile-shape i {
+        font-size: 2em;
     }
 }
 

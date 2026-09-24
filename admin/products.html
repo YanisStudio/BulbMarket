@@ -44,7 +44,9 @@
             getStorage,
             ref,
             uploadBytes,
-            getDownloadURL
+            getDownloadURL,
+            getMetadata,
+            updateMetadata
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
         
         // Firebase配置 - 統一使用與其他頁面相同的配置
@@ -80,7 +82,9 @@
             deleteField,
             storageRef: ref,
             uploadBytes,
-            getDownloadURL
+            getDownloadURL,
+            getMetadata,
+            updateMetadata
         };
     </script>
     
@@ -113,6 +117,49 @@
         
         .form-group:last-child {
             margin-right: 0;
+        }
+
+        .category-checkboxes {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 10px;
+        }
+
+        .form-group .category-checkbox {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin: 0;
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background-color: #fff;
+            font-weight: 400;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .form-group .category-checkbox input {
+            width: auto;
+            margin: 0;
+        }
+
+        .form-group .category-checkbox:has(input:checked) {
+            border-color: #4caf50;
+            background-color: #f1f8f1;
+            color: #2e7d32;
+        }
+
+        .field-hint {
+            margin: 8px 0 0;
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .shipping-class-hint {
+            display: block;
+            color: #999;
+            font-size: 0.85em;
         }
         
         .form-group label {
@@ -548,6 +595,7 @@
                     <li><a href="/admin/dashboard.html">管理首頁</a></li>
                     <li><a href="/admin/orders.html">訂單管理</a></li>
                     <li><a href="/admin/products.html" class="active">商品管理</a></li>
+                    <li><a href="/admin/categories.html">分類管理</a></li>
                     <li><a href="/admin/users.html">會員管理</a></li>
                     <li><a href="/admin/messages.html">訊息管理</a></li>
                     <li><a href="/admin/shipping.html">運費設定</a></li>
@@ -594,9 +642,9 @@
                             <input type="text" id="product-name" required>
                         </div>
                         <div class="form-group">
-                            <label for="product-category">商品分類</label>
+                            <label for="product-category">運費類別（計算階梯運費用）</label>
                             <select id="product-category" required style="width: 100%; height: 40px; font-size: 15px; padding: 5px;">
-                                <option value="">請選擇分類</option>
+                                <option value="">請選擇運費類別</option>
                                 <option value="bulbs">球根花卉</option>
                                 <option value="plants">花卉盆栽</option>
                                 <option value="seeds">種子</option>
@@ -604,7 +652,15 @@
                             </select>
                         </div>
                     </div>
-                    
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>商品分類（可複選，顯示在首頁與商品頁）</label>
+                            <div id="product-category-checkboxes" class="category-checkboxes"></div>
+                            <p class="field-hint">要新增、改名或排序分類，請到 <a href="/admin/categories.html">分類管理</a>。</p>
+                        </div>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="product-price">商品價格</label>
@@ -677,6 +733,9 @@
                 <div class="card-header">
                     <h2>商品列表</h2>
                     <div class="card-actions">
+                        <button class="btn btn-outline" id="optimize-image-cache" title="讓顧客的瀏覽器記住已經下載過的商品、輪播、分類圖片，第二次進站不用再重新下載">
+                            <i class="fas fa-bolt"></i> 加速圖片載入
+                        </button>
                         <button class="btn btn-outline" id="refresh-products">
                             <i class="fas fa-sync-alt"></i> 刷新列表
                         </button>
@@ -769,11 +828,112 @@
         </div>
     </footer>
     
+    <script src="/js/categories.js"></script>
+    <script src="/js/image-upload.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/admin-common.js"></script>
     <script>
     // 全局變量：當前精選商品ID列表
     let currentFeaturedProductIds = [];
+
+    // 顯示用商品分類（百合、鬱金香…），清單來自後台「分類管理」
+    let adminProductCategories = ProductCategories.getCached();
+
+    // 表單裡的分類勾選框；selectedIds 裡已經不存在的分類（被刪掉的）不會顯示，存檔時也就一併移除
+    function renderProductCategoryCheckboxes(selectedIds) {
+        const container = document.getElementById('product-category-checkboxes');
+        if (!container) return;
+        const selected = new Set(selectedIds || []);
+        if (adminProductCategories.length === 0) {
+            container.innerHTML = '<span class="field-hint">目前沒有任何分類，請先到「分類管理」新增。</span>';
+            return;
+        }
+        container.innerHTML = adminProductCategories.map(category => `
+            <label class="category-checkbox">
+                <input type="checkbox" value="${escapeHtml(category.id)}" ${selected.has(category.id) ? 'checked' : ''}>
+                ${escapeHtml(category.name)}
+            </label>
+        `).join('');
+    }
+
+    function getSelectedProductCategoryIds() {
+        return Array.from(document.querySelectorAll('#product-category-checkboxes input:checked'))
+            .map(input => input.value);
+    }
+
+    // 「加速圖片載入」：替已經上傳過的商品、輪播、分類圖片補上瀏覽器快取設定。
+    // 以前上傳的圖片沒有設定快取，Firebase Storage 預設每次都要重新下載，
+    // 顧客每次進站都要重抓全部圖片。只改檔案的快取設定，不會動到圖片內容。
+    // 之後新上傳的圖片（js/image-upload.js）上傳時就會自動設定好
+    async function optimizeImageCache(button) {
+        const services = window.firebaseServices;
+        const bucketHost = 'firebasestorage.googleapis.com/v0/b/bulb-market-217c4.firebasestorage.app/';
+        const isOurStorageUrl = url => typeof url === 'string' && url.indexOf(bucketHost) !== -1;
+
+        const originalHTML = button.innerHTML;
+        button.disabled = true;
+        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 收集圖片中...';
+
+        try {
+            const urls = new Set();
+            const productsSnap = await services.getDocs(services.collection(services.db, 'products'));
+            productsSnap.forEach(docSnap => urls.add(docSnap.data().imageUrl));
+            for (const settingId of ['bulletin', 'categories']) {
+                const snap = await services.getDoc(services.doc(services.db, 'settings', settingId));
+                const items = snap.exists() && Array.isArray(snap.data().items) ? snap.data().items : [];
+                items.forEach(item => urls.add(item && item.imageUrl));
+            }
+            const targets = Array.from(urls).filter(isOurStorageUrl);
+
+            let updated = 0;
+            let alreadyOk = 0;
+            const failed = [];
+            let done = 0;
+
+            // 同時處理 4 張，不要一次對 Storage 發太多請求
+            const queue = targets.slice();
+            const worker = async function() {
+                while (queue.length > 0) {
+                    const url = queue.shift();
+                    try {
+                        const fileRef = services.storageRef(services.storage, url);
+                        const meta = await services.getMetadata(fileRef);
+                        if (meta.cacheControl === ImageUpload.CACHE_CONTROL) {
+                            alreadyOk++;
+                        } else {
+                            await services.updateMetadata(fileRef, { cacheControl: ImageUpload.CACHE_CONTROL });
+                            updated++;
+                        }
+                    } catch (error) {
+                        console.warn('設定圖片快取失敗:', url, error);
+                        failed.push(url);
+                    }
+                    done++;
+                    button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 處理中 ${done}/${targets.length}`;
+                }
+            };
+            await Promise.all([worker(), worker(), worker(), worker()]);
+
+            let message = `完成！共 ${targets.length} 張圖片：新設定 ${updated} 張、原本就設定好 ${alreadyOk} 張。`;
+            if (failed.length > 0) {
+                message += `\n\n有 ${failed.length} 張沒有成功（可能是圖片已經被刪除），詳細網址請看瀏覽器主控台。`;
+            }
+            alert(message);
+        } catch (error) {
+            console.error('加速圖片載入失敗:', error);
+            alert('加速圖片載入失敗：' + error.message);
+        } finally {
+            button.disabled = false;
+            button.innerHTML = originalHTML;
+        }
+    }
+
+    function productCategoryNames(product) {
+        return ProductCategories.productCategoryIds(product)
+            .map(id => ProductCategories.findById(adminProductCategories, id))
+            .filter(Boolean)
+            .map(category => category.name);
+    }
 
     // 使用 admin-common.js 的管理員檢查函數（讀 Firebase Auth custom claim）
 async function isAdmin(user) {
@@ -828,9 +988,15 @@ const waitForAdminCommon = function() {
             // 檢查 Firestore 權限
             console.log('檢查 Firestore 服務狀態:', window.firebaseServices.db ? '已初始化' : '未初始化');
             
-            // 獲取商品列表
-            loadProducts();
-            
+            // 先讀分類清單（表單勾選框、列表分類欄都要用），再載入商品列表。
+            // ProductCategories.load() 讀取失敗會退回預設清單，不會擋住商品列表
+            renderProductCategoryCheckboxes([]);
+            ProductCategories.load().then(function(categories) {
+                adminProductCategories = categories;
+                renderProductCategoryCheckboxes(getSelectedProductCategoryIds());
+                loadProducts();
+            });
+
             // 加載當前精選商品
             loadCurrentFeaturedProducts();
             
@@ -851,6 +1017,14 @@ const waitForAdminCommon = function() {
                 });
             }
             
+            // 綁定「加速圖片載入」按鈕
+            const optimizeCacheBtn = document.getElementById('optimize-image-cache');
+            if (optimizeCacheBtn) {
+                optimizeCacheBtn.addEventListener('click', function() {
+                    optimizeImageCache(optimizeCacheBtn);
+                });
+            }
+
             // 綁定刷新商品列表按鈕
             const refreshBtn = document.getElementById('refresh-products');
             if (refreshBtn) {
@@ -1095,14 +1269,19 @@ const waitForAdminCommon = function() {
                                 const statusDotClass = product.status === 'active' ? 'active' : 'inactive';
                                 const statusText = product.status === 'active' ? '上架中' : '已下架';
                                 
-                                // 格式化分類顯示
-                                let categoryText = '其他';
+                                // 分類欄：上面是顯示用分類（可複選），下面小字是運費類別
+                                let shippingClassText = '其他';
                                 switch(product.category) {
-                                    case 'bulbs': categoryText = '球根花卉'; break;
-                                    case 'plants': categoryText = '花卉盆栽'; break;
-                                    case 'seeds': categoryText = '種子'; break;
-                                    case 'other': categoryText = '其他'; break;
+                                    case 'bulbs': shippingClassText = '球根花卉'; break;
+                                    case 'plants': shippingClassText = '花卉盆栽'; break;
+                                    case 'seeds': shippingClassText = '種子'; break;
+                                    case 'other': shippingClassText = '其他'; break;
                                 }
+                                const displayNames = productCategoryNames(product);
+                                const categoryText = (displayNames.length > 0
+                                    ? escapeHtml(displayNames.join('、'))
+                                    : '<span style="color:#e67e22;">未分類</span>')
+                                    + `<span class="shipping-class-hint">運費：${shippingClassText}</span>`;
                                 
                                 // 檢查是否為精選商品
                                 const isFeatured = product.isFeaturedOffer === true;
@@ -1421,6 +1600,7 @@ const waitForAdminCommon = function() {
                     document.getElementById('product-id').value = productId;
                     document.getElementById('product-name').value = product.name || '';
                     document.getElementById('product-category').value = product.category || '';
+                    renderProductCategoryCheckboxes(ProductCategories.productCategoryIds(product));
                     document.getElementById('product-price').value = product.price || 0;
                     document.getElementById('product-unit').value = product.unit || '份';
                     document.getElementById('product-stock').value = product.stock || 0;
@@ -1473,57 +1653,9 @@ const waitForAdminCommon = function() {
         // 上傳前在瀏覽器端自動縮圖壓縮，避免手機直接拍的原始大圖（常常好幾 MB）
         // 整張傳到 Storage，拖慢每個訪客瀏覽商品頁的速度。
         // 任何一步出錯都直接 fallback 回傳原始檔案，不會擋住商品儲存。
-        const compressImageFile = async function(file) {
-            const MAX_DIMENSION = 1600;
-            const JPEG_QUALITY = 0.85;
-
-            try {
-                if (!file.type || !file.type.startsWith('image/')) {
-                    return file;
-                }
-
-                // imageOrientation: 'from-image' 會自動套用照片的 EXIF 方向資訊，
-                // 避免手機拍的照片壓縮後變成橫的/顛倒
-                const bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
-                const { width, height } = bitmap;
-
-                // 圖片本來就不大，不用處理，直接用原始檔案
-                if (width <= MAX_DIMENSION && height <= MAX_DIMENSION && file.size <= 500 * 1024) {
-                    bitmap.close();
-                    return file;
-                }
-
-                const scale = Math.min(1, MAX_DIMENSION / Math.max(width, height));
-                const targetWidth = Math.round(width * scale);
-                const targetHeight = Math.round(height * scale);
-
-                const canvas = document.createElement('canvas');
-                canvas.width = targetWidth;
-                canvas.height = targetHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(bitmap, 0, 0, targetWidth, targetHeight);
-                bitmap.close();
-
-                // PNG 可能有透明背景，保留原格式；其他一律輸出 JPEG（照片壓縮效果好很多）
-                const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
-                const blob = await new Promise((resolve) => {
-                    canvas.toBlob(resolve, outputType, outputType === 'image/jpeg' ? JPEG_QUALITY : undefined);
-                });
-
-                if (!blob) {
-                    return file;
-                }
-
-                const newExt = outputType === 'image/png' ? 'png' : 'jpg';
-                const baseName = file.name.replace(/\.[^.]+$/, '');
-                const compressedFile = new File([blob], `${baseName}.${newExt}`, { type: outputType });
-
-                console.log(`圖片壓縮: ${file.name} ${(file.size / 1024).toFixed(0)}KB -> ${compressedFile.name} ${(compressedFile.size / 1024).toFixed(0)}KB`);
-                return compressedFile;
-            } catch (error) {
-                console.warn('圖片壓縮失敗，改用原始檔案上傳:', error);
-                return file;
-            }
+        // 共用的 js/image-upload.js：商品圖最長邊 1200px（卡片、詳細介紹彈窗都夠清楚）
+        const compressImageFile = function(file) {
+            return ImageUpload.compress(file, { maxDimension: 1200, quality: 0.82 });
         };
 
         // 保存商品
@@ -1595,6 +1727,7 @@ const waitForAdminCommon = function() {
                 const productData = {
                     name,
                     category,
+                    categoryIds: getSelectedProductCategoryIds(),
                     price,
                     unit,
                     stock,
@@ -1661,7 +1794,7 @@ const waitForAdminCommon = function() {
                         console.log('上傳圖片到路徑:', imagePath);
 
                         // 上傳圖片
-                        await uploadBytes(imageRef, uploadFile);
+                        await uploadBytes(imageRef, uploadFile, ImageUpload.metadataFor(uploadFile));
                         console.log('圖片上傳成功');
                         
                         // 直接構造 URL 而不是使用 getDownloadURL
@@ -1744,6 +1877,7 @@ const waitForAdminCommon = function() {
             document.getElementById('product-id').value = '';
             document.getElementById('product-name').value = '';
             document.getElementById('product-category').value = '';
+            renderProductCategoryCheckboxes([]);
             document.getElementById('product-price').value = '';
             document.getElementById('product-stock').value = '';
             document.getElementById('product-status').value = 'active';

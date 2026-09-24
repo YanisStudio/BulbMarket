@@ -753,6 +753,8 @@ const FirebaseUtils = {
                 price: data.price || 0,
                 unit: data.unit || '份',
                 category: data.category || 'other',
+                // 顯示用的商品分類（百合、鬱金香…可複選），跟上面計算運費用的 category 是兩回事
+                categoryIds: Array.isArray(data.categoryIds) ? data.categoryIds : [],
                 imageUrl: data.imageUrl || '/images/placeholder.jpg',
                 tags: Array.isArray(data.tags) ? data.tags : [],
                 stock: data.stock || 0,
@@ -784,3 +786,36 @@ window.addToCart = addToCart;
 window.initAddToCartButtons = initAddToCartButtons;
 window.showToast = showToast;
 window.FirebaseUtils = FirebaseUtils;
+// 頁首隨捲動縮放：在頁面最上方時 Logo 和選單比較大，往下捲就縮小，
+// 留更多畫面給內容（樣式在 css/storefront.css 的 body.header-compact，只作用在桌面版）。
+// 往下超過 80px 才縮小、回到 20px 以內才放大，中間留緩衝，避免頁首高度變化
+// 讓捲動位置剛好卡在門檻上來回跳動
+(function initHeaderShrink() {
+    const COMPACT_AT = 80;
+    const EXPAND_AT = 20;
+    let ticking = false;
+
+    function update() {
+        ticking = false;
+        const y = window.scrollY || window.pageYOffset;
+        const compact = document.body.classList.contains('header-compact');
+        if (!compact && y > COMPACT_AT) {
+            document.body.classList.add('header-compact');
+        } else if (compact && y < EXPAND_AT) {
+            document.body.classList.remove('header-compact');
+        }
+    }
+
+    window.addEventListener('scroll', function() {
+        if (!ticking) {
+            ticking = true;
+            window.requestAnimationFrame(update);
+        }
+    }, { passive: true });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', update);
+    } else {
+        update();
+    }
+})();

@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>分類管理 - 球根花卉團購</title>
+    <meta name="robots" content="noindex, follow">
+    <meta name="author" content="球根花卉團購">
+    <link rel="icon" type="image/png" sizes="32x32" href="/images/logo.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/images/logo.png">
+    <link rel="apple-touch-icon" sizes="180x180" href="/images/logo.png">
+    <link rel="shortcut icon" href="/images/logo.png">
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/admin-common.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+    <script src="/js/firebase-config.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import {
+          getAuth,
+          onAuthStateChanged,
+          signOut
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        import {
+          initializeFirestore,
+          collection,
+          doc,
+          getDoc,
+          getDocs,
+          setDoc,
+          writeBatch,
+          serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        import {
+          getStorage,
+          ref,
+          uploadBytes
+        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
+
+        const firebaseConfig = window.FIREBASE_CONFIG;
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        // 開啟 experimentalAutoDetectLongPolling：自動偵測目前網路環境是否
+        // 會擋掉預設的串流連線，會的話自動改用長輪詢，降低連線逾時機率
+        const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+        const storage = getStorage(app);
+
+        window.firebaseServices = {
+          auth: auth,
+          db: db,
+          storage: storage,
+          getAuth,
+          signOut,
+          onAuthStateChanged,
+          collection,
+          doc,
+          getDoc,
+          getDocs,
+          setDoc,
+          writeBatch,
+          serverTimestamp,
+          storageRef: ref,
+          uploadBytes
+        };
+    </script>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <button class="menu-toggle" id="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <a href="/index.html" class="logo-container">
+                <img src="/images/logo.jpg" alt="球根花卉團購 logo" class="logo-image" width="520" height="730">
+                <div class="logo">
+                    <h1>球根花卉團購</h1>
+                    <p>管理系統</p>
+                </div>
+            </a>
+
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/admin/dashboard.html">管理首頁</a></li>
+                    <li><a href="/admin/orders.html">訂單管理</a></li>
+                    <li><a href="/admin/products.html">商品管理</a></li>
+                    <li><a href="/admin/categories.html" class="active">分類管理</a></li>
+                    <li><a href="/admin/users.html">會員管理</a></li>
+                    <li><a href="/admin/messages.html">訊息管理</a></li>
+                    <li><a href="/admin/shipping.html">運費設定</a></li>
+                    <li><a href="/admin/bulletin.html">布告欄管理</a></li>
+                </ul>
+            </nav>
+
+            <div class="header-right">
+                <div class="user-profile" id="user-profile">
+                    <div class="user-name" id="user-dropdown-btn">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="username-display">管理員</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="user-menu" id="user-menu">
+                        <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <div class="menu-overlay" id="menu-overlay"></div>
+
+    <main>
+        <div class="admin-container">
+            <h1 class="admin-title">分類管理</h1>
+            <p class="page-intro">這裡的分類會顯示在首頁「商品分類」、商品頁的分類篩選和頁尾。可以新增、改名、調整順序、刪除，也可以替每個分類設定一張首頁用的圖片。一個商品可以同時屬於好幾個分類（例如「百合」+「稀有品種」），在「商品管理」編輯商品時勾選。</p>
+            <p class="page-tip"><i class="fas fa-info-circle"></i> 這裡的分類跟「運費類別」（球根花卉／花卉盆栽／種子／其他）是分開的，改分類不會影響運費計算。</p>
+
+            <div id="categories-section" style="display: none;">
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-header-title">
+                            <i class="fas fa-tags"></i>
+                            <h2>分類清單</h2>
+                        </div>
+                        <span class="card-header-note" id="unsaved-note" hidden><i class="fas fa-circle"></i> 有尚未儲存的變更</span>
+                    </div>
+                    <div class="card-body">
+                        <ul class="category-list" id="category-list"></ul>
+                        <div class="category-list-actions">
+                            <button type="button" class="btn btn-outline" id="add-category-btn">
+                                <i class="fas fa-plus"></i> 新增分類
+                            </button>
+                            <button type="button" class="btn btn-primary" id="save-categories-btn">
+                                <i class="fas fa-save"></i> 儲存分類
+                            </button>
+                        </div>
+                        <p class="field-hint">分類圖片建議用正方形照片（至少 400 × 400 像素），首頁會裁成水滴形。沒有設定圖片的分類會顯示綠色花朵圖示。</p>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-header-title">
+                            <i class="fas fa-magic"></i>
+                            <h2>依商品名稱自動歸類</h2>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <p class="auto-intro">
+                            只處理<b>還沒有任何分類</b>的商品：用商品名稱比對分類名稱（例如名稱有「百合」就建議「百合」），先預覽，你確認勾選後才會寫入。
+                            「稀有品種」這種看名稱判斷不出來的分類，請到商品管理手動勾選。
+                            <span id="uncategorized-count"></span>
+                        </p>
+                        <button type="button" class="btn btn-outline" id="preview-auto-btn">
+                            <i class="fas fa-search"></i> 預覽自動歸類
+                        </button>
+                        <div id="auto-preview"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="unauthorized-section" style="display: none;">
+                <div class="unauthorized-content">
+                    <i class="fas fa-exclamation-triangle auth-icon"></i>
+                    <h2>您沒有權限訪問此頁面</h2>
+                    <p>只有管理員可以訪問分類管理。</p>
+                    <p id="current-user-email"></p>
+                    <a href="/index.html" class="btn btn-primary">
+                        <i class="fas fa-home"></i> 返回首頁
+                    </a>
+                </div>
+            </div>
+
+            <div id="not-logged-in-section" style="display: none;">
+                <div class="unauthorized-content">
+                    <i class="fas fa-user-lock auth-icon"></i>
+                    <h2>請先登入</h2>
+                    <p>您需要先登入才能訪問分類管理。</p>
+                    <a href="/index.html" class="btn btn-primary">
+                        <i class="fas fa-sign-in-alt"></i> 返回首頁登入
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <div class="footer-content admin-footer">
+                <p>&copy; 2025 球根花卉團購管理系統。僅限授權人員使用。</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/categories.js"></script>
+    <script src="/js/image-upload.js"></script>
+    <script src="/js/member.js"></script>
+    <script src="/js/admin-common.js"></script>
+
+    <style>
+        .page-intro {
+            color: #666;
+            margin: -10px 0 10px;
+            max-width: 900px;
+        }
+
+        .page-tip {
+            max-width: 900px;
+            color: #2e7d32;
+            background-color: #f1f8f1;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin: 0 0 20px;
+            font-size: 0.95em;
+        }
+
+        .settings-card {
+            max-width: 900px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .settings-card .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 10px;
+            padding: 16px 24px;
+            background-color: #f9f9f9;
+            border-bottom: 1px solid #eee;
+        }
+
+        .card-header-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card-header-title i {
+            color: #4caf50;
+            font-size: 1.2em;
+        }
+
+        .card-header-title h2 {
+            margin: 0;
+            font-size: 1.1em;
+            color: #333;
+        }
+
+        .card-header-note {
+            color: #e67e22;
+            font-size: 0.9em;
+        }
+
+        .card-header-note i {
+            font-size: 0.6em;
+            vertical-align: middle;
+        }
+
+        .card-body {
+            padding: 20px 24px;
+        }
+
+        .category-list {
+            list-style: none;
+            margin: 0 0 16px;
+            padding: 0;
+        }
+
+        .category-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .category-thumb {
+            flex: 0 0 52px;
+            width: 52px;
+            height: 52px;
+            border-radius: 0 50% 50% 50%;
+            transform: rotate(45deg);
+            overflow: hidden;
+            background-color: #4caf50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .category-thumb img {
+            width: 150%;
+            height: 150%;
+            max-width: none;
+            object-fit: cover;
+            transform: rotate(-45deg);
+        }
+
+        .category-thumb i {
+            transform: rotate(-45deg);
+            color: #fff;
+        }
+
+        .category-name-input {
+            flex: 1 1 180px;
+            min-width: 120px;
+            padding: 8px 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .category-name-input:focus {
+            border-color: #4caf50;
+            outline: none;
+        }
+
+        .category-count {
+            flex: 0 0 auto;
+            color: #888;
+            font-size: 0.9em;
+            min-width: 4.5em;
+        }
+
+        .category-row-actions {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .icon-btn {
+            width: 34px;
+            height: 34px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            background-color: #fff;
+            color: #555;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .icon-btn:hover:not(:disabled) {
+            border-color: #4caf50;
+            color: #2e7d32;
+        }
+
+        .icon-btn:disabled {
+            opacity: 0.35;
+            cursor: default;
+        }
+
+        .icon-btn.danger:hover:not(:disabled) {
+            border-color: #e74c3c;
+            color: #e74c3c;
+        }
+
+        .category-list-actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .field-hint {
+            margin: 12px 0 0;
+            color: #888;
+            font-size: 0.9em;
+        }
+
+        .auto-intro {
+            color: #555;
+            margin: 0 0 14px;
+        }
+
+        #uncategorized-count {
+            color: #e67e22;
+            font-weight: 600;
+        }
+
+        .auto-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+            font-size: 0.95em;
+        }
+
+        .auto-table th,
+        .auto-table td {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 1px solid #f0f0f0;
+            vertical-align: top;
+        }
+
+        .auto-table th {
+            background-color: #f9f9f9;
+            font-weight: 600;
+        }
+
+        .suggest-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin: 0 6px 6px 0;
+            padding: 3px 10px;
+            border: 1px solid #ddd;
+            border-radius: 14px;
+            cursor: pointer;
+            user-select: none;
+        }
+
+        .suggest-chip:has(input:checked) {
+            border-color: #4caf50;
+            background-color: #f1f8f1;
+            color: #2e7d32;
+        }
+
+        .status-tag {
+            font-size: 0.8em;
+            color: #999;
+        }
+
+        .unmatched-list {
+            color: #777;
+            font-size: 0.9em;
+            margin: 8px 0 16px;
+            padding-left: 1.2em;
+        }
+
+        .unauthorized-content {
+            text-align: center;
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 40px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .auth-icon {
+            font-size: 48px;
+            color: #f39c12;
+            margin-bottom: 20px;
+            display: block;
+        }
+
+        #not-logged-in-section .auth-icon {
+            color: #3498db;
+        }
+
+        .unauthorized-content h2 {
+            color: #2c3e50;
+            margin-bottom: 15px;
+        }
+
+        .unauthorized-content p {
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        #current-user-email {
+            margin: 15px 0;
+            padding: 10px;
+            background-color: #f9f9f9;
+            border-radius: 6px;
+            display: inline-block;
+            color: #333;
+        }
+
+        @media (max-width: 600px) {
+            .card-body {
+                padding: 16px;
+            }
+
+            .category-row {
+                flex-wrap: wrap;
+            }
+
+            .category-count {
+                order: 3;
+            }
+
+            .category-row-actions {
+                order: 4;
+                width: 100%;
+                justify-content: flex-end;
+            }
+        }
+    </style>
+
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // 分類清單的編輯狀態：
+        // { id, name, imageUrl（已存的網址）, pendingFile（還沒上傳的新圖片）, previewUrl }
+        let rows = [];
+        // 每個分類目前有幾個商品（載入商品後計算），以及還沒有任何分類的商品
+        let products = [];
+        let dirty = false;
+
+        const listEl = document.getElementById('category-list');
+
+        const waitForAdminCommon = function() {
+            if (window.AdminCommon) {
+                checkAdminAccess();
+            } else {
+                setTimeout(waitForAdminCommon, 100);
+            }
+        };
+
+        const checkAdminAccess = function() {
+            window.AdminCommon.checkAdminAccess(
+                function() {
+                    showSection('categories-section');
+                    loadAll();
+                },
+                function(error) {
+                    if (error === '未登入') {
+                        showSection('not-logged-in-section');
+                    } else {
+                        showSection('unauthorized-section');
+                        const currentUser = window.AdminCommon.getCurrentUser();
+                        const currentUserEmail = document.getElementById('current-user-email');
+                        if (currentUserEmail && currentUser) {
+                            currentUserEmail.textContent = `當前登入帳號: ${currentUser.email}`;
+                        }
+                    }
+                }
+            );
+        };
+
+        const showSection = function(id) {
+            ['categories-section', 'unauthorized-section', 'not-logged-in-section'].forEach(function(sectionId) {
+                document.getElementById(sectionId).style.display = sectionId === id ? 'block' : 'none';
+            });
+        };
+
+        const setDirty = function(value) {
+            dirty = value;
+            document.getElementById('unsaved-note').hidden = !value;
+        };
+
+        // 離開頁面前提醒還沒儲存
+        window.addEventListener('beforeunload', function(event) {
+            if (!dirty) return;
+            event.preventDefault();
+            event.returnValue = '';
+        });
+
+        // 新分類的 id：建立後就固定不變，改名不影響已經勾選這個分類的商品
+        const newCategoryId = function() {
+            return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        };
+
+        const loadAll = async function() {
+            window.AdminCommon.showLoading('載入分類中...');
+            try {
+                const categories = await ProductCategories.load();
+                rows = categories.map(function(category) {
+                    return { id: category.id, name: category.name, imageUrl: category.imageUrl || '', pendingFile: null, previewUrl: '' };
+                });
+                await loadProducts();
+                renderRows();
+                setDirty(false);
+            } catch (error) {
+                console.error('載入分類失敗:', error);
+                window.AdminCommon.handleError(error, '載入分類');
+            } finally {
+                window.AdminCommon.hideLoading();
+            }
+        };
+
+        const loadProducts = async function() {
+            const services = window.firebaseServices;
+            const snapshot = await services.getDocs(services.collection(services.db, 'products'));
+            products = [];
+            snapshot.forEach(function(docSnap) {
+                const data = docSnap.data();
+                products.push({
+                    id: docSnap.id,
+                    name: data.name || '（未命名商品）',
+                    status: data.status || 'inactive',
+                    categoryIds: Array.isArray(data.categoryIds) ? data.categoryIds : []
+                });
+            });
+            const uncategorized = products.filter(function(product) { return product.categoryIds.length === 0; });
+            document.getElementById('uncategorized-count').textContent =
+                uncategorized.length > 0 ? `目前有 ${uncategorized.length} 個商品還沒有分類。` : '目前所有商品都已經有分類。';
+        };
+
+        const countFor = function(categoryId) {
+            return products.filter(function(product) { return product.categoryIds.indexOf(categoryId) !== -1; }).length;
+        };
+
+        const renderRows = function() {
+            if (rows.length === 0) {
+                listEl.innerHTML = '<li class="field-hint">目前沒有任何分類，按「新增分類」開始建立。</li>';
+                return;
+            }
+            listEl.innerHTML = rows.map(function(row, index) {
+                const imageSrc = row.previewUrl || row.imageUrl;
+                const thumb = imageSrc
+                    ? `<img src="${escapeHtml(imageSrc)}" alt="">`
+                    : '<i class="fas fa-seedling"></i>';
+                return `
+                    <li class="category-row" data-index="${index}">
+                        <span class="category-thumb">${thumb}</span>
+                        <input type="text" class="category-name-input" value="${escapeHtml(row.name)}" maxlength="30" placeholder="分類名稱" aria-label="分類名稱">
+                        <span class="category-count">${countFor(row.id)} 個商品</span>
+                        <span class="category-row-actions">
+                            <label class="icon-btn" title="設定分類圖片">
+                                <i class="fas fa-image"></i>
+                                <input type="file" accept="image/*" class="category-image-input" hidden>
+                            </label>
+                            <button type="button" class="icon-btn" data-action="remove-image" title="移除圖片" ${imageSrc ? '' : 'disabled'}><i class="fas fa-eraser"></i></button>
+                            <button type="button" class="icon-btn" data-action="up" title="往前移" ${index === 0 ? 'disabled' : ''}><i class="fas fa-arrow-up"></i></button>
+                            <button type="button" class="icon-btn" data-action="down" title="往後移" ${index === rows.length - 1 ? 'disabled' : ''}><i class="fas fa-arrow-down"></i></button>
+                            <button type="button" class="icon-btn danger" data-action="delete" title="刪除分類"><i class="fas fa-trash"></i></button>
+                        </span>
+                    </li>
+                `;
+            }).join('');
+        };
+
+        // 改名：直接更新資料，不重畫整個清單（避免游標跳掉）
+        listEl.addEventListener('input', function(event) {
+            if (!event.target.classList.contains('category-name-input')) return;
+            const index = Number(event.target.closest('.category-row').dataset.index);
+            rows[index].name = event.target.value;
+            setDirty(true);
+        });
+
+        // 選擇分類圖片：先在畫面上預覽，儲存時才上傳
+        listEl.addEventListener('change', function(event) {
+            if (!event.target.classList.contains('category-image-input')) return;
+            const file = event.target.files[0];
+            if (!file) return;
+            const index = Number(event.target.closest('.category-row').dataset.index);
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                rows[index].pendingFile = file;
+                rows[index].previewUrl = e.target.result;
+                setDirty(true);
+                renderRows();
+            };
+            reader.readAsDataURL(file);
+        });
+
+        listEl.addEventListener('click', function(event) {
+            const button = event.target.closest('button[data-action]');
+            if (!button) return;
+            const index = Number(button.closest('.category-row').dataset.index);
+            const action = button.dataset.action;
+
+            if (action === 'up' && index > 0) {
+                [rows[index - 1], rows[index]] = [rows[index], rows[index - 1]];
+            } else if (action === 'down' && index < rows.length - 1) {
+                [rows[index + 1], rows[index]] = [rows[index], rows[index + 1]];
+            } else if (action === 'remove-image') {
+                rows[index].imageUrl = '';
+                rows[index].pendingFile = null;
+                rows[index].previewUrl = '';
+            } else if (action === 'delete') {
+                const count = countFor(rows[index].id);
+                const name = rows[index].name || '（未命名）';
+                const message = count > 0
+                    ? `確定要刪除「${name}」嗎？\n\n目前有 ${count} 個商品勾選了這個分類，刪除後這些商品就不會出現在這個分類裡（商品本身不會被刪除）。\n\n按「儲存分類」後才會生效。`
+                    : `確定要刪除「${name}」嗎？按「儲存分類」後才會生效。`;
+                if (!confirm(message)) return;
+                rows.splice(index, 1);
+            } else {
+                return;
+            }
+            setDirty(true);
+            renderRows();
+        });
+
+        document.getElementById('add-category-btn').addEventListener('click', function() {
+            rows.push({ id: newCategoryId(), name: '', imageUrl: '', pendingFile: null, previewUrl: '' });
+            setDirty(true);
+            renderRows();
+            const inputs = listEl.querySelectorAll('.category-name-input');
+            if (inputs.length > 0) inputs[inputs.length - 1].focus();
+        });
+
+        const uploadCategoryImage = async function(originalFile) {
+            // 分類圖在首頁只顯示成小水滴，最長邊 600px 就很夠
+            const file = await ImageUpload.compress(originalFile, { maxDimension: 600, quality: 0.82 });
+            const services = window.firebaseServices;
+            // 跟商品圖片放在同一層結構（products/<資料夾>/<檔名>）
+            const imagePath = `products/category-covers/${Date.now()}_${file.name}`;
+            await services.uploadBytes(services.storageRef(services.storage, imagePath), file, ImageUpload.metadataFor(file));
+            const bucketName = "bulb-market-217c4.firebasestorage.app";
+            return `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(imagePath)}?alt=media`;
+        };
+
+        document.getElementById('save-categories-btn').addEventListener('click', async function() {
+            // 名稱不能空白、不能重複
+            const names = rows.map(function(row) { return row.name.trim(); });
+            const emptyIndex = names.findIndex(function(name) { return !name; });
+            if (emptyIndex !== -1) {
+                window.AdminCommon.showToast(`第 ${emptyIndex + 1} 個分類還沒有名稱`, 'warning');
+                listEl.querySelectorAll('.category-name-input')[emptyIndex].focus();
+                return;
+            }
+            const duplicate = names.find(function(name, index) { return names.indexOf(name) !== index; });
+            if (duplicate) {
+                window.AdminCommon.showToast(`分類名稱「${duplicate}」重複了`, 'warning');
+                return;
+            }
+
+            window.AdminCommon.showLoading('儲存中...');
+            try {
+                for (const row of rows) {
+                    if (row.pendingFile) {
+                        row.imageUrl = await uploadCategoryImage(row.pendingFile);
+                        row.pendingFile = null;
+                        row.previewUrl = '';
+                    }
+                }
+
+                const items = rows.map(function(row) {
+                    return { id: row.id, name: row.name.trim(), imageUrl: row.imageUrl || '' };
+                });
+
+                const services = window.firebaseServices;
+                await services.setDoc(services.doc(services.db, 'settings', 'categories'), {
+                    items: items,
+                    updatedAt: services.serverTimestamp()
+                });
+
+                setDirty(false);
+                renderRows();
+                ProductCategories.renderFooterLinks(items);
+                try { localStorage.setItem('productCategoriesCache', JSON.stringify(items)); } catch (e) {}
+                window.AdminCommon.showToast('分類已儲存', 'success');
+            } catch (error) {
+                console.error('儲存分類失敗:', error);
+                window.AdminCommon.handleError(error, '儲存分類');
+            } finally {
+                window.AdminCommon.hideLoading();
+            }
+        });
+
+        // ---------- 依商品名稱自動歸類 ----------
+        const previewEl = document.getElementById('auto-preview');
+
+        document.getElementById('preview-auto-btn').addEventListener('click', function() {
+            if (dirty) {
+                window.AdminCommon.showToast('分類清單有尚未儲存的變更，請先按「儲存分類」再預覽', 'warning');
+                return;
+            }
+            const categories = rows.map(function(row) { return { id: row.id, name: row.name }; });
+            const uncategorized = products.filter(function(product) { return product.categoryIds.length === 0; });
+
+            if (uncategorized.length === 0) {
+                previewEl.innerHTML = '<p class="field-hint">所有商品都已經有分類了，沒有需要自動歸類的商品。</p>';
+                return;
+            }
+
+            const matched = [];
+            const unmatched = [];
+            uncategorized.forEach(function(product) {
+                const ids = ProductCategories.suggestForName(product.name, categories);
+                if (ids.length > 0) matched.push({ product: product, ids: ids });
+                else unmatched.push(product);
+            });
+
+            const statusText = function(product) {
+                return product.status === 'active' ? '上架中' : '已下架';
+            };
+
+            let html = '';
+            if (matched.length > 0) {
+                html += `
+                    <table class="auto-table">
+                        <thead><tr><th>商品</th><th>建議分類（取消勾選就不會套用）</th></tr></thead>
+                        <tbody>
+                            ${matched.map(function(entry) {
+                                return `
+                                    <tr data-product-id="${escapeHtml(entry.product.id)}">
+                                        <td>${escapeHtml(entry.product.name)} <span class="status-tag">${statusText(entry.product)}</span></td>
+                                        <td>${entry.ids.map(function(id) {
+                                            const category = ProductCategories.findById(categories, id);
+                                            return `<label class="suggest-chip"><input type="checkbox" value="${escapeHtml(id)}" checked> ${escapeHtml(category.name)}</label>`;
+                                        }).join('')}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
+                        </tbody>
+                    </table>
+                    <button type="button" class="btn btn-primary" id="apply-auto-btn">
+                        <i class="fas fa-check"></i> 套用勾選的歸類（${matched.length} 個商品）
+                    </button>
+                `;
+            }
+            if (unmatched.length > 0) {
+                html += `
+                    <p class="field-hint">以下 ${unmatched.length} 個商品名稱比對不到任何分類，需要時可以新增分類，或到商品管理手動勾選：</p>
+                    <ul class="unmatched-list">
+                        ${unmatched.map(function(product) {
+                            return `<li>${escapeHtml(product.name)} <span class="status-tag">${statusText(product)}</span></li>`;
+                        }).join('')}
+                    </ul>
+                `;
+            }
+            previewEl.innerHTML = html;
+        });
+
+        previewEl.addEventListener('click', async function(event) {
+            if (!event.target.closest('#apply-auto-btn')) return;
+
+            const updates = [];
+            previewEl.querySelectorAll('tr[data-product-id]').forEach(function(tr) {
+                const ids = Array.from(tr.querySelectorAll('input:checked')).map(function(input) { return input.value; });
+                if (ids.length > 0) updates.push({ id: tr.dataset.productId, categoryIds: ids });
+            });
+            if (updates.length === 0) {
+                window.AdminCommon.showToast('沒有勾選任何分類', 'warning');
+                return;
+            }
+            if (!confirm(`確定要替 ${updates.length} 個商品套用勾選的分類嗎？`)) return;
+
+            window.AdminCommon.showLoading('套用中...');
+            try {
+                const services = window.firebaseServices;
+                // Firestore 單一 batch 最多 500 筆寫入
+                for (let start = 0; start < updates.length; start += 500) {
+                    const batch = services.writeBatch(services.db);
+                    updates.slice(start, start + 500).forEach(function(update) {
+                        batch.update(services.doc(services.db, 'products', update.id), {
+                            categoryIds: update.categoryIds,
+                            updatedAt: services.serverTimestamp()
+                        });
+                    });
+                    await batch.commit();
+                }
+                previewEl.innerHTML = '';
+                await loadProducts();
+                renderRows();
+                window.AdminCommon.showToast(`已替 ${updates.length} 個商品套用分類`, 'success');
+            } catch (error) {
+                console.error('套用自動歸類失敗:', error);
+                window.AdminCommon.handleError(error, '套用自動歸類');
+            } finally {
+                window.AdminCommon.hideLoading();
+            }
+        });
+
+        waitForAdminCommon();
+    });
+    </script>
+</body>
+</html>

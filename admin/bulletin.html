@@ -85,6 +85,7 @@
                     <li><a href="/admin/dashboard.html">管理首頁</a></li>
                     <li><a href="/admin/orders.html">訂單管理</a></li>
                     <li><a href="/admin/products.html">商品管理</a></li>
+                    <li><a href="/admin/categories.html">分類管理</a></li>
                     <li><a href="/admin/users.html">會員管理</a></li>
                     <li><a href="/admin/messages.html">訊息管理</a></li>
                     <li><a href="/admin/shipping.html">運費設定</a></li>
@@ -161,6 +162,7 @@
         </div>
     </footer>
 
+    <script src="/js/image-upload.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/admin-common.js"></script>
 
@@ -545,15 +547,17 @@
             let imageUrl = state.removeImageFlag ? '' : state.currentImageUrl;
 
             if (imageFile) {
+                // 輪播圖要滿版顯示，最長邊保留 1920px
+                const uploadFile = await ImageUpload.compress(imageFile, { maxDimension: 1920, quality: 0.85 });
                 const storage = window.firebaseServices.storage;
                 const storageRef = window.firebaseServices.storageRef;
                 const uploadBytes = window.firebaseServices.uploadBytes;
 
                 const timestamp = Date.now();
-                const imagePath = `bulletin/${timestamp}_${imageFile.name}`;
+                const imagePath = `bulletin/${timestamp}_${uploadFile.name}`;
                 const imageRef = storageRef(storage, imagePath);
 
-                await uploadBytes(imageRef, imageFile);
+                await uploadBytes(imageRef, uploadFile, ImageUpload.metadataFor(uploadFile));
 
                 // 直接構造 URL，跟商品管理頁面用同一套做法
                 const bucketName = "bulb-market-217c4.firebasestorage.app";

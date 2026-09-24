@@ -260,24 +260,8 @@
         <section class="home-band-section home-categories">
             <div class="section-band"><h2>商品分類</h2></div>
             <div class="container">
-                <div class="category-tiles">
-                    <a class="category-tile" href="/products.html?category=bulbs">
-                        <span class="category-tile-shape"><img src="/images/bulb_tulip.jpg" alt="" loading="lazy"></span>
-                        球根花卉
-                    </a>
-                    <a class="category-tile" href="/products.html?category=plants">
-                        <span class="category-tile-shape"><img src="/images/bulb_hydrangea.jpg" alt="" loading="lazy"></span>
-                        花卉盆栽
-                    </a>
-                    <a class="category-tile" href="/products.html?category=seeds">
-                        <span class="category-tile-shape"><i class="fas fa-seedling"></i></span>
-                        種子
-                    </a>
-                    <a class="category-tile" href="/products.html?category=other">
-                        <span class="category-tile-shape"><i class="fas fa-tools"></i></span>
-                        園藝資材
-                    </a>
-                </div>
+                <!-- 分類由後台「分類管理」設定，js/categories.js 提供清單，下方 renderCategoryTiles() 產生 -->
+                <div class="category-tiles" id="category-tiles"></div>
             </div>
         </section>
 
@@ -396,11 +380,8 @@
 
                 <div class="footer-section">
                     <h3>商品分類</h3>
-                    <ul class="footer-links">
-                        <li><a href="/products.html?category=bulbs">球根花卉</a></li>
-                        <li><a href="/products.html?category=plants">花卉盆栽</a></li>
-                        <li><a href="/products.html?category=seeds">種子</a></li>
-                        <li><a href="/products.html?category=other">園藝資材與其他</a></li>
+                    <ul class="footer-links footer-category-links">
+                        <li><a href="/products.html">所有商品 &raquo;</a></li>
                     </ul>
                 </div>
 
@@ -465,6 +446,7 @@
 
     <!-- 引入彈窗管理器 -->
     <script src="/js/auth-modals.js"></script>
+    <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/cart.js"></script>
@@ -476,6 +458,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化共用功能
     initCommonFeatures();
 
+    // 商品分類入口：先用瀏覽器記住的清單立刻畫出來，讀到最新清單後再更新
+    renderCategoryTiles(ProductCategories.getCached());
+    ProductCategories.load().then(renderCategoryTiles);
+
     // 加載首頁輪播圖片
     loadHomeCarousel();
 
@@ -483,6 +469,31 @@ document.addEventListener('DOMContentLoaded', function() {
     loadFeaturedProducts();
     initFeaturedSlider();
 });
+
+// 商品分類入口（水滴形圖片）；分類沒有設定圖片時用花朵圖示代替
+function renderCategoryTiles(categories) {
+    const container = document.getElementById('category-tiles');
+    if (!container) return;
+
+    const section = container.closest('section');
+    if (!categories || categories.length === 0) {
+        if (section) section.style.display = 'none';
+        return;
+    }
+    if (section) section.style.display = '';
+
+    container.innerHTML = categories.map(category => {
+        const shape = category.imageUrl
+            ? `<img src="${escapeHtml(category.imageUrl)}" alt="" loading="lazy">`
+            : '<i class="fas fa-seedling"></i>';
+        return `
+            <a class="category-tile" href="${ProductCategories.categoryUrl(category.id)}">
+                <span class="category-tile-shape">${shape}</span>
+                ${escapeHtml(category.name)}
+            </a>
+        `;
+    }).join('');
+}
 
 // 從 Firebase 讀取首頁輪播圖片（settings/bulletin 這份固定文件的 items 陣列，
 // 由後台「布告欄管理」上傳）。一張圖片都沒有、或讀取失敗時，改顯示文字版主視覺
@@ -745,7 +756,7 @@ function renderProducts(products) {
                 data-category="${product.category}">
                 <div class="product-image">
                     ${tagHTML}
-                    <img src="${product.imageUrl || '/images/placeholder.jpg'}" alt="${escapeHtml(product.name)}" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
+                    <img src="${product.imageUrl || '/images/placeholder.jpg'}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
                 </div>
                 <div class="product-info">
                     <div class="product-content">

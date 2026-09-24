@@ -239,10 +239,7 @@
                         <label>分類：</label>
                         <select id="category-filter">
                             <option value="all">所有商品</option>
-                            <option value="bulbs">球根花卉</option>
-                            <option value="plants">花卉盆栽</option>
-                            <option value="seeds">種子</option>
-                            <option value="other">其他</option>
+                            <!-- 其他分類選項由 populateCategoryFilter() 依後台「分類管理」產生 -->
                         </select>
                     </div>
                     
@@ -323,11 +320,8 @@
 
                 <div class="footer-section">
                     <h3>商品分類</h3>
-                    <ul class="footer-links">
-                        <li><a href="/products.html?category=bulbs">球根花卉</a></li>
-                        <li><a href="/products.html?category=plants">花卉盆栽</a></li>
-                        <li><a href="/products.html?category=seeds">種子</a></li>
-                        <li><a href="/products.html?category=other">園藝資材與其他</a></li>
+                    <ul class="footer-links footer-category-links">
+                        <li><a href="/products.html">所有商品 &raquo;</a></li>
                     </ul>
                 </div>
 
@@ -393,6 +387,7 @@
     <!-- JavaScript 文件 -->
     <!-- 引入彈窗管理器 -->
     <script src="/js/auth-modals.js"></script>
+    <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/cart.js"></script>
@@ -401,6 +396,8 @@
     <script>
 // 產品頁面專用變數
 let currentProducts = [];
+// 目前的顯示分類清單（後台「分類管理」設定），由 populateCategoryFilter() 更新
+let productCategories = [];
 let currentFilters = {
     category: 'all',
     price: 'all',
@@ -437,6 +434,11 @@ document.addEventListener('DOMContentLoaded', function() {
 
 // 初始化產品頁面
 function initProductsPage() {
+    // 先用瀏覽器記住的分類清單填好下拉選單（網址帶的 ?category= 才能馬上對得上），
+    // 讀到最新清單後再更新一次
+    populateCategoryFilter(ProductCategories.getCached());
+    ProductCategories.load().then(populateCategoryFilter);
+
     loadProducts();
     initFilters();
     initSearch();
@@ -622,7 +624,7 @@ function buildProductCardHTML(product) {
             <div class="product-image">
                 ${tagHTML}
                 ${unavailableBadge}
-                <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
+                <img src="${product.imageUrl}" alt="${escapeHtml(product.name)}" loading="lazy" decoding="async" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
             </div>
             <div class="product-info">
                 <div class="product-content">
@@ -651,7 +653,7 @@ function renderCurrentPage(pageNum) {
 
     productGrid.innerHTML = pageProducts.length > 0
         ? pageProducts.map(buildProductCardHTML).join('')
-        : '<div class="no-products">目前沒有可用的商品</div>';
+        : `<div class="no-products">${emptyProductsMessage()}</div>`;
 
     document.querySelectorAll('.pagination-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.page === String(pageNum));
@@ -680,7 +682,7 @@ function applyFilters() {
     
     // 分類篩選
     if (currentFilters.category !== 'all') {
-        filteredProducts = filteredProducts.filter(p => p.category === currentFilters.category);
+        filteredProducts = filteredProducts.filter(p => ProductCategories.productInCategory(p, currentFilters.category));
     }
     
     // 價格篩選
@@ -747,14 +749,33 @@ function updateSectionTitle() {
     } else if (currentFilters.category === 'all') {
         sectionTitle.textContent = '全部商品';
     } else {
-        const categoryNames = {
-            'bulbs': '球根花卉',
-            'plants': '花卉盆栽',
-            'seeds': '種子',
-            'other': '其他'
-        };
-        sectionTitle.textContent = categoryNames[currentFilters.category] || '其他商品';
+        const category = ProductCategories.findById(productCategories, currentFilters.category);
+        sectionTitle.textContent = category ? category.name : '其他商品';
     }
+}
+
+// 篩選後沒有商品時的提示：有選分類就講明是哪個分類，並提供回到全部商品的連結
+function emptyProductsMessage() {
+    const category = currentFilters.category !== 'all'
+        ? ProductCategories.findById(productCategories, currentFilters.category)
+        : null;
+    if (category) {
+        return `「${escapeHtml(category.name)}」目前還沒有商品，<a href="/products.html">看看全部商品</a>`;
+    }
+    return '目前沒有符合條件的商品';
+}
+
+// 分類下拉選單：「所有商品」之外的選項都依分類清單產生，重建時保留目前的選擇
+function populateCategoryFilter(categories) {
+    productCategories = categories || [];
+    const select = document.getElementById('category-filter');
+    if (!select) return;
+
+    const selected = select.value;
+    select.innerHTML = '<option value="all">所有商品</option>' + productCategories
+        .map(category => `<option value="${escapeHtml(category.id)}">${escapeHtml(category.name)}</option>`)
+        .join('');
+    select.value = productCategories.some(category => category.id === selected) ? selected : 'all';
 }
 
 // 初始化搜尋功能
