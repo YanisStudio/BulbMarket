@@ -112,71 +112,16 @@
     <main>
         <div class="admin-container">
             <h1 class="admin-title">布告欄管理</h1>
-            <p class="bulletin-intro">最多可以同時顯示兩則公告，首頁「最新公告」區塊會依啟用的則數自動排版；兩則都關閉的話，首頁就不會顯示這個區塊。</p>
+            <p class="bulletin-intro">首頁最上方的輪播圖片，最多 3 張，會依照下面的順序自動輪播，顧客也可以左右滑動切換。全部關閉的話，首頁會改顯示原本的文字版主視覺。</p>
+            <p class="bulletin-tip"><i class="fas fa-info-circle"></i> 建議尺寸 1920 × 800 像素（寬：高 = 12：5）。手機畫面會裁掉圖片左右兩側一些，重要的文字請放在圖片中間。</p>
 
-            <!-- 布告欄編輯區塊 -->
+            <!-- 布告欄編輯區塊：3 個輪播圖片欄位由下方程式產生 -->
             <div id="bulletin-section" style="display: none;">
-                <div class="settings-card">
-                    <div class="card-header">
-                        <div class="card-header-title">
-                            <i class="fas fa-bullhorn"></i>
-                            <h2>公告一</h2>
-                        </div>
-                        <label class="bulletin-toggle">
-                            <input type="checkbox" id="enable-slot-1" checked>
-                            啟用這則公告
-                        </label>
-                    </div>
-                    <div class="card-body enabled" id="slot-1-body">
-                        <div class="form-group">
-                            <label for="bulletin-text-1">公告文字</label>
-                            <textarea id="bulletin-text-1" rows="5" placeholder="輸入要顯示在首頁的公告內容..."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="bulletin-image-input-1">公告圖片（選填）</label>
-                            <input type="file" id="bulletin-image-input-1" accept="image/*" data-slot="1">
-                            <div class="image-preview-wrap" id="bulletin-image-preview-wrap-1" style="display: none;">
-                                <img class="image-preview" id="bulletin-image-preview-1" src="" alt="公告圖片預覽">
-                                <button type="button" class="btn btn-outline remove-image-btn" data-slot="1">
-                                    <i class="fas fa-trash"></i> 移除圖片
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="settings-card">
-                    <div class="card-header">
-                        <div class="card-header-title">
-                            <i class="fas fa-bullhorn"></i>
-                            <h2>公告二</h2>
-                        </div>
-                        <label class="bulletin-toggle">
-                            <input type="checkbox" id="enable-slot-2">
-                            啟用第二則公告
-                        </label>
-                    </div>
-                    <div class="card-body" id="slot-2-body">
-                        <div class="form-group">
-                            <label for="bulletin-text-2">公告文字</label>
-                            <textarea id="bulletin-text-2" rows="5" placeholder="輸入要顯示在首頁的公告內容..."></textarea>
-                        </div>
-                        <div class="form-group">
-                            <label for="bulletin-image-input-2">公告圖片（選填）</label>
-                            <input type="file" id="bulletin-image-input-2" accept="image/*" data-slot="2">
-                            <div class="image-preview-wrap" id="bulletin-image-preview-wrap-2" style="display: none;">
-                                <img class="image-preview" id="bulletin-image-preview-2" src="" alt="公告圖片預覽">
-                                <button type="button" class="btn btn-outline remove-image-btn" data-slot="2">
-                                    <i class="fas fa-trash"></i> 移除圖片
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <div id="bulletin-slots"></div>
 
                 <div class="form-actions">
                     <button type="button" id="save-bulletin-btn" class="btn btn-primary">
-                        <i class="fas fa-save"></i> 儲存公告
+                        <i class="fas fa-save"></i> 儲存輪播圖片
                     </button>
                 </div>
             </div>
@@ -223,7 +168,17 @@
         /* 布告欄管理特定樣式 */
         .bulletin-intro {
             color: #666;
-            margin: -10px 0 20px;
+            margin: -10px 0 10px;
+        }
+
+        .bulletin-tip {
+            max-width: 700px;
+            color: #2e7d32;
+            background-color: #f1f8f1;
+            border-radius: 6px;
+            padding: 10px 14px;
+            margin: 0 0 20px;
+            font-size: 0.95em;
         }
 
         .settings-card {
@@ -325,9 +280,15 @@
             gap: 16px;
         }
 
+        .image-preview-wrap {
+            flex-wrap: wrap;
+        }
+
+        /* 預覽用跟首頁輪播一樣的 12:5 比例，看得出實際會被裁切的樣子 */
         .image-preview {
-            max-width: 240px;
-            max-height: 160px;
+            width: 360px;
+            max-width: 100%;
+            aspect-ratio: 12 / 5;
             object-fit: cover;
             border-radius: 6px;
             border: 1px solid #eee;
@@ -390,11 +351,48 @@
             }
         };
 
-        // 兩個欄位組（公告一、公告二）各自的圖片狀態獨立管理
-        const slotState = {
-            1: { currentImageUrl: '', removeImageFlag: false },
-            2: { currentImageUrl: '', removeImageFlag: false }
-        };
+        // 首頁輪播最多 3 張圖片，每個欄位的圖片狀態各自獨立管理
+        const SLOT_COUNT = 3;
+        const SLOT_LABELS = ['第一張', '第二張', '第三張'];
+        const slots = [];
+        for (let i = 1; i <= SLOT_COUNT; i++) slots.push(i);
+
+        const slotState = {};
+        slots.forEach(function(slot) {
+            slotState[slot] = { currentImageUrl: '', removeImageFlag: false };
+        });
+
+        // 產生 3 個圖片欄位；預設只開第一張，跟以前「公告一開、其他關」的預設一致
+        document.getElementById('bulletin-slots').innerHTML = slots.map(function(slot) {
+            const label = SLOT_LABELS[slot - 1];
+            const enabled = slot === 1;
+            return `
+                <div class="settings-card">
+                    <div class="card-header">
+                        <div class="card-header-title">
+                            <i class="fas fa-image"></i>
+                            <h2>輪播圖片${label}</h2>
+                        </div>
+                        <label class="bulletin-toggle">
+                            <input type="checkbox" id="enable-slot-${slot}" ${enabled ? 'checked' : ''}>
+                            啟用這張圖片
+                        </label>
+                    </div>
+                    <div class="card-body ${enabled ? 'enabled' : ''}" id="slot-${slot}-body">
+                        <div class="form-group">
+                            <label for="bulletin-image-input-${slot}">選擇圖片</label>
+                            <input type="file" id="bulletin-image-input-${slot}" accept="image/*" data-slot="${slot}">
+                            <div class="image-preview-wrap" id="bulletin-image-preview-wrap-${slot}" style="display: none;">
+                                <img class="image-preview" id="bulletin-image-preview-${slot}" src="" alt="輪播圖片預覽">
+                                <button type="button" class="btn btn-outline remove-image-btn" data-slot="${slot}">
+                                    <i class="fas fa-trash"></i> 移除圖片
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
 
         const checkAdminAccess = function() {
             window.AdminCommon.checkAdminAccess(
@@ -450,64 +448,71 @@
             document.getElementById(`bulletin-image-preview-wrap-${slot}`).style.display = 'none';
         };
 
-        const fillSlot = function(slot, item) {
-            document.getElementById(`bulletin-text-${slot}`).value = item.text || '';
+        const fillSlot = function(slot, imageUrl) {
             document.getElementById(`enable-slot-${slot}`).checked = true;
             setSlotEnabled(slot, true);
-            if (item.imageUrl) {
-                slotState[slot].currentImageUrl = item.imageUrl;
-                showImagePreview(slot, item.imageUrl);
-            }
+            slotState[slot].currentImageUrl = imageUrl;
+            showImagePreview(slot, imageUrl);
         };
 
-        // 讀取現有公告，填入表單
+        // 讀取現有輪播圖片，填入表單
         const loadBulletin = async function() {
-            window.AdminCommon.showLoading('載入公告中...');
+            window.AdminCommon.showLoading('載入輪播圖片中...');
             try {
                 const db = window.firebaseServices.db;
                 const doc = window.firebaseServices.doc;
                 const getDoc = window.firebaseServices.getDoc;
 
-                const bulletinRef = doc(db, 'settings', 'bulletin');
-                const bulletinSnap = await getDoc(bulletinRef);
+                const bulletinSnap = await getDoc(doc(db, 'settings', 'bulletin'));
 
                 if (bulletinSnap.exists()) {
                     const data = bulletinSnap.data();
                     let items = Array.isArray(data.items) ? data.items : [];
 
-                    // 相容舊格式（單一物件 text/imageUrl，沒有 items 陣列），當成一則公告
-                    if (items.length === 0 && (data.text || data.imageUrl)) {
-                        items = [{ text: data.text || '', imageUrl: data.imageUrl || '' }];
+                    // 相容最早的舊格式（單一 imageUrl 欄位，沒有 items 陣列）
+                    if (items.length === 0 && data.imageUrl) {
+                        items = [{ imageUrl: data.imageUrl }];
                     }
 
-                    // 文件已經存在，代表之前存過設定，兩個開關先照資料庫實際狀態重置
-                    // （不要沿用 HTML 預設的「公告一開、公告二關」）
-                    [1, 2].forEach(function(slot) {
+                    // 輪播只用圖片；舊版只有文字、沒有圖片的公告不會帶進來
+                    const imageUrls = items
+                        .map(function(item) { return (item && item.imageUrl) || ''; })
+                        .filter(Boolean)
+                        .slice(0, SLOT_COUNT);
+
+                    // 文件已經存在，代表之前存過設定，開關照資料庫實際狀態重置
+                    slots.forEach(function(slot) {
                         document.getElementById(`enable-slot-${slot}`).checked = false;
                         setSlotEnabled(slot, false);
                     });
 
-                    if (items[0]) fillSlot(1, items[0]);
-                    if (items[1]) fillSlot(2, items[1]);
+                    imageUrls.forEach(function(url, index) {
+                        fillSlot(index + 1, url);
+                    });
+
+                    const hadTextOnly = items.some(function(item) { return item && item.text && !item.imageUrl; });
+                    if (hadTextOnly) {
+                        window.AdminCommon.showToast('舊的純文字公告已不會顯示在首頁，請改用圖片', 'warning');
+                    }
                 }
-                // 文件不存在（從沒存過）就維持 HTML 預設狀態：公告一開、公告二關
+                // 文件不存在（從沒存過）就維持預設狀態：第一張開、其他關
             } catch (error) {
-                console.error('載入公告失敗:', error);
-                window.AdminCommon.handleError(error, '載入公告');
+                console.error('載入輪播圖片失敗:', error);
+                window.AdminCommon.handleError(error, '載入輪播圖片');
             } finally {
                 window.AdminCommon.hideLoading();
             }
         };
 
         // 啟用開關
-        [1, 2].forEach(function(slot) {
+        slots.forEach(function(slot) {
             document.getElementById(`enable-slot-${slot}`).addEventListener('change', function() {
                 setSlotEnabled(slot, this.checked);
             });
         });
 
         // 選擇新圖片時，立即在畫面上預覽
-        [1, 2].forEach(function(slot) {
+        slots.forEach(function(slot) {
             const input = document.getElementById(`bulletin-image-input-${slot}`);
             input.addEventListener('change', function() {
                 const file = input.files[0];
@@ -521,7 +526,7 @@
             });
         });
 
-        // 移除圖片：清掉預覽跟已選檔案，存檔時會把該則的圖片網址整個清掉
+        // 移除圖片：清掉預覽跟已選檔案，存檔時會把該欄位的圖片網址清掉
         document.querySelectorAll('.remove-image-btn').forEach(function(btn) {
             btn.addEventListener('click', function() {
                 const slot = btn.dataset.slot;
@@ -531,9 +536,8 @@
             });
         });
 
-        // 上傳單一欄位組的圖片（如果有選新圖片），回傳這一則公告要存的資料
+        // 上傳單一欄位的圖片（如果有選新圖片），回傳這張輪播圖要存的資料
         const buildItem = async function(slot) {
-            const text = document.getElementById(`bulletin-text-${slot}`).value.trim();
             const imageInput = document.getElementById(`bulletin-image-input-${slot}`);
             const imageFile = imageInput.files[0] || null;
             const state = slotState[slot];
@@ -557,24 +561,22 @@
                 imageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media`;
             }
 
-            return { text: text, imageUrl: imageUrl };
+            return { imageUrl: imageUrl };
         };
 
-        // 儲存公告
+        // 儲存輪播圖片
         document.getElementById('save-bulletin-btn').addEventListener('click', async function() {
-            const slot1Enabled = document.getElementById('enable-slot-1').checked;
-            const slot2Enabled = document.getElementById('enable-slot-2').checked;
+            const enabledSlots = slots.filter(function(slot) {
+                return document.getElementById(`enable-slot-${slot}`).checked;
+            });
 
-            // 有啟用但文字跟圖片都空的話提醒一下，不要存一則空白公告
-            for (const slot of [1, 2]) {
-                const enabled = slot === 1 ? slot1Enabled : slot2Enabled;
-                if (!enabled) continue;
-                const text = document.getElementById(`bulletin-text-${slot}`).value.trim();
+            // 有啟用但沒有圖片的話提醒一下，不要存一張空白輪播
+            for (const slot of enabledSlots) {
                 const state = slotState[slot];
                 const hasExistingImage = !state.removeImageFlag && state.currentImageUrl;
                 const hasNewImage = document.getElementById(`bulletin-image-input-${slot}`).files[0];
-                if (!text && !hasExistingImage && !hasNewImage) {
-                    window.AdminCommon.showToast(`公告${slot === 1 ? '一' : '二'}已啟用，但沒有輸入文字或圖片，請填寫內容或取消啟用`, 'warning');
+                if (!hasExistingImage && !hasNewImage) {
+                    window.AdminCommon.showToast(`輪播圖片${SLOT_LABELS[slot - 1]}已啟用，但還沒選擇圖片，請選擇圖片或取消啟用`, 'warning');
                     return;
                 }
             }
@@ -588,8 +590,9 @@
                 const deleteField = window.firebaseServices.deleteField;
 
                 const items = [];
-                if (slot1Enabled) items.push(await buildItem(1));
-                if (slot2Enabled) items.push(await buildItem(2));
+                for (const slot of enabledSlots) {
+                    items.push(await buildItem(slot));
+                }
 
                 await setDoc(doc(db, 'settings', 'bulletin'), {
                     items: items,
@@ -599,18 +602,23 @@
                     updatedAt: serverTimestamp()
                 }, { merge: true });
 
-                // 重新整理每個 slot 記錄的「目前圖片網址」，並清空已選擇的檔案
-                [1, 2].forEach(function(slot) {
-                    slotState[slot].removeImageFlag = false;
+                // 存檔後依實際存進去的順序重新排列欄位（中間有關掉的會往前補），
+                // 畫面跟資料庫、跟首頁輪播順序保持一致
+                slots.forEach(function(slot) {
+                    slotState[slot] = { currentImageUrl: '', removeImageFlag: false };
                     document.getElementById(`bulletin-image-input-${slot}`).value = '';
+                    document.getElementById(`enable-slot-${slot}`).checked = false;
+                    setSlotEnabled(slot, false);
+                    hideImagePreview(slot);
                 });
-                slotState[1].currentImageUrl = items[0] ? (items[0].imageUrl || '') : '';
-                slotState[2].currentImageUrl = items[1] ? (items[1].imageUrl || '') : '';
+                items.forEach(function(item, index) {
+                    fillSlot(index + 1, item.imageUrl);
+                });
 
-                window.AdminCommon.showToast('公告已儲存', 'success');
+                window.AdminCommon.showToast('輪播圖片已儲存', 'success');
             } catch (error) {
-                console.error('儲存公告失敗:', error);
-                window.AdminCommon.handleError(error, '儲存公告');
+                console.error('儲存輪播圖片失敗:', error);
+                window.AdminCommon.handleError(error, '儲存輪播圖片');
             } finally {
                 window.AdminCommon.hideLoading();
             }

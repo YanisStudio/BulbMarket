@@ -647,6 +647,7 @@
             signInWithCredential
         };
     </script>
+    <link rel="stylesheet" href="/css/storefront.css">
 </head>
 <body>
     <header>
@@ -852,35 +853,48 @@
         </section>
     </main>
     
-    <footer>
+    <footer class="site-footer">
         <div class="container">
             <div class="footer-content">
                 <div class="footer-section">
                     <h3>球根花卉團購</h3>
                     <p>為您提供最優質的球根花卉選擇</p>
                     <div class="social-links">
-                        <a href="https://www.facebook.com/groups/g112332?locale=zh_TW" target="_blank" title="Facebook 社團"><i class="fab fa-facebook"></i></a>
-                        <!-- 蝦皮賣場連結先暫時關閉，之後要重新開放時把 style="display:none;" 拿掉即可 --><a href="https://shopee.tw/vincentsayhello?categoryId=100636&entryPoint=ShopByPDP&itemId=27426426770" target="_blank" title="蝦皮賣場" style="display:none;"><i class="fas fa-shopping-bag"></i></a>
+                        <a href="https://www.facebook.com/groups/g112332?locale=zh_TW" target="_blank" rel="noopener" title="Facebook 社團"><i class="fab fa-facebook"></i></a>
+                        <!-- 蝦皮賣場連結先暫時關閉，之後要重新開放時把 style="display:none;" 拿掉即可 --><a href="https://shopee.tw/vincentsayhello?categoryId=100636&entryPoint=ShopByPDP&itemId=27426426770" target="_blank" rel="noopener" title="蝦皮賣場" style="display:none;"><i class="fas fa-shopping-bag"></i></a>
                     </div>
                 </div>
-                
+
                 <div class="footer-section">
                     <h3>商品分類</h3>
-                    <p><i class="fas fa-seedling"></i> 球根花卉（香水百合、孤挺花、鳶尾等）</p>
-                    <p><i class="fas fa-leaf"></i> 花卉盆栽（繡球花苗等）</p>
-                    <p><i class="fas fa-spa"></i> 進口花卉蔬菜種子</p>
-                    <p><i class="fas fa-tools"></i> 園藝資材用品</p>
+                    <ul class="footer-links">
+                        <li><a href="/products.html?category=bulbs">球根花卉</a></li>
+                        <li><a href="/products.html?category=plants">花卉盆栽</a></li>
+                        <li><a href="/products.html?category=seeds">種子</a></li>
+                        <li><a href="/products.html?category=other">園藝資材與其他</a></li>
+                    </ul>
                 </div>
-                
+
+                <div class="footer-section">
+                    <h3>顧客服務</h3>
+                    <ul class="footer-links">
+                        <li><a href="/about.html">關於我們</a></li>
+                        <li><a href="/contact.html">聯絡我們</a></li>
+                        <li><a href="/orders.html">訂單查詢</a></li>
+                        <li><a href="/cart.html">購物車</a></li>
+                    </ul>
+                </div>
+
                 <div class="footer-section">
                     <h3>服務時間</h3>
                     <p><i class="far fa-clock"></i> 週一至週五：9:00 - 18:00</p>
-                    <p><i class="fas fa-truck"></i> 提供超商取貨與宅急便配送服務</p>
+                    <p><i class="fas fa-truck"></i> 超商取貨與宅急便配送</p>
                     <p><i class="fas fa-users"></i> 團購優惠價格</p>
                 </div>
             </div>
-            
+
             <div class="copyright">
+                <p class="footer-company">黃裕泰種子行｜統一編號：94806296</p>
                 <p>&copy; 2025 球根花卉團購。保留所有權利。</p>
                 <p class="disclaimer">※ 植物為活體，不適用七天鑑賞期 ※</p>
             </div>
