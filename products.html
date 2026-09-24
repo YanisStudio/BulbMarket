@@ -71,10 +71,10 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        // 開啟 experimentalAutoDetectLongPolling：自動偵測目前網路環境是否會
-        // 擋掉預設的串流連線（VPN、防火牆、廣告阻擋擴充功能等常見成因），
-        // 會的話自動改用長輪詢，降低連線逾時、觸發自動重試的機率
-        const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+        // 固定使用長輪詢（experimentalForceLongPolling），不先嘗試串流連線。
+        // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
+        // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
+        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
 
         window.firebaseServices = {
             app: app,

@@ -433,8 +433,9 @@ async function resetFirestoreConnection() {
     }
     try {
         await services.terminate(services.db);
+        // 跟各頁面初始化時的設定一致：固定使用長輪詢
         services.db = services.initializeFirestore(services.app, {
-            experimentalAutoDetectLongPolling: true
+            experimentalForceLongPolling: true
         });
         console.log('Firestore 連線已重建');
         return true;

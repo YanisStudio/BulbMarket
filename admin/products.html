@@ -44,9 +44,7 @@
             getStorage,
             ref,
             uploadBytes,
-            getDownloadURL,
-            getMetadata,
-            updateMetadata
+            getDownloadURL
         } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js";
         
         // Firebase配置 - 統一使用與其他頁面相同的配置
@@ -55,9 +53,10 @@
         // 初始化Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        // 開啟 experimentalAutoDetectLongPolling：自動偵測目前網路環境是否
-        // 會擋掉預設的串流連線，會的話自動改用長輪詢，降低連線逾時機率
-        const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+        // 固定使用長輪詢（experimentalForceLongPolling），不先嘗試串流連線。
+        // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
+        // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
+        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
         const storage = getStorage(app);
         
         // 將Firebase服務暴露給全局使用
@@ -82,9 +81,7 @@
             deleteField,
             storageRef: ref,
             uploadBytes,
-            getDownloadURL,
-            getMetadata,
-            updateMetadata
+            getDownloadURL
         };
     </script>
     
@@ -733,9 +730,6 @@
                 <div class="card-header">
                     <h2>商品列表</h2>
                     <div class="card-actions">
-                        <button class="btn btn-outline" id="optimize-image-cache" title="讓顧客的瀏覽器記住已經下載過的商品、輪播、分類圖片，第二次進站不用再重新下載">
-                            <i class="fas fa-bolt"></i> 加速圖片載入
-                        </button>
                         <button class="btn btn-outline" id="refresh-products">
                             <i class="fas fa-sync-alt"></i> 刷新列表
                         </button>
@@ -861,73 +855,6 @@
             .map(input => input.value);
     }
 
-    // 「加速圖片載入」：替已經上傳過的商品、輪播、分類圖片補上瀏覽器快取設定。
-    // 以前上傳的圖片沒有設定快取，Firebase Storage 預設每次都要重新下載，
-    // 顧客每次進站都要重抓全部圖片。只改檔案的快取設定，不會動到圖片內容。
-    // 之後新上傳的圖片（js/image-upload.js）上傳時就會自動設定好
-    async function optimizeImageCache(button) {
-        const services = window.firebaseServices;
-        const bucketHost = 'firebasestorage.googleapis.com/v0/b/bulb-market-217c4.firebasestorage.app/';
-        const isOurStorageUrl = url => typeof url === 'string' && url.indexOf(bucketHost) !== -1;
-
-        const originalHTML = button.innerHTML;
-        button.disabled = true;
-        button.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 收集圖片中...';
-
-        try {
-            const urls = new Set();
-            const productsSnap = await services.getDocs(services.collection(services.db, 'products'));
-            productsSnap.forEach(docSnap => urls.add(docSnap.data().imageUrl));
-            for (const settingId of ['bulletin', 'categories']) {
-                const snap = await services.getDoc(services.doc(services.db, 'settings', settingId));
-                const items = snap.exists() && Array.isArray(snap.data().items) ? snap.data().items : [];
-                items.forEach(item => urls.add(item && item.imageUrl));
-            }
-            const targets = Array.from(urls).filter(isOurStorageUrl);
-
-            let updated = 0;
-            let alreadyOk = 0;
-            const failed = [];
-            let done = 0;
-
-            // 同時處理 4 張，不要一次對 Storage 發太多請求
-            const queue = targets.slice();
-            const worker = async function() {
-                while (queue.length > 0) {
-                    const url = queue.shift();
-                    try {
-                        const fileRef = services.storageRef(services.storage, url);
-                        const meta = await services.getMetadata(fileRef);
-                        if (meta.cacheControl === ImageUpload.CACHE_CONTROL) {
-                            alreadyOk++;
-                        } else {
-                            await services.updateMetadata(fileRef, { cacheControl: ImageUpload.CACHE_CONTROL });
-                            updated++;
-                        }
-                    } catch (error) {
-                        console.warn('設定圖片快取失敗:', url, error);
-                        failed.push(url);
-                    }
-                    done++;
-                    button.innerHTML = `<i class="fas fa-spinner fa-spin"></i> 處理中 ${done}/${targets.length}`;
-                }
-            };
-            await Promise.all([worker(), worker(), worker(), worker()]);
-
-            let message = `完成！共 ${targets.length} 張圖片：新設定 ${updated} 張、原本就設定好 ${alreadyOk} 張。`;
-            if (failed.length > 0) {
-                message += `\n\n有 ${failed.length} 張沒有成功（可能是圖片已經被刪除），詳細網址請看瀏覽器主控台。`;
-            }
-            alert(message);
-        } catch (error) {
-            console.error('加速圖片載入失敗:', error);
-            alert('加速圖片載入失敗：' + error.message);
-        } finally {
-            button.disabled = false;
-            button.innerHTML = originalHTML;
-        }
-    }
-
     function productCategoryNames(product) {
         return ProductCategories.productCategoryIds(product)
             .map(id => ProductCategories.findById(adminProductCategories, id))
@@ -1017,14 +944,6 @@ const waitForAdminCommon = function() {
                 });
             }
             
-            // 綁定「加速圖片載入」按鈕
-            const optimizeCacheBtn = document.getElementById('optimize-image-cache');
-            if (optimizeCacheBtn) {
-                optimizeCacheBtn.addEventListener('click', function() {
-                    optimizeImageCache(optimizeCacheBtn);
-                });
-            }
-
             // 綁定刷新商品列表按鈕
             const refreshBtn = document.getElementById('refresh-products');
             if (refreshBtn) {

@@ -42,9 +42,10 @@
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        // 開啟 experimentalAutoDetectLongPolling：自動偵測目前網路環境是否
-        // 會擋掉預設的串流連線，會的話自動改用長輪詢，降低連線逾時機率
-        const db = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
+        // 固定使用長輪詢（experimentalForceLongPolling），不先嘗試串流連線。
+        // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
+        // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
+        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
         const storage = getStorage(app);
 
         window.firebaseServices = {
@@ -114,8 +115,7 @@
     <main>
         <div class="admin-container">
             <h1 class="admin-title">分類管理</h1>
-            <p class="page-intro">這裡的分類會顯示在首頁「商品分類」、商品頁的分類篩選和頁尾。可以新增、改名、調整順序、刪除，也可以替每個分類設定一張首頁用的圖片。一個商品可以同時屬於好幾個分類（例如「百合」+「稀有品種」），在「商品管理」編輯商品時勾選。</p>
-            <p class="page-tip"><i class="fas fa-info-circle"></i> 這裡的分類跟「運費類別」（球根花卉／花卉盆栽／種子／其他）是分開的，改分類不會影響運費計算。</p>
+            <p class="page-tip"><i class="fas fa-info-circle"></i> 商品要歸到哪些分類，在「商品管理」勾選。改分類不影響運費。</p>
 
             <div id="categories-section" style="display: none;">
                 <div class="settings-card">
@@ -124,7 +124,7 @@
                             <i class="fas fa-tags"></i>
                             <h2>分類清單</h2>
                         </div>
-                        <span class="card-header-note" id="unsaved-note" hidden><i class="fas fa-circle"></i> 有尚未儲存的變更</span>
+                        <span class="card-header-note" id="unsaved-note" hidden><i class="fas fa-circle"></i> 未儲存</span>
                     </div>
                     <div class="card-body">
                         <ul class="category-list" id="category-list"></ul>
@@ -136,7 +136,7 @@
                                 <i class="fas fa-save"></i> 儲存分類
                             </button>
                         </div>
-                        <p class="field-hint">分類圖片建議用正方形照片（至少 400 × 400 像素），首頁會裁成水滴形。沒有設定圖片的分類會顯示綠色花朵圖示。</p>
+                        <p class="field-hint">圖片建議用正方形照片。</p>
                     </div>
                 </div>
 
@@ -149,8 +149,7 @@
                     </div>
                     <div class="card-body">
                         <p class="auto-intro">
-                            只處理<b>還沒有任何分類</b>的商品：用商品名稱比對分類名稱（例如名稱有「百合」就建議「百合」），先預覽，你確認勾選後才會寫入。
-                            「稀有品種」這種看名稱判斷不出來的分類，請到商品管理手動勾選。
+                            依名稱幫<b>還沒分類</b>的商品配分類，確認後才寫入。
                             <span id="uncategorized-count"></span>
                         </p>
                         <button type="button" class="btn btn-outline" id="preview-auto-btn">
@@ -592,7 +591,7 @@
             });
             const uncategorized = products.filter(function(product) { return product.categoryIds.length === 0; });
             document.getElementById('uncategorized-count').textContent =
-                uncategorized.length > 0 ? `目前有 ${uncategorized.length} 個商品還沒有分類。` : '目前所有商品都已經有分類。';
+                uncategorized.length > 0 ? `（目前 ${uncategorized.length} 個）` : '';
         };
 
         const countFor = function(categoryId) {
@@ -601,7 +600,7 @@
 
         const renderRows = function() {
             if (rows.length === 0) {
-                listEl.innerHTML = '<li class="field-hint">目前沒有任何分類，按「新增分類」開始建立。</li>';
+                listEl.innerHTML = '<li class="field-hint">還沒有分類。</li>';
                 return;
             }
             listEl.innerHTML = rows.map(function(row, index) {
@@ -671,8 +670,8 @@
                 const count = countFor(rows[index].id);
                 const name = rows[index].name || '（未命名）';
                 const message = count > 0
-                    ? `確定要刪除「${name}」嗎？\n\n目前有 ${count} 個商品勾選了這個分類，刪除後這些商品就不會出現在這個分類裡（商品本身不會被刪除）。\n\n按「儲存分類」後才會生效。`
-                    : `確定要刪除「${name}」嗎？按「儲存分類」後才會生效。`;
+                    ? `刪除「${name}」？（${count} 個商品會移出此分類，商品不會被刪）`
+                    : `刪除「${name}」？`;
                 if (!confirm(message)) return;
                 rows.splice(index, 1);
             } else {
@@ -754,14 +753,14 @@
 
         document.getElementById('preview-auto-btn').addEventListener('click', function() {
             if (dirty) {
-                window.AdminCommon.showToast('分類清單有尚未儲存的變更，請先按「儲存分類」再預覽', 'warning');
+                window.AdminCommon.showToast('請先儲存分類', 'warning');
                 return;
             }
             const categories = rows.map(function(row) { return { id: row.id, name: row.name }; });
             const uncategorized = products.filter(function(product) { return product.categoryIds.length === 0; });
 
             if (uncategorized.length === 0) {
-                previewEl.innerHTML = '<p class="field-hint">所有商品都已經有分類了，沒有需要自動歸類的商品。</p>';
+                previewEl.innerHTML = '<p class="field-hint">所有商品都已分類。</p>';
                 return;
             }
 
@@ -781,7 +780,7 @@
             if (matched.length > 0) {
                 html += `
                     <table class="auto-table">
-                        <thead><tr><th>商品</th><th>建議分類（取消勾選就不會套用）</th></tr></thead>
+                        <thead><tr><th>商品</th><th>建議分類</th></tr></thead>
                         <tbody>
                             ${matched.map(function(entry) {
                                 return `
@@ -797,13 +796,13 @@
                         </tbody>
                     </table>
                     <button type="button" class="btn btn-primary" id="apply-auto-btn">
-                        <i class="fas fa-check"></i> 套用勾選的歸類（${matched.length} 個商品）
+                        <i class="fas fa-check"></i> 套用（${matched.length} 個商品）
                     </button>
                 `;
             }
             if (unmatched.length > 0) {
                 html += `
-                    <p class="field-hint">以下 ${unmatched.length} 個商品名稱比對不到任何分類，需要時可以新增分類，或到商品管理手動勾選：</p>
+                    <p class="field-hint">配不到分類（${unmatched.length} 個）：</p>
                     <ul class="unmatched-list">
                         ${unmatched.map(function(product) {
                             return `<li>${escapeHtml(product.name)} <span class="status-tag">${statusText(product)}</span></li>`;
@@ -826,7 +825,7 @@
                 window.AdminCommon.showToast('沒有勾選任何分類', 'warning');
                 return;
             }
-            if (!confirm(`確定要替 ${updates.length} 個商品套用勾選的分類嗎？`)) return;
+            if (!confirm(`套用到 ${updates.length} 個商品？`)) return;
 
             window.AdminCommon.showLoading('套用中...');
             try {
