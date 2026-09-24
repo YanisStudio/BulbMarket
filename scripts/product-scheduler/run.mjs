@@ -31,17 +31,22 @@ async function processBatchTransition(db, field, newStatus) {
         return 0;
     }
 
-    const batch = db.batch();
+    // Firestore 單一 batch 最多 500 筆寫入，超過要分批送出
+    const BATCH_LIMIT = 500;
+    const docs = snapshot.docs;
     const names = [];
-    snapshot.forEach((doc) => {
-        const data = doc.data();
-        names.push(`${doc.id}（${data.name || '未命名商品'}）`);
-        batch.update(doc.ref, {
-            status: newStatus,
-            [field]: FieldValue.delete(),
+    for (let start = 0; start < docs.length; start += BATCH_LIMIT) {
+        const batch = db.batch();
+        docs.slice(start, start + BATCH_LIMIT).forEach((doc) => {
+            const data = doc.data();
+            names.push(`${doc.id}（${data.name || '未命名商品'}）`);
+            batch.update(doc.ref, {
+                status: newStatus,
+                [field]: FieldValue.delete(),
+            });
         });
-    });
-    await batch.commit();
+        await batch.commit();
+    }
 
     console.log(`[${field}] 已將 ${snapshot.size} 項商品的 status 改成 "${newStatus}"：`);
     names.forEach((n) => console.log(`  - ${n}`));

@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/cart.css">
     <link rel="stylesheet" href="/css/auth-modals.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
     
     <style>
 /* 訂單記錄頁面特有樣式 */
@@ -1226,7 +1226,7 @@ async function loadUserOrders(user) {
         orderListContainer.innerHTML = `
             <div class="loading">
                 <p>獲取訂單時發生錯誤，請稍後再試</p>
-                <p style="font-size: 0.8em; color: #999;">錯誤詳情: ${error.message}</p>
+                <p style="font-size: 0.8em; color: #999;">錯誤詳情: ${escapeHtml(error.message)}</p>
             </div>`;
     }
 }

@@ -25,10 +25,10 @@ jobs:
         working-directory: scripts/set-admin-claims
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: '20'
 
@@ -38,4 +38,7 @@ jobs:
       - name: 執行管理員權限設定
         env:
           FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-        run: node run.mjs "${{ github.event.inputs.action }}" "${{ github.event.inputs.emails }}"
+          # 表單輸入透過環境變數傳進去，不直接嵌進 shell 指令，避免指令注入
+          INPUT_ACTION: ${{ github.event.inputs.action }}
+          INPUT_EMAILS: ${{ github.event.inputs.emails }}
+        run: node run.mjs "$INPUT_ACTION" "$INPUT_EMAILS"

@@ -47,6 +47,24 @@ function normalizePhone(phoneNumber) {
     return phoneNumber.replace(/^\+886/, '0');
 }
 
+// 這支腳本每天在 GitHub Actions 上跑，公開 repo 的執行紀錄任何人都看得到，
+// 印到 log 裡的 email / 電話一律遮罩，只留足夠辨識的頭尾
+function maskPii(value) {
+    if (!value) return '';
+    const text = String(value);
+    if (text.includes('@')) {
+        const [local, domain] = text.split('@');
+        return `${local.slice(0, 2)}***@${domain}`;
+    }
+    if (/^\+?\d{6,}$/.test(text)) {
+        return `${text.slice(0, 4)}***${text.slice(-3)}`;
+    }
+    return text;
+}
+
+// Firestore 單一 batch 最多 500 筆寫入，超過要分批送出
+const BATCH_LIMIT = 500;
+
 function detectProvider(user) {
     const providerId = user.providerData?.[0]?.providerId;
     if (providerId === 'google.com') return 'google';
@@ -185,7 +203,7 @@ async function main() {
     });
     if (orphanDocs.length > 0) {
         console.log(`發現 ${orphanDocs.length} 筆孤兒資料（Authentication 帳號已不存在，僅記錄、不會自動刪除）：`);
-        orphanDocs.forEach((o) => console.log(`[孤兒資料] ${o.identifier} (${o.uid})`));
+        orphanDocs.forEach((o) => console.log(`[孤兒資料] ${maskPii(o.identifier)} (${o.uid})`));
     } else {
         console.log('沒有發現孤兒資料。');
     }
@@ -207,10 +225,13 @@ async function main() {
                 if ((k === 'createdAt' || k === 'lastLoginAt') && v?.toDate) {
                     return `${k}=${v.toDate().toISOString()}`;
                 }
+                if (k === 'email' || k === 'phone') {
+                    return `${k}=${maskPii(v)}`;
+                }
                 return `${k}=${v}`;
             })
             .join(', ');
-        console.log(`${tag} ${u.identifier} (${u.uid}) -> ${changeText || '(建立基本資料文件)'}`);
+        console.log(`${tag} ${maskPii(u.identifier)} (${u.uid}) -> ${changeText || '(建立基本資料文件)'}`);
     });
 
     if (!applyChanges) {
@@ -220,16 +241,18 @@ async function main() {
     }
 
     console.log('\n開始寫入 Firestore...');
-    const batch = db.batch();
-    plannedUpdates.forEach((u) => {
-        const userRef = db.collection('users').doc(u.uid);
-        if (u.isNewDoc) {
-            batch.set(userRef, u.changes);
-        } else {
-            batch.update(userRef, u.changes);
-        }
-    });
-    await batch.commit();
+    for (let start = 0; start < plannedUpdates.length; start += BATCH_LIMIT) {
+        const batch = db.batch();
+        plannedUpdates.slice(start, start + BATCH_LIMIT).forEach((u) => {
+            const userRef = db.collection('users').doc(u.uid);
+            if (u.isNewDoc) {
+                batch.set(userRef, u.changes);
+            } else {
+                batch.update(userRef, u.changes);
+            }
+        });
+        await batch.commit();
+    }
     console.log(`完成，已更新 ${plannedUpdates.length} 筆會員資料。`);
 }
 

@@ -55,12 +55,19 @@ function parseEmails(raw) {
         .filter(Boolean);
 }
 
+// GitHub Actions 的執行紀錄在公開 repo 任何人都看得到，印到 log 的信箱一律遮罩
+function maskEmail(email) {
+    if (!email || !email.includes('@')) return email || '';
+    const [local, domain] = email.split('@');
+    return `${local.slice(0, 2)}***@${domain}`;
+}
+
 async function setAdminClaim(auth, email, isAdmin) {
     let user;
     try {
         user = await auth.getUserByEmail(email);
     } catch (error) {
-        console.error(`✗ ${email}：找不到這個帳號（確認信箱有沒有打錯、這個人是否已經用這個信箱註冊過）`);
+        console.error(`✗ ${maskEmail(email)}：找不到這個帳號（確認信箱有沒有打錯、這個人是否已經用這個信箱註冊過）`);
         return false;
     }
 
@@ -73,7 +80,7 @@ async function setAdminClaim(auth, email, isAdmin) {
     }
 
     await auth.setCustomUserClaims(user.uid, nextClaims);
-    console.log(`✓ ${email}（uid: ${user.uid}）已${isAdmin ? '設定為管理員' : '移除管理員權限'}`);
+    console.log(`✓ ${maskEmail(email)}（uid: ${user.uid}）已${isAdmin ? '設定為管理員' : '移除管理員權限'}`);
     return true;
 }
 
@@ -92,7 +99,7 @@ async function main() {
             console.log('目前沒有任何帳號擁有 admin claim。');
         } else {
             console.log(`目前共有 ${admins.length} 位管理員：`);
-            admins.forEach((user) => console.log(`  - ${user.email || '(無 email)'}（uid: ${user.uid}）`));
+            admins.forEach((user) => console.log(`  - ${maskEmail(user.email) || '(無 email)'}（uid: ${user.uid}）`));
         }
         return;
     }
@@ -109,7 +116,7 @@ async function main() {
         return;
     }
 
-    console.log(`準備${action === 'add' ? '設定' : '移除'}管理員權限：${emails.join(', ')}\n`);
+    console.log(`準備${action === 'add' ? '設定' : '移除'}管理員權限：${emails.map(maskEmail).join(', ')}\n`);
 
     let successCount = 0;
     for (const email of emails) {
