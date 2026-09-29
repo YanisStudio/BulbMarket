@@ -8,6 +8,17 @@
  */
 (function() {
     const DEFAULT_CATEGORIES = ['球根知識', '種植指南', '種植筆記'];
+
+    // 「新增文章」的簡易範本：先放好常見的段落小標題，內文欄用提示文字說明該寫什麼
+    // （hint 只顯示在編輯器，不會存進資料庫）。用不到的段落可以直接刪掉、小標題也能改
+    const ARTICLE_TEMPLATE = [
+        { heading: '', hint: '前言：先簡單介紹這篇的主題，例如這種球根的特色、為什麼適合現在種。' },
+        { heading: '一、適合種植的時間', hint: '適合種植的月份、台灣氣候要注意的地方（例如是否需要冷藏催芽）。' },
+        { heading: '二、介質與種植方式', hint: '土壤／介質配方、盆器大小、種植深度與間距。' },
+        { heading: '三、日常照顧', hint: '日照需求、澆水頻率、施肥時機，以及常見問題。' },
+        { heading: '四、開花後的處理', hint: '剪除花莖、養球、休眠期與球根保存方式。' },
+        { heading: '小結', hint: '用幾句話整理重點，也可以推薦相關商品。' }
+    ];
     const BUCKET = 'bulb-market-217c4.firebasestorage.app';
 
     let articles = [];
@@ -150,7 +161,9 @@
                 coverImageUrl: '',
                 coverFile: null,
                 coverPreview: '',
-                sections: [{ heading: '', text: '', imageUrl: '', file: null, preview: '' }]
+                sections: ARTICLE_TEMPLATE.map(function(t) {
+                    return { heading: t.heading, hint: t.hint, text: '', imageUrl: '', file: null, preview: '' };
+                })
             };
         if (draft.sections.length === 0) {
             draft.sections.push({ heading: '', text: '', imageUrl: '', file: null, preview: '' });
@@ -218,7 +231,7 @@
                     </div>
                     <div class="form-group">
                         <label>內文</label>
-                        <textarea data-section-field="text" rows="7" placeholder="空一行會分成新的段落">${escapeHtml(section.text)}</textarea>
+                        <textarea data-section-field="text" rows="7" placeholder="${escapeHtml(section.hint || '空一行會分成新的段落')}">${escapeHtml(section.text)}</textarea>
                     </div>
                 </div>
             `;
@@ -256,7 +269,7 @@
 
                 <div class="form-group">
                     <label for="kn-summary">摘要（選填，顯示在文章卡片與文章開頭；沒填會自動取第一段內文）</label>
-                    <textarea id="kn-summary" data-field="summary" rows="3" maxlength="200">${escapeHtml(d.summary)}</textarea>
+                    <textarea id="kn-summary" data-field="summary" rows="3" maxlength="200" placeholder="用一兩句話說明這篇文章要介紹什麼，例如：秋天是種鬱金香的好時機，這篇整理從挑球根到開花的 4 個重點。">${escapeHtml(d.summary)}</textarea>
                 </div>
 
                 <div class="form-group">
@@ -388,6 +401,15 @@
         if (!hasContent) {
             window.AdminCommon.showToast('文章內容還是空的，請至少填一個段落', 'warning');
             return;
+        }
+
+        // 範本留下來、只有小標題沒寫內文的段落，前台會顯示成空的標題，先提醒一下
+        const headingOnly = draft.sections.filter(function(s) {
+            return s.heading.trim() && !s.text.trim() && !s.file && !s.imageUrl;
+        });
+        if (headingOnly.length > 0) {
+            const names = headingOnly.map(function(s) { return '・' + s.heading.trim(); }).join('\n');
+            if (!confirm(`以下段落只有小標題、還沒有內文：\n${names}\n\n確定要直接儲存嗎？（不需要的段落可以按垃圾桶刪除）`)) return;
         }
 
         window.AdminCommon.showLoading('儲存文章中...');
