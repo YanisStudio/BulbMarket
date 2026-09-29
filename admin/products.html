@@ -830,6 +830,10 @@
     // 全局變量：當前精選商品ID列表
     let currentFeaturedProductIds = [];
 
+    // 按下「編輯」時讀到的庫存數字。儲存時用來判斷管理員有沒有改庫存、
+    // 以及編輯期間有沒有顧客下單把庫存扣掉（避免用表單上的舊數字蓋回去造成超賣）
+    let editingOriginalStock = null;
+
     // 顯示用商品分類（百合、鬱金香…），清單來自後台「分類管理」
     let adminProductCategories = ProductCategories.getCached();
 
@@ -1523,6 +1527,7 @@ const waitForAdminCommon = function() {
                     document.getElementById('product-price').value = product.price || 0;
                     document.getElementById('product-unit').value = product.unit || '份';
                     document.getElementById('product-stock').value = product.stock || 0;
+                    editingOriginalStock = product.stock || 0;
                     document.getElementById('product-status').value = product.status || 'active';
                     document.getElementById('product-description').value = product.description || '';
                     document.getElementById('product-detail-description').value = product.detailDescription || '';
@@ -1657,7 +1662,30 @@ const waitForAdminCommon = function() {
                     imageUrl: initialImageUrl,
                     updatedAt: serverTimestamp()
                 };
-                
+
+                // 編輯既有商品時的庫存處理：表單上的庫存是按「編輯」當下讀到的數字，
+                // 這段期間如果有顧客下單，資料庫的庫存已經被扣掉了，直接寫回會把訂單扣的量加回來（超賣）
+                if (productId && editingOriginalStock !== null) {
+                    if (stock === editingOriginalStock) {
+                        // 沒有改庫存 → 不寫入 stock，保留資料庫目前的數字（含編輯期間被訂單扣掉的量）
+                        delete productData.stock;
+                    } else {
+                        // 有改庫存 → 先確認編輯期間庫存有沒有變動，有的話讓管理員決定
+                        const latestSnap = await window.firebaseServices.getDoc(doc(db, "products", productId));
+                        const latestStock = latestSnap.exists() ? (latestSnap.data().stock || 0) : editingOriginalStock;
+                        if (latestStock !== editingOriginalStock) {
+                            const keepNewValue = confirm(
+                                `這個商品的庫存在您編輯期間已經變動了（可能有新訂單）：\n` +
+                                `打開編輯時：${editingOriginalStock}\n目前資料庫：${latestStock}\n您填的數字：${stock}\n\n` +
+                                `確定＝把庫存設為 ${stock}\n取消＝保留目前的 ${latestStock}（其他欄位照常儲存）`
+                            );
+                            if (!keepNewValue) {
+                                delete productData.stock;
+                            }
+                        }
+                    }
+                }
+
                 // 保存商品基本資料到 Firestore
                 let savedProductId = productId;
                 let saveSuccess = false;
@@ -1799,6 +1827,7 @@ const waitForAdminCommon = function() {
             renderProductCategoryCheckboxes([]);
             document.getElementById('product-price').value = '';
             document.getElementById('product-stock').value = '';
+            editingOriginalStock = null;
             document.getElementById('product-status').value = 'active';
             document.getElementById('product-description').value = '';
             document.getElementById('product-detail-description').value = '';
