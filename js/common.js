@@ -27,6 +27,24 @@ function escapeHtml(value) {
 }
 
 /**
+ * 顧客是否已經回報過匯款（還沒被管理員確認）。
+ * 顧客回報匯款只會在訂單備註加上【匯款確認】/【合併匯款確認】，不會直接改成已付款，
+ * 要等管理員對帳後在後台改狀態。admin-common.js 有同一個函數給後台用。
+ */
+function isPaymentReported(order) {
+    if (!order || order.paymentConfirmed === true) return false;
+    return /【(合併)?匯款確認】/.test(order.notes || '');
+}
+
+/**
+ * 回傳本地時區的 YYYY-MM-DD。toISOString() 是 UTC，台灣早上 8 點前會變成前一天
+ */
+function localDateString(date) {
+    const d = date || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/**
  * 初始化共用功能
  * 在每個頁面的 DOMContentLoaded 事件中調用
  */

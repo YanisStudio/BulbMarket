@@ -444,6 +444,13 @@
     border: 1px solid #ffeaa7;
 }
 
+/* 顧客已回報匯款、等待對帳（訂單仍是未付款） */
+.status-badge.reported {
+    background-color: #e3f2fd;
+    color: #1565c0;
+    margin-left: 4px;
+}
+
 .status-badge.confirmed {
     background-color: #d1ecf1;
     color: #0c5460;
@@ -942,4 +949,14 @@
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+/* 訂單管理：顧客已回報匯款、等待對帳的提示 */
+.reported-notice {
+    margin: 12px 0 0;
+    padding: 10px 14px;
+    border-radius: 6px;
+    background-color: #e3f2fd;
+    color: #0d47a1;
+    font-size: 0.95em;
+    line-height: 1.6;
 }

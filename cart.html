@@ -418,6 +418,7 @@
                 <ul>
                     <li><a href="/index.html">首頁</a></li>
                     <li><a href="/products.html">商品</a></li>
+                    <li><a href="/knowledge.html">栽培小知識</a></li>
                     <li><a href="/about.html">關於我們</a></li>
                     <li><a href="/contact.html">聯絡我們</a></li>
                     
@@ -624,6 +625,7 @@
                 <div class="footer-section">
                     <h3>顧客服務</h3>
                     <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
                         <li><a href="/about.html">關於我們</a></li>
                         <li><a href="/contact.html">聯絡我們</a></li>
                         <li><a href="/orders.html">訂單查詢</a></li>
@@ -1106,13 +1108,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // 從Firebase獲取產品圖片、庫存和狀態
     // 只查購物車裡實際有的商品，不要把整個商品目錄都下載下來
     // ——賣場商品一多，購物車頁的載入速度會被拖慢
+    // 讀取失敗一定要 throw，不能回傳空物件：空物件會讓 renderCart() 以為
+    // 每一樣商品都「不存在／已下架」，把顧客整個購物車清空
     async function getProductDetails() {
+        if (!window.firebaseServices) {
+            throw new Error('Firebase 服務未初始化');
+        }
         try {
-            if (!window.firebaseServices) {
-                console.error('Firebase 服務未初始化');
-                return {};
-            }
-
             const db = window.firebaseServices.db;
             const doc = window.firebaseServices.doc;
             const getDoc = window.firebaseServices.getDoc;
@@ -1137,7 +1139,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return productDetails;
         } catch (error) {
             console.error('獲取產品資訊失敗:', error);
-            return {};
+            throw error;
         }
     }
     
@@ -1302,9 +1304,25 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             console.error('渲染購物車時出錯:', error);
-            // 即使出錯也要隱藏加載動畫
+            // 即使出錯也要隱藏加載動畫。購物車內容（localStorage）完全沒動，
+            // 顯示提示＋重試按鈕，也先把結帳按鈕藏起來，避免用沒確認過的資料結帳
             finishLoading();
-            showToast('載入購物車時發生錯誤，請重新整理頁面');
+            if (cartSummary) cartSummary.style.display = 'none';
+            if (cartContainer) {
+                cartContainer.innerHTML = `
+                    <div class="empty-cart-container" style="display: flex;">
+                        <div class="empty-cart-icon"><i class="fas fa-wifi"></i></div>
+                        <p class="empty-cart-message">網路連線不穩定，暫時無法取得最新的商品資訊。<br>您購物車裡的商品都還在，請稍後再試。</p>
+                        <button type="button" class="btn btn-primary" id="cart-retry-btn">重新載入</button>
+                    </div>
+                `;
+                const retryBtn = document.getElementById('cart-retry-btn');
+                if (retryBtn) {
+                    retryBtn.addEventListener('click', function() {
+                        location.reload();
+                    });
+                }
+            }
         }
     }
     

@@ -43,6 +43,23 @@ function escapeHtml(value) {
 }
 
 /**
+ * 顧客是否已經回報過匯款、但管理員還沒確認（跟 js/common.js 同一套判斷）。
+ * 顧客回報匯款只會在訂單備註加上【匯款確認】/【合併匯款確認】，不會自己改成已付款
+ */
+function isPaymentReported(order) {
+    if (!order || order.paymentConfirmed === true) return false;
+    return /【(合併)?匯款確認】/.test(order.notes || '');
+}
+
+/**
+ * 回傳本地時區的 YYYY-MM-DD（toISOString() 是 UTC，台灣早上 8 點前會變成前一天）
+ */
+function localDateString(date) {
+    const d = date || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+/**
  * 初始化 Firebase
  * 使用動態導入避免重複初始化
  */
@@ -71,7 +88,8 @@ async function initializeFirebase() {
             limit,
             serverTimestamp,
             writeBatch,
-            deleteField
+            deleteField,
+            increment
         } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
         const {
             getStorage,
@@ -115,6 +133,7 @@ async function initializeFirebase() {
             serverTimestamp,
             writeBatch,
             deleteField,
+            increment,
             // Storage 方法
             storageRef: ref,
             uploadBytes,

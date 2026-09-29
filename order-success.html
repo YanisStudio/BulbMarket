@@ -414,6 +414,7 @@
                 <ul>
                     <li><a href="/index.html">首頁</a></li>
                     <li><a href="/products.html">商品</a></li>
+                    <li><a href="/knowledge.html">栽培小知識</a></li>
                     <li><a href="/about.html">關於我們</a></li>
                     <li><a href="/contact.html">聯絡我們</a></li>
                     
@@ -634,6 +635,7 @@
                 <div class="footer-section">
                     <h3>顧客服務</h3>
                     <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
                         <li><a href="/about.html">關於我們</a></li>
                         <li><a href="/contact.html">聯絡我們</a></li>
                         <li><a href="/orders.html">訂單查詢</a></li>
@@ -911,7 +913,7 @@
             document.getElementById('customer-phone').textContent = lastOrder.customerPhone || '未知';
 
             // 設置訂單日期
-            let orderDate = lastOrder.orderDate || new Date().toISOString().split('T')[0];
+            let orderDate = lastOrder.orderDate || localDateString();
             document.getElementById('order-date').textContent = orderDate;
             
             // 獲取URL參數
@@ -1013,12 +1015,12 @@
                         const existingNotes = orderSnap.data().notes || '';
                         const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
 
-                        // 更新訂單備註，並標記已完成匯款確認、同步推進 status，
-                        // 兩個欄位要一起改，不然訂單記錄那邊會一直顯示「未付款」
+                        // 只把匯款資訊寫進備註（【匯款確認】標記），不直接改成已付款：
+                        // 顧客回報不等於款項真的入帳，要等管理員對帳後在後台改成「已付款」，
+                        // 那時 Cloud Function 才會寄出「付款已確認」通知信。
+                        // 訂單記錄頁靠備註裡的標記顯示「已回報匯款，待確認」（見 common.js 的 isPaymentReported）
                         await window.firebaseServices.updateDoc(orderRef, {
-                            notes: updatedNotes,
-                            paymentConfirmed: true,
-                            status: 'confirmed'
+                            notes: updatedNotes
                         });
 
                         // Firestore 確認寫入成功，才顯示確認畫面
@@ -1082,7 +1084,7 @@
             // 設置默認匯款日期為今天
             const transferDateInput = document.getElementById('transfer-date');
             if (transferDateInput) {
-                const today = new Date().toISOString().split('T')[0];
+                const today = localDateString();
                 transferDateInput.value = today;
                 transferDateInput.max = today; // 不允許選擇未來日期
             }

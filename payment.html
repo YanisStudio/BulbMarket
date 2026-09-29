@@ -464,6 +464,7 @@
                 <ul>
                     <li><a href="/index.html">首頁</a></li>
                     <li><a href="/products.html">商品</a></li>
+                    <li><a href="/knowledge.html">栽培小知識</a></li>
                     <li><a href="/about.html">關於我們</a></li>
                     <li><a href="/contact.html">聯絡我們</a></li>
                     
@@ -708,6 +709,7 @@
                 <div class="footer-section">
                     <h3>顧客服務</h3>
                     <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
                         <li><a href="/about.html">關於我們</a></li>
                         <li><a href="/contact.html">聯絡我們</a></li>
                         <li><a href="/orders.html">訂單查詢</a></li>
@@ -959,7 +961,8 @@
                         } else {
                             shippingRates.store = data.store || 0;
                         }
-                        shippingRates.home = data.home || 130;
+                        // 用 typeof 判斷，後台設成 0 元（免運）時不能被 || 當成沒設定而改收 130
+                        shippingRates.home = typeof data.home === 'number' ? data.home : 130;
                     }
 
                     // 載入階梯運費（包含宅配和超商）
@@ -1026,7 +1029,7 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
     if (shippingSettings.calculationMode === 'fixed') {
         // 固定運費模式
         if (method === 'home') {
-            shippingFee = shippingRates.home || 130;
+            shippingFee = shippingRates.home;
             description = '宅配到府運費';
         } else {
             if (cartItems.length > 0) {
@@ -1246,7 +1249,7 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                     try {
                         if (!window.firebaseServices) {
                             console.error('Firebase 服務未初始化');
-                            return {};
+                            throw new Error('Firebase 服務未初始化');
                         }
 
                         const db = window.firebaseServices.db;
@@ -1272,7 +1275,9 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                         return productDetails;
                     } catch (error) {
                         console.error('獲取產品資訊失敗:', error);
-                        return {};
+                        // 不能回傳空物件：會讓所有商品的運費類別都變成「其他」，運費算錯卻沒人發現；
+                        // 交給 initializeCheckout() 的 catch 顯示「載入失敗，請重新整理」
+                        throw error;
                     }
                 };
                 
@@ -1400,6 +1405,13 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                 } catch (error) {
                     console.error('初始化結帳頁面失敗:', error);
                     updateLoadingText('載入失敗', '請重新整理頁面');
+                    // 商品資訊、運費都沒算出來，不能讓顧客用不完整的金額送出訂單
+                    [submitOrderBtn, mobileSubmitOrderBtn].forEach(btn => {
+                        if (btn) {
+                            btn.disabled = true;
+                            btn.textContent = '載入失敗，請重新整理頁面';
+                        }
+                    });
                     setTimeout(() => {
                         finishLoading();
                         showToast('載入結帳頁面時發生錯誤，請重新整理頁面');
@@ -1476,13 +1488,16 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                                 const productData = productDoc.data();
                                 const currentStock = productData.stock || 0;
                                 const realPrice = productData.price || 0;
+                                // 放進購物車之後才被下架的商品不能結帳
+                                const isActive = productData.status === 'active';
 
                                 stockValidationResults.push({
                                     id: item.id,
                                     name: item.name,
                                     requestedQuantity: item.quantity,
-                                    currentStock: currentStock,
-                                    isValid: currentStock >= item.quantity
+                                    currentStock: isActive ? currentStock : 0,
+                                    unavailable: !isActive,
+                                    isValid: isActive && currentStock >= item.quantity
                                 });
 
                                 // 購物車裡的價格跟 Firestore 目前的價格不一致（可能被竄改，
@@ -1526,9 +1541,11 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                     const invalidItems = stockValidationResults.filter(item => !item.isValid);
 
                     if (invalidItems.length > 0) {
-                        let errorMessage = '以下商品庫存不足：\n';
+                        let errorMessage = '以下商品已下架或庫存不足：\n';
                         invalidItems.forEach(item => {
-                            errorMessage += `• ${item.name}: 需要 ${item.requestedQuantity} 件，庫存 ${item.currentStock} 件\n`;
+                            errorMessage += item.unavailable
+                                ? `• ${item.name}: 已下架，請從購物車移除\n`
+                                : `• ${item.name}: 需要 ${item.requestedQuantity} 件，庫存 ${item.currentStock} 件\n`;
                         });
                         errorMessage += '\n請返回購物車調整數量。';
 
@@ -1563,6 +1580,11 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
             
             // 提交訂單函數
             async function submitOrder() {
+                // 運費還沒算出來（例如頁面載入失敗）就不能送出，否則運費會變成 0
+                if (!window.currentShippingResult) {
+                    showToast('運費尚未計算完成，請重新整理頁面後再試');
+                    return;
+                }
                 if (!checkoutForm.checkValidity()) {
                     showToast('請填寫所有必填欄位');
                     return;
@@ -1715,15 +1737,18 @@ if (shipping === 'store') {
                         const insufficientItems = [];
                         productSnaps.forEach((snap, index) => {
                             const item = orderData.items[index];
+                            const isActive = snap.exists() && snap.data().status === 'active';
                             const currentStock = snap.exists() ? (snap.data().stock || 0) : 0;
-                            if (currentStock < item.quantity) {
+                            if (!isActive) {
+                                insufficientItems.push(`${item.name}（已下架）`);
+                            } else if (currentStock < item.quantity) {
                                 insufficientItems.push(`${item.name}（剩 ${currentStock} 件）`);
                             }
                         });
 
                         if (insufficientItems.length > 0) {
                             throw new Error(
-                                `以下商品庫存在您結帳的同時被買完了：${insufficientItems.join('、')}，請返回購物車調整數量`
+                                `以下商品在您結帳的同時已售完或下架：${insufficientItems.join('、')}，請返回購物車調整數量`
                             );
                         }
 
@@ -1751,7 +1776,7 @@ if (shipping === 'store') {
                         items: cart.length,
                         customerName: orderData.customer.name,
                         customerPhone: orderData.customer.phone,
-                        orderDate: new Date().toISOString().split('T')[0]
+                        orderDate: localDateString()
                     }));
                     
                     // 第八步：顯示成功訊息並跳轉

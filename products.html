@@ -149,6 +149,7 @@
                 <ul>
                     <li><a href="/index.html">首頁</a></li>
                     <li><a href="/products.html" class="active">商品</a></li>
+                    <li><a href="/knowledge.html">栽培小知識</a></li>
                     <li><a href="/about.html">關於我們</a></li>
                     <li><a href="/contact.html">聯絡我們</a></li>
                     
@@ -328,6 +329,7 @@
                 <div class="footer-section">
                     <h3>顧客服務</h3>
                     <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
                         <li><a href="/about.html">關於我們</a></li>
                         <li><a href="/contact.html">聯絡我們</a></li>
                         <li><a href="/orders.html">訂單查詢</a></li>
@@ -679,7 +681,15 @@ function applyFilters() {
     currentFilters.sort = document.getElementById('sort-filter').value;
     
     let filteredProducts = [...currentProducts];
-    
+
+    // 搜尋關鍵字：跟分類/價格篩選一起套用，重新分頁（例如視窗大小改變）時才不會把搜尋結果洗掉
+    if (currentFilters.search) {
+        filteredProducts = filteredProducts.filter(product =>
+            product.name.toLowerCase().includes(currentFilters.search) ||
+            product.description.toLowerCase().includes(currentFilters.search)
+        );
+    }
+
     // 分類篩選
     if (currentFilters.category !== 'all') {
         filteredProducts = filteredProducts.filter(p => ProductCategories.productInCategory(p, currentFilters.category));
@@ -807,18 +817,8 @@ function performSearch(searchTerm) {
         return;
     }
     
-    // 搜尋產品
-    const searchResults = currentProducts.filter(product => {
-        const productName = product.name.toLowerCase();
-        const productDesc = product.description.toLowerCase();
-        return productName.includes(searchTerm) || productDesc.includes(searchTerm);
-    });
-    
-    updateSectionTitle();
-    renderProducts(searchResults);
-    initAddToCartButtons();
-    initWishlistButtons();
-    updateWishlistButtons();
+    // 搜尋產品（applyFilters 會一併套用 currentFilters.search）
+    applyFilters();
 }
 
 // 更新分頁按鈕：依實際頁數全部產生，沒有頁數上限
@@ -968,10 +968,14 @@ function updateWishlistButtons() {
         }
     });
 }
-// 視窗大小改變時重新計算分頁
+// 視窗寬度改變時重新計算分頁（每頁數量依寬度決定）。
+// 只看寬度：手機往下捲時網址列收起來也會觸發 resize，但那只是高度變化，不用重新分頁
+let lastViewportWidth = window.innerWidth;
 window.addEventListener('resize', function() {
+    if (window.innerWidth === lastViewportWidth) return;
+    lastViewportWidth = window.innerWidth;
     if (currentProducts.length > 0) {
-        // 重新應用當前的篩選條件
+        // 重新應用當前的篩選條件（含搜尋關鍵字）
         applyFilters();
     }
 });

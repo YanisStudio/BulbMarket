@@ -148,6 +148,7 @@
                 <ul>
                     <li><a href="/index.html">首頁</a></li>
                     <li><a href="/products.html">商品</a></li>
+                    <li><a href="/knowledge.html">栽培小知識</a></li>
                     <li><a href="/about.html">關於我們</a></li>
                     <li><a href="/contact.html" class="active">聯絡我們</a></li>
                     
@@ -415,6 +416,7 @@
                 <div class="footer-section">
                     <h3>顧客服務</h3>
                     <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
                         <li><a href="/about.html">關於我們</a></li>
                         <li><a href="/contact.html">聯絡我們</a></li>
                         <li><a href="/orders.html">訂單查詢</a></li>
@@ -711,14 +713,5 @@ function closeSuccessMessage() {
     }
 }
 
-// 簡單的 Toast 通知函數（如果 showToast 不存在）
-function showToast(message) {
-    // 如果有其他 toast 函數，可以使用，否則使用 alert
-    if (typeof window.showToast === 'function') {
-        window.showToast(message);
-    } else {
-        alert(message);
-    }
-}
 </script>
 </body>

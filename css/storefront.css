@@ -1,7 +1,7 @@
 /*
  * 前台（顧客頁面）共用版型：頁首置中、頁尾、首頁輪播／分類／橫向商品列。
  * 只在顧客頁面引入（index、products、about、contact、cart、payment、
- * order-success、orders、profile、messages），後台 /admin/ 不引入，
+ * order-success、orders、profile、messages、knowledge），後台 /admin/ 不引入，
  * 所以這裡的覆寫不會影響管理系統的頁首頁尾。
  * 一定要放在 style.css / common.css 之後引入，才能覆寫原本的規則。
  */
@@ -499,5 +499,305 @@ footer.site-footer {
 
     .product-slider-arrow {
         display: none;
+    }
+}
+
+/* ---------- 栽培小知識（knowledge.html）：分類分頁 + 文章卡片 + 單篇文章 ---------- */
+.knowledge-page {
+    padding-bottom: 4em;
+    background-color: #fff;
+}
+
+.knowledge-intro {
+    text-align: center;
+    color: #666;
+    max-width: 640px;
+    margin: 0 auto 1.8em;
+    line-height: 1.8;
+}
+
+.knowledge-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 0.4em 1.6em;
+    border-bottom: 1px solid #e6ece7;
+    margin-bottom: 2em;
+}
+
+.knowledge-tabs:empty {
+    display: none;
+}
+
+.knowledge-tabs a {
+    color: #555;
+    text-decoration: none;
+    padding: 0.6em 0.2em;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    letter-spacing: 0.05em;
+    transition: color 0.2s, border-color 0.2s;
+}
+
+.knowledge-tabs a:hover,
+.knowledge-tabs a.active {
+    color: var(--sf-green-deep);
+    border-bottom-color: var(--sf-green);
+}
+
+.knowledge-tabs .count {
+    color: #999;
+    font-size: 0.85em;
+}
+
+.knowledge-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 1.8em;
+}
+
+.knowledge-grid > .loading-indicator,
+.knowledge-grid > .no-products,
+.knowledge-grid > .error-message {
+    grid-column: 1 / -1;
+    text-align: center;
+    padding: 3em 1em;
+    color: #777;
+}
+
+.knowledge-card {
+    display: flex;
+    flex-direction: column;
+    background: #fff;
+    border: 1px solid #edf1ee;
+    border-radius: 10px;
+    overflow: hidden;
+    text-decoration: none;
+    color: inherit;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.04);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.knowledge-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 24px rgba(46, 125, 50, 0.12);
+}
+
+.knowledge-card-image {
+    display: block;
+    aspect-ratio: 4 / 3;
+    background-color: var(--sf-green-soft);
+    overflow: hidden;
+}
+
+.knowledge-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.4s ease;
+}
+
+.knowledge-card:hover .knowledge-card-image img {
+    transform: scale(1.04);
+}
+
+.knowledge-card-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    font-size: 3em;
+    color: #a5d6a7;
+}
+
+.knowledge-card-body {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6em;
+    padding: 1.2em 1.3em 1.3em;
+    flex: 1;
+}
+
+.knowledge-card-category {
+    align-self: flex-start;
+    display: inline-block;
+    font-size: 0.8em;
+    color: var(--sf-green-deep);
+    background-color: var(--sf-green-soft);
+    border-radius: 999px;
+    padding: 0.2em 0.8em;
+    text-decoration: none;
+}
+
+.knowledge-card-title {
+    font-size: 1.15em;
+    font-weight: 600;
+    color: #2c3e2f;
+    line-height: 1.5;
+}
+
+.knowledge-card-excerpt {
+    color: #666;
+    font-size: 0.93em;
+    line-height: 1.7;
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.knowledge-card-meta {
+    margin-top: auto;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85em;
+    color: #999;
+    padding-top: 0.8em;
+    border-top: 1px solid #f0f0f0;
+}
+
+.knowledge-read-more {
+    color: var(--sf-green-deep);
+    font-weight: 600;
+}
+
+.knowledge-more {
+    text-align: center;
+    margin-top: 2.2em;
+}
+
+/* .btn 會設定 display，要明確蓋回去 hidden 才有效 */
+.knowledge-more .btn[hidden],
+.knowledge-article[hidden] {
+    display: none;
+}
+
+/* 單篇文章 */
+.knowledge-article {
+    max-width: 780px;
+    margin: 0 auto;
+}
+
+.knowledge-back {
+    display: inline-block;
+    color: var(--sf-green-deep);
+    text-decoration: none;
+    margin-bottom: 1.5em;
+}
+
+.knowledge-article-header {
+    text-align: center;
+    margin-bottom: 1.8em;
+}
+
+.knowledge-article-header h1 {
+    font-size: clamp(1.5rem, 3.5vw, 2.1rem);
+    color: #2c3e2f;
+    line-height: 1.45;
+    margin: 0.5em 0 0.4em;
+}
+
+.knowledge-article-date {
+    color: #999;
+    font-size: 0.9em;
+    margin: 0;
+}
+
+.knowledge-cover,
+.knowledge-section figure {
+    margin: 0 0 1.6em;
+}
+
+.knowledge-cover img,
+.knowledge-section figure img {
+    width: 100%;
+    border-radius: 10px;
+    display: block;
+}
+
+/* 封面固定 4:3 裁切，直式照片才不會佔滿整個畫面 */
+.knowledge-cover img {
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+}
+
+.knowledge-section figure img {
+    max-height: 560px;
+    object-fit: cover;
+}
+
+.knowledge-summary {
+    font-size: 1.05em;
+    color: #555;
+    line-height: 1.9;
+    background-color: var(--sf-green-soft);
+    border-left: 4px solid var(--sf-green);
+    border-radius: 0 8px 8px 0;
+    padding: 1em 1.3em;
+    margin: 0 0 2em;
+}
+
+.knowledge-section {
+    margin-bottom: 2.2em;
+}
+
+.knowledge-section h2 {
+    font-size: 1.3em;
+    color: var(--sf-green-deep);
+    border-bottom: 2px solid var(--sf-green-soft);
+    padding-bottom: 0.4em;
+    margin: 0 0 0.9em;
+}
+
+.knowledge-section p {
+    color: #444;
+    line-height: 1.95;
+    margin: 0 0 1em;
+}
+
+.knowledge-cta {
+    text-align: center;
+    background-color: var(--sf-green-soft);
+    border-radius: 10px;
+    padding: 1.6em 1em;
+    margin: 2.5em 0;
+}
+
+.knowledge-cta p {
+    margin: 0 0 1em;
+    color: #555;
+}
+
+.knowledge-related h2 {
+    text-align: center;
+    font-size: 1.3em;
+    letter-spacing: 0.15em;
+    color: #2c3e2f;
+    margin: 0 0 1.2em;
+}
+
+@media (max-width: 992px) {
+    .knowledge-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 600px) {
+    .knowledge-grid {
+        grid-template-columns: 1fr;
+        gap: 1.3em;
+    }
+
+    .knowledge-tabs {
+        justify-content: flex-start;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        gap: 1.2em;
+    }
+
+    .knowledge-tabs a {
+        white-space: nowrap;
     }
 }

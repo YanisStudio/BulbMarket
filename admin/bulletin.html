@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>布告欄管理 - 球根花卉團購</title>
+    <title>內容管理 - 球根花卉團購</title>
     <meta name="robots" content="noindex, follow">
     <meta name="description" content="球根花卉團購提供各式球根花卉、繡球花苗、進口球根、花卉種子及園藝資材。香水百合、孤挺花、鳶尾、睡蓮、鬱金香等，品質保證。">
     <meta name="keywords" content="花卉,球根,球根花卉,進口球根,花卉盆栽,種子,香水百合,孤挺花,鳶尾,睡蓮,鬱金香,繡球花苗,園藝資材,球根花卉團購,團購">
@@ -90,7 +90,7 @@
                     <li><a href="/admin/users.html">會員管理</a></li>
                     <li><a href="/admin/messages.html">訊息管理</a></li>
                     <li><a href="/admin/shipping.html">運費設定</a></li>
-                    <li><a href="/admin/bulletin.html" class="active">布告欄管理</a></li>
+                    <li><a href="/admin/bulletin.html" class="active">內容管理</a></li>
                 </ul>
             </nav>
 
@@ -113,18 +113,50 @@
 
     <main>
         <div class="admin-container">
-            <h1 class="admin-title">布告欄管理</h1>
-            <p class="bulletin-intro">首頁最上方的輪播圖片，最多 3 張，會依照下面的順序自動輪播，顧客也可以左右滑動切換。全部關閉的話，首頁會改顯示原本的文字版主視覺。</p>
-            <p class="bulletin-tip"><i class="fas fa-info-circle"></i> 建議尺寸 1920 × 800 像素（寬：高 = 12：5）。手機畫面會裁掉圖片左右兩側一些，重要的文字請放在圖片中間。</p>
+            <h1 class="admin-title">內容管理</h1>
 
-            <!-- 布告欄編輯區塊：3 個輪播圖片欄位由下方程式產生 -->
+            <!-- 管理員才看得到：分成「布告欄」、「栽培小知識」兩個區域 -->
             <div id="bulletin-section" style="display: none;">
-                <div id="bulletin-slots"></div>
-
-                <div class="form-actions">
-                    <button type="button" id="save-bulletin-btn" class="btn btn-primary">
-                        <i class="fas fa-save"></i> 儲存輪播圖片
+                <div class="content-tabs" role="tablist">
+                    <button type="button" class="content-tab active" role="tab" data-panel="bulletin-panel" aria-selected="true">
+                        <i class="fas fa-images"></i> 布告欄
                     </button>
+                    <button type="button" class="content-tab" role="tab" data-panel="knowledge-panel" aria-selected="false">
+                        <i class="fas fa-seedling"></i> 栽培小知識
+                    </button>
+                </div>
+
+                <!-- 布告欄：3 個輪播圖片欄位由下方程式產生 -->
+                <div class="content-panel" id="bulletin-panel">
+                    <p class="bulletin-intro">首頁最上方的輪播圖片，最多 3 張，會依照下面的順序自動輪播，顧客也可以左右滑動切換。全部關閉的話，首頁會改顯示原本的文字版主視覺。</p>
+                    <p class="bulletin-tip"><i class="fas fa-info-circle"></i> 建議尺寸 1920 × 800 像素（寬：高 = 12：5）。手機畫面會裁掉圖片左右兩側一些，重要的文字請放在圖片中間。</p>
+
+                    <div id="bulletin-slots"></div>
+
+                    <div class="form-actions">
+                        <button type="button" id="save-bulletin-btn" class="btn btn-primary">
+                            <i class="fas fa-save"></i> 儲存輪播圖片
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 栽培小知識：文章列表與編輯器由 js/admin-knowledge.js 產生 -->
+                <div class="content-panel" id="knowledge-panel" hidden>
+                    <p class="bulletin-intro">前台「栽培小知識」頁面的文章。每篇文章可以設定封面、分類，內文拆成多個段落，每段可以有小標題和一張圖片。</p>
+
+                    <div id="knowledge-list-wrap">
+                        <div class="knowledge-toolbar">
+                            <button type="button" class="btn btn-primary" id="knowledge-new-btn">
+                                <i class="fas fa-plus"></i> 新增文章
+                            </button>
+                            <a href="/knowledge.html" target="_blank" rel="noopener" class="btn btn-outline">
+                                <i class="fas fa-external-link-alt"></i> 查看前台頁面
+                            </a>
+                        </div>
+                        <div id="knowledge-admin-list"></div>
+                    </div>
+
+                    <div id="knowledge-editor" hidden></div>
                 </div>
             </div>
 
@@ -133,7 +165,7 @@
                 <div class="unauthorized-content">
                     <i class="fas fa-exclamation-triangle auth-icon"></i>
                     <h2>您沒有權限訪問此頁面</h2>
-                    <p>只有管理員可以訪問布告欄管理。</p>
+                    <p>只有管理員可以訪問內容管理。</p>
                     <p id="current-user-email"></p>
                     <a href="/index.html" class="btn btn-primary">
                         <i class="fas fa-home"></i> 返回首頁
@@ -146,7 +178,7 @@
                 <div class="unauthorized-content">
                     <i class="fas fa-user-lock auth-icon"></i>
                     <h2>請先登入</h2>
-                    <p>您需要先登入才能訪問布告欄管理。</p>
+                    <p>您需要先登入才能訪問內容管理。</p>
                     <a href="/index.html" class="btn btn-primary">
                         <i class="fas fa-sign-in-alt"></i> 返回首頁登入
                     </a>
@@ -164,10 +196,341 @@
     </footer>
 
     <script src="/js/image-upload.js"></script>
+    <script src="/js/knowledge.js"></script>
     <script src="/js/member.js"></script>
     <script src="/js/admin-common.js"></script>
+    <script src="/js/admin-knowledge.js"></script>
 
     <style>
+        /* ---------- 內容管理：布告欄 / 栽培小知識 分頁 ---------- */
+        .content-tabs {
+            display: flex;
+            gap: 4px;
+            border-bottom: 2px solid #e0e0e0;
+            margin-bottom: 20px;
+        }
+
+        .content-tab {
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            margin-bottom: -2px;
+            padding: 10px 20px;
+            font-size: 1rem;
+            color: #666;
+            cursor: pointer;
+            font-family: inherit;
+        }
+
+        .content-tab:hover {
+            color: #2e7d32;
+        }
+
+        .content-tab.active {
+            color: #2e7d32;
+            font-weight: 600;
+            border-bottom-color: #4caf50;
+        }
+
+        .content-panel[hidden],
+        #knowledge-list-wrap[hidden],
+        #knowledge-editor[hidden] {
+            display: none;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.85rem;
+        }
+
+        .required {
+            color: #e53935;
+        }
+
+        .icon-btn {
+            background: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            color: #555;
+        }
+
+        .icon-btn:disabled {
+            opacity: 0.4;
+            cursor: default;
+        }
+
+        .icon-btn.danger {
+            color: #e53935;
+        }
+
+        /* 栽培小知識：文章列表 */
+        .knowledge-toolbar {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 16px;
+        }
+
+        .knowledge-empty {
+            color: #777;
+            background: #fff;
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+        }
+
+        .knowledge-row {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+            padding: 12px 16px;
+            margin-bottom: 12px;
+        }
+
+        .knowledge-thumb {
+            flex-shrink: 0;
+            width: 96px;
+            height: 72px;
+            border-radius: 6px;
+            overflow: hidden;
+            background: #f1f8f1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #a5d6a7;
+            font-size: 1.6em;
+        }
+
+        .knowledge-thumb img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .knowledge-row-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .knowledge-row-info strong {
+            display: block;
+            color: #333;
+            margin-bottom: 6px;
+        }
+
+        .knowledge-row-meta {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 14px;
+            font-size: 0.85em;
+            color: #777;
+        }
+
+        .knowledge-row-meta .muted {
+            color: #bbb;
+        }
+
+        .knowledge-status {
+            border-radius: 999px;
+            padding: 1px 10px;
+            font-weight: 600;
+        }
+
+        .knowledge-status.published {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .knowledge-status.draft {
+            background: #fff3e0;
+            color: #ef6c00;
+        }
+
+        .knowledge-row-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            justify-content: flex-end;
+        }
+
+        /* 栽培小知識：編輯器 */
+        .knowledge-editor-card {
+            max-width: 900px;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            padding: 24px;
+        }
+
+        .knowledge-editor-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 20px;
+        }
+
+        .knowledge-editor-header h2 {
+            margin: 0;
+            font-size: 1.3em;
+            color: #333;
+        }
+
+        .knowledge-editor-card .form-group {
+            margin-bottom: 18px;
+        }
+
+        .knowledge-editor-card .form-group > label {
+            display: block;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 8px;
+        }
+
+        .knowledge-editor-card input[type="text"],
+        .knowledge-editor-card input[type="date"],
+        .knowledge-editor-card textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-family: inherit;
+            box-sizing: border-box;
+        }
+
+        .knowledge-editor-card textarea {
+            resize: vertical;
+            line-height: 1.7;
+        }
+
+        .knowledge-editor-card input:focus,
+        .knowledge-editor-card textarea:focus {
+            border-color: #4caf50;
+            outline: none;
+        }
+
+        .knowledge-form-row {
+            display: grid;
+            grid-template-columns: 2fr 1.3fr 1fr;
+            gap: 16px;
+        }
+
+        .knowledge-checkbox {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            height: 42px;
+            cursor: pointer;
+        }
+
+        .knowledge-checkbox input {
+            width: auto;
+            margin: 0;
+        }
+
+        .knowledge-image-field {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .knowledge-image-preview,
+        .knowledge-image-empty {
+            width: 240px;
+            max-width: 100%;
+            aspect-ratio: 16 / 10;
+            border-radius: 6px;
+            border: 1px solid #eee;
+            object-fit: cover;
+        }
+
+        .knowledge-image-preview.cover,
+        .knowledge-image-empty.cover {
+            aspect-ratio: 4 / 3;
+        }
+
+        .knowledge-image-empty {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            color: #aaa;
+            background: #fafafa;
+            border-style: dashed;
+        }
+
+        .knowledge-image-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .knowledge-image-actions label.btn {
+            cursor: pointer;
+        }
+
+        .knowledge-sections-title {
+            margin: 28px 0 12px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+            color: #333;
+        }
+
+        .knowledge-section-card {
+            border: 1px solid #e6ece7;
+            border-left: 4px solid #4caf50;
+            border-radius: 6px;
+            padding: 16px;
+            margin-bottom: 14px;
+            background: #fcfdfc;
+        }
+
+        .knowledge-section-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            color: #2e7d32;
+        }
+
+        .knowledge-editor-footer {
+            display: flex;
+            gap: 10px;
+            margin-top: 24px;
+            padding-top: 20px;
+            border-top: 1px solid #eee;
+        }
+
+        @media (max-width: 768px) {
+            .knowledge-row {
+                flex-wrap: wrap;
+            }
+
+            .knowledge-row-actions {
+                width: 100%;
+                justify-content: flex-start;
+            }
+
+            .knowledge-form-row {
+                grid-template-columns: 1fr;
+                gap: 0;
+            }
+
+            .knowledge-editor-card {
+                padding: 16px;
+            }
+        }
+
         /* 布告欄管理特定樣式 */
         .bulletin-intro {
             color: #666;
@@ -402,6 +765,7 @@
                 function(user) {
                     showBulletinSection();
                     loadBulletin();
+                    window.AdminKnowledge.init();
                 },
                 function(error) {
                     if (error === '未登入') {
@@ -436,6 +800,23 @@
             document.getElementById('unauthorized-section').style.display = 'none';
             document.getElementById('not-logged-in-section').style.display = 'block';
         };
+
+        // 「布告欄」、「栽培小知識」兩個分頁；網址帶 #knowledge 直接打開栽培小知識
+        const switchPanel = function(panelId) {
+            document.querySelectorAll('.content-tab').forEach(function(tab) {
+                const active = tab.dataset.panel === panelId;
+                tab.classList.toggle('active', active);
+                tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            });
+            document.querySelectorAll('.content-panel').forEach(function(panel) {
+                panel.hidden = panel.id !== panelId;
+            });
+            history.replaceState(null, '', panelId === 'knowledge-panel' ? '#knowledge' : location.pathname);
+        };
+        document.querySelectorAll('.content-tab').forEach(function(tab) {
+            tab.addEventListener('click', function() { switchPanel(tab.dataset.panel); });
+        });
+        if (location.hash === '#knowledge') switchPanel('knowledge-panel');
 
         const setSlotEnabled = function(slot, enabled) {
             document.getElementById(`slot-${slot}-body`).classList.toggle('enabled', enabled);

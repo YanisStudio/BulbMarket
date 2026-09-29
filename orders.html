@@ -172,6 +172,12 @@
     color: #FF8F00;
 }
 
+/* 顧客已回報匯款、等待管理員對帳 */
+.status-reported {
+    background-color: #E3F2FD;
+    color: #1565C0;
+}
+
 .status-confirmed {
     background-color: #E3F2FD;
     color: #1565C0;
@@ -681,6 +687,7 @@
                 <ul>
                     <li><a href="/index.html">首頁</a></li>
                     <li><a href="/products.html">商品</a></li>
+                    <li><a href="/knowledge.html">栽培小知識</a></li>
                     <li><a href="/about.html">關於我們</a></li>
                     <li><a href="/contact.html">聯絡我們</a></li>
                     
@@ -876,6 +883,7 @@
                 <div class="footer-section">
                     <h3>顧客服務</h3>
                     <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
                         <li><a href="/about.html">關於我們</a></li>
                         <li><a href="/contact.html">聯絡我們</a></li>
                         <li><a href="/orders.html">訂單查詢</a></li>
@@ -1172,10 +1180,14 @@ async function loadUserOrders(user) {
 
             // 還沒付款的訂單，對客戶來說重點是「要去付款」，用專屬的紅色徽章
             // 突顯、並顯示合併匯款用的勾選框，跟一般狀態徽章的樣式分開處理
-            const isUnpaid = order.status === 'pending' && order.paymentConfirmed !== true;
+            // 已經回報過匯款、等管理員對帳的訂單，不能再勾選合併匯款，改顯示「待確認」
+            const isReported = order.status === 'pending' && isPaymentReported(order);
+            const isUnpaid = order.status === 'pending' && order.paymentConfirmed !== true && !isReported;
             const badgeHTML = isUnpaid
                 ? '<span class="unpaid-badge">未付款</span>'
-                : `<span class="order-status ${statusClass}">${statusText}</span>`;
+                : isReported
+                    ? '<span class="order-status status-reported">已回報匯款・待確認</span>'
+                    : `<span class="order-status ${statusClass}">${statusText}</span>`;
             const checkboxHTML = isUnpaid
                 ? `<input type="checkbox" class="order-select-checkbox" data-id="${order.id}" data-total="${order.total || 0}">`
                 : '';
@@ -1279,7 +1291,7 @@ function openMergePaymentForm() {
     document.getElementById('merge-amount').value = total;
 
     const dateInput = document.getElementById('merge-date');
-    const today = new Date().toISOString().split('T')[0];
+    const today = localDateString();
     dateInput.value = today;
     dateInput.max = today;
 
@@ -1338,12 +1350,10 @@ async function submitMergePayment(e) {
             const orderSnap = await getDoc(orderRef);
             const existingNotes = orderSnap.exists() ? (orderSnap.data().notes || '') : '';
             const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
+            // 只寫入匯款資訊（【合併匯款確認】標記），不直接改成已付款；
+            // 管理員對帳後在後台改成「已付款」，才會寄出付款確認信
             batch.update(orderRef, {
-                notes: updatedNotes,
-                paymentConfirmed: true,
-                // 顧客自己回報匯款時一併把狀態推進到「已付款」，畫面才會立刻反映，
-                // 不用等管理員另外手動去後台改狀態
-                status: 'confirmed'
+                notes: updatedNotes
             });
         }
         await batch.commit();
@@ -1493,13 +1503,20 @@ async function showOrderDetail(orderId) {
         }
         
         // 未付款時提醒重點是「請去付款」，跟訂單處理狀態分開判斷
-        const isOrderUnpaid = order.status === 'pending' && order.paymentConfirmed !== true;
+        const isOrderReported = order.status === 'pending' && isPaymentReported(order);
+        const isOrderUnpaid = order.status === 'pending' && order.paymentConfirmed !== true && !isOrderReported;
 
         let paymentReminderHTML = '';
-        if (isOrderUnpaid && order.payment === 'transfer') {
+        if (isOrderReported) {
             paymentReminderHTML = `
                 <div class="section-alert">
-                    <p><strong>等待付款確認：</strong> 請完成ATM轉帳，並在下方表單填寫匯款資訊。我們將在確認付款後處理您的訂單。</p>
+                    <p><strong>已收到您的匯款回報：</strong> 我們核對款項後會將訂單改為「已付款」並寄信通知您。</p>
+                </div>
+            `;
+        } else if (isOrderUnpaid && order.payment === 'transfer') {
+            paymentReminderHTML = `
+                <div class="section-alert">
+                    <p><strong>等待付款：</strong> 請完成ATM轉帳，並回到<a href="/orders.html">訂單記錄</a>列表勾選這筆訂單填寫匯款資訊。我們將在確認付款後處理您的訂單。</p>
                 </div>
             `;
         } else if (isOrderUnpaid && order.payment === 'transfer_later') {
@@ -1528,6 +1545,8 @@ async function showOrderDetail(orderId) {
 
         const detailStatusBadgeHTML = isOrderUnpaid
             ? '<span class="unpaid-badge">未付款</span>'
+            : isOrderReported
+                ? '<span class="order-detail-status status-reported">已回報匯款・待確認</span>'
             : `<span class="order-detail-status ${statusClass}">${statusText}</span>`;
 
         const detailHTML = `
@@ -1836,14 +1855,6 @@ function getOrderStatusInfo(status) {
    return { statusText, statusClass };
 }
 
-// Toast 通知函數
-function showToast(message) {
-    if (typeof window.showToast === 'function') {
-        window.showToast(message);
-    } else {
-        alert(message);
-    }
-}
     </script>
 </body>
 </html>

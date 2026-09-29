@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>栽培小知識 - 球根花卉團購 | 優質球根花卉專賣店</title>
+    <meta name="description" content="球根花卉栽培小知識：種植時機、土壤介質、澆水施肥、球根保存與休眠照顧，帶你輕鬆種出漂亮的百合、鬱金香、孤挺花等球根花卉。">
+    <meta name="keywords" content="球根,球根花卉,種植,栽培,球根保存,鬱金香,百合,孤挺花,風信子,園藝知識,球根花卉團購">
+    <meta name="author" content="球根花卉團購">
+    <!-- Open Graph 標籤 (用於社交媒體分享) -->
+<meta property="og:title" content="栽培小知識 - 球根花卉團購">
+<meta property="og:description" content="球根花卉栽培小知識：種植時機、土壤介質、澆水施肥、球根保存與休眠照顧。">
+<meta property="og:image" content="https://flowerbulb.tw/images/logo.png">
+<meta property="og:url" content="https://flowerbulb.tw/knowledge.html">
+<link rel="canonical" href="https://flowerbulb.tw/knowledge.html">
+<meta property="og:type" content="website">
+<link rel="icon" type="image/png" sizes="32x32" href="/images/logo.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/images/logo.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/images/logo.png">
+<link rel="shortcut icon" href="/images/logo.png">
+
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/cart.css">
+    <link rel="stylesheet" href="/css/auth-modals.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+    <!-- Firebase SDK引入 - 使用模組方式 -->
+    <script src="/js/firebase-config.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import {
+            getAuth,
+            signOut,
+            onAuthStateChanged,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            FacebookAuthProvider,
+            RecaptchaVerifier,
+            signInWithPhoneNumber,
+            PhoneAuthProvider,
+            signInWithCredential
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import {
+            initializeFirestore,
+            terminate,
+            collection,
+            doc,
+            setDoc,
+            getDoc,
+            getDocs,
+            getDocsFromServer,
+            query,
+            orderBy,
+            where,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = window.FIREBASE_CONFIG;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        // 跟其他頁面一致：固定使用長輪詢，避免公司網路擋串流連線時讀取卡住
+        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+
+        window.firebaseServices = {
+            app,
+            auth,
+            db,
+            initializeFirestore,
+            terminate,
+            getAuth,
+            signOut,
+            onAuthStateChanged,
+            doc,
+            setDoc,
+            getDoc,
+            collection,
+            getDocs,
+            getDocsFromServer,
+            query,
+            where,
+            orderBy,
+            serverTimestamp,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            FacebookAuthProvider,
+            RecaptchaVerifier,
+            signInWithPhoneNumber,
+            PhoneAuthProvider,
+            signInWithCredential
+        };
+    </script>
+    <link rel="stylesheet" href="/css/storefront.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <!-- 漢堡選單按鈕 (手機版) -->
+            <button class="menu-toggle" id="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <a href="/index.html" class="logo-container">
+    <img src="/images/logo.jpg" alt="球根花卉團購 logo" class="logo-image" width="520" height="730">
+    <div class="logo">
+        <h1>球根花卉團購</h1>
+        <p>球根花卉・種子專賣</p>
+    </div>
+</a>
+
+            <!-- 手機版頂部購物車 -->
+            <div class="mobile-header-actions">
+                <div class="cart-icon-container">
+                    <a href="/cart.html" class="cart-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count" id="cart-count-fixed">0</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 導航選單 -->
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/index.html">首頁</a></li>
+                    <li><a href="/products.html">商品</a></li>
+                    <li><a href="/knowledge.html" class="active">栽培小知識</a></li>
+                    <li><a href="/about.html">關於我們</a></li>
+                    <li><a href="/contact.html">聯絡我們</a></li>
+
+                    <!-- 手機版選單中的操作選項 -->
+                    <div class="mobile-actions">
+                        <div class="user-actions" id="user-actions-mobile">
+                            <a href="#" class="btn-login" id="login-btn-mobile">登入</a>
+                        </div>
+
+                        <div class="user-profile-mobile" id="user-profile-mobile">
+                            <div class="user-info">
+                                <i class="fas fa-user-circle"></i>
+                                <span id="username-display-mobile">會員名稱</span>
+                            </div>
+                            <div class="user-links">
+                                <a href="/profile.html"><i class="fas fa-user"></i> 會員資料</a>
+                                <a href="/orders.html"><i class="fas fa-shopping-bag"></i> 訂單記錄</a>
+                                <a href="/messages.html"><i class="fas fa-envelope"></i> 我的訊息</a>
+                                <a href="/admin/dashboard.html" id="admin-btn-mobile" class="admin-link" style="display: none;"><i class="fas fa-cog"></i> 系統管理</a>
+                                <a href="#" id="logout-btn-mobile"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                            </div>
+                        </div>
+                    </div>
+                </ul>
+            </nav>
+
+            <!-- 桌面版右側元素 -->
+            <div class="header-right">
+                <div class="cart-icon-container">
+                    <a href="/cart.html" class="cart-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count" id="cart-count">0</span>
+                    </a>
+                </div>
+
+                <div class="user-actions" id="user-actions">
+                    <a href="#" class="btn-login" id="login-btn">登入</a>
+                </div>
+
+                <div class="user-profile" id="user-profile">
+                    <div class="user-name" id="user-dropdown-btn">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="username-display">會員名稱</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="user-menu" id="user-menu">
+                        <a href="/profile.html"><i class="fas fa-user"></i> 會員資料</a>
+                        <a href="/orders.html"><i class="fas fa-shopping-bag"></i> 訂單記錄</a>
+                        <a href="/messages.html"><i class="fas fa-envelope"></i> 我的訊息</a>
+                        <a href="/admin/dashboard.html" id="admin-btn" class="admin-link" style="display: none;"><i class="fas fa-cog"></i> 系統管理</a>
+                        <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 半透明背景覆蓋 (用於手機版選單) -->
+    <div class="menu-overlay" id="menu-overlay"></div>
+
+    <main class="knowledge-page">
+        <div class="section-band"><h2>栽培小知識</h2></div>
+
+        <div class="container">
+            <!-- 文章列表：分類分頁 + 文章卡片 -->
+            <section id="knowledge-list-view">
+                <p class="knowledge-intro">從挑選球根、種植時機到開花後的保存，整理給花友的栽培筆記，一起把球根種出漂亮的花。</p>
+                <nav class="knowledge-tabs" id="knowledge-tabs" aria-label="文章分類"></nav>
+                <div class="knowledge-grid" id="knowledge-grid">
+                    <div class="loading-indicator">載入文章中...</div>
+                </div>
+                <div class="knowledge-more">
+                    <button type="button" class="btn btn-outline" id="knowledge-more-btn" hidden>載入更多文章</button>
+                </div>
+            </section>
+
+            <!-- 單篇文章 -->
+            <article class="knowledge-article" id="knowledge-article-view" hidden></article>
+        </div>
+    </main>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>球根花卉團購</h3>
+                    <p>為您提供最優質的球根花卉選擇</p>
+                    <div class="social-links">
+                        <a href="https://www.facebook.com/groups/g112332?locale=zh_TW" target="_blank" rel="noopener" title="Facebook 社團"><i class="fab fa-facebook"></i></a>
+                        <!-- 蝦皮賣場連結先暫時關閉，之後要重新開放時把 style="display:none;" 拿掉即可 --><a href="https://shopee.tw/vincentsayhello?categoryId=100636&entryPoint=ShopByPDP&itemId=27426426770" target="_blank" rel="noopener" title="蝦皮賣場" style="display:none;"><i class="fas fa-shopping-bag"></i></a>
+                    </div>
+                </div>
+
+                <div class="footer-section">
+                    <h3>商品分類</h3>
+                    <ul class="footer-links footer-category-links">
+                        <li><a href="/products.html">所有商品 &raquo;</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>顧客服務</h3>
+                    <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
+                        <li><a href="/about.html">關於我們</a></li>
+                        <li><a href="/contact.html">聯絡我們</a></li>
+                        <li><a href="/orders.html">訂單查詢</a></li>
+                        <li><a href="/cart.html">購物車</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>服務時間</h3>
+                    <p><i class="far fa-clock"></i> 週一至週五：9:00 - 18:00</p>
+                    <p><i class="fas fa-truck"></i> 超商取貨與宅急便配送</p>
+                    <p><i class="fas fa-users"></i> 團購優惠價格</p>
+                </div>
+            </div>
+
+            <div class="copyright">
+                <p class="footer-company">黃裕泰種子行｜統一編號：94806296</p>
+                <p>&copy; 2025 球根花卉團購。保留所有權利。</p>
+                <p class="disclaimer">※ 植物為活體，不適用七天鑑賞期 ※</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/auth-modals.js"></script>
+    <script src="/js/categories.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/member.js"></script>
+    <script src="/js/cart.js"></script>
+    <script src="/js/knowledge.js"></script>
+
+    <script>
+// 栽培小知識：文章存在 Firestore 的 settings/knowledge（{ articles: [...] }），
+// 由後台「內容管理 → 栽培小知識」編輯。網址 ?category=分類名稱 篩選列表、?id=文章ID 顯示單篇
+const PAGE_SIZE = 9;
+let lastConnectionResetAt = 0;
+const CONNECTION_RESET_COOLDOWN_MS = 60000;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initCommonFeatures();
+    loadKnowledge();
+});
+
+async function loadKnowledge(attempt = 1) {
+    const grid = document.getElementById('knowledge-grid');
+    try {
+        if (attempt > 2) {
+            grid.innerHTML = '<div class="error-message">網路連線不穩定，正在自動重新連線中，請稍候⋯⋯</div>';
+        }
+        const articles = await KnowledgeArticles.load({ publishedOnly: true });
+        const params = new URLSearchParams(window.location.search);
+        const articleId = params.get('id');
+        if (articleId) {
+            renderArticle(articles, articleId);
+        } else {
+            renderList(articles, params.get('category') || '');
+        }
+    } catch (error) {
+        console.error(`載入栽培小知識失敗（第 ${attempt} 次嘗試）:`, error);
+        // 跟商品頁一樣：連續失敗才重建 Firestore 連線，60 秒內不重複重建
+        if (attempt >= 2 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
+            lastConnectionResetAt = Date.now();
+            if (window.resetFirestoreConnection) await window.resetFirestoreConnection();
+        }
+        setTimeout(() => loadKnowledge(attempt + 1), Math.min(attempt * 1000, 8000));
+    }
+}
+
+function renderList(articles, activeCategory) {
+    const tabs = document.getElementById('knowledge-tabs');
+    const grid = document.getElementById('knowledge-grid');
+    const moreBtn = document.getElementById('knowledge-more-btn');
+
+    const categories = KnowledgeArticles.categoriesOf(articles);
+    if (activeCategory && !categories.some(c => c.name === activeCategory)) activeCategory = '';
+
+    const tabLink = (name, label, count) => {
+        const href = name ? `/knowledge.html?category=${encodeURIComponent(name)}` : '/knowledge.html';
+        const active = name === activeCategory ? ' class="active" aria-current="page"' : '';
+        return `<a href="${href}"${active}>${escapeHtml(label)} <span class="count">(${count})</span></a>`;
+    };
+    tabs.innerHTML = categories.length > 0
+        ? tabLink('', '全部文章', articles.length) + categories.map(c => tabLink(c.name, c.name, c.count)).join('')
+        : '';
+
+    const filtered = activeCategory ? articles.filter(a => a.category === activeCategory) : articles;
+    if (activeCategory) document.title = `${activeCategory} - 栽培小知識 - 球根花卉團購`;
+
+    if (filtered.length === 0) {
+        grid.innerHTML = '<div class="no-products">栽培小知識整理中，敬請期待！</div>';
+        moreBtn.hidden = true;
+        return;
+    }
+
+    let shown = 0;
+    grid.innerHTML = '';
+    const showMore = () => {
+        const next = filtered.slice(shown, shown + PAGE_SIZE);
+        grid.insertAdjacentHTML('beforeend', next.map(buildCard).join(''));
+        shown += next.length;
+        moreBtn.hidden = shown >= filtered.length;
+    };
+    moreBtn.onclick = showMore;
+    showMore();
+}
+
+function buildCard(article) {
+    const cover = article.coverImageUrl
+        ? `<img src="${escapeHtml(article.coverImageUrl)}" alt="" loading="lazy" decoding="async">`
+        : '<span class="knowledge-card-placeholder"><i class="fas fa-seedling"></i></span>';
+    return `
+        <a class="knowledge-card" href="/knowledge.html?id=${encodeURIComponent(article.id)}">
+            <span class="knowledge-card-image">${cover}</span>
+            <span class="knowledge-card-body">
+                ${article.category ? `<span class="knowledge-card-category">${escapeHtml(article.category)}</span>` : ''}
+                <span class="knowledge-card-title">${escapeHtml(article.title)}</span>
+                <span class="knowledge-card-excerpt">${escapeHtml(KnowledgeArticles.excerptOf(article))}</span>
+                <span class="knowledge-card-meta">
+                    <span><i class="far fa-calendar"></i> ${escapeHtml(article.date)}</span>
+                    <span class="knowledge-read-more">閱讀更多 <i class="fas fa-arrow-right"></i></span>
+                </span>
+            </span>
+        </a>
+    `;
+}
+
+// 內文：空一行分段、單一換行保留成換行
+function paragraphsHTML(text) {
+    return String(text || '')
+        .split(/\n\s*\n/)
+        .map(p => p.trim())
+        .filter(Boolean)
+        .map(p => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+        .join('');
+}
+
+function renderArticle(articles, articleId) {
+    const listView = document.getElementById('knowledge-list-view');
+    const view = document.getElementById('knowledge-article-view');
+    const article = articles.find(a => a.id === articleId);
+
+    listView.hidden = true;
+    view.hidden = false;
+
+    if (!article) {
+        view.innerHTML = `
+            <a class="knowledge-back" href="/knowledge.html"><i class="fas fa-arrow-left"></i> 回到栽培小知識</a>
+            <div class="no-products">找不到這篇文章，可能已經下架了。</div>
+        `;
+        return;
+    }
+
+    document.title = `${article.title} - 栽培小知識 - 球根花卉團購`;
+    const metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', KnowledgeArticles.excerptOf(article));
+
+    const sectionsHTML = article.sections.map(section => `
+        <section class="knowledge-section">
+            ${section.heading ? `<h2>${escapeHtml(section.heading)}</h2>` : ''}
+            ${section.imageUrl ? `<figure><img src="${escapeHtml(section.imageUrl)}" alt="${escapeHtml(section.heading || article.title)}" loading="lazy"></figure>` : ''}
+            ${paragraphsHTML(section.text)}
+        </section>
+    `).join('');
+
+    // 同分類優先的其他文章，最多 3 篇
+    const others = articles.filter(a => a.id !== article.id);
+    const related = others.filter(a => a.category && a.category === article.category)
+        .concat(others.filter(a => !a.category || a.category !== article.category))
+        .slice(0, 3);
+
+    view.innerHTML = `
+        <a class="knowledge-back" href="/knowledge.html"><i class="fas fa-arrow-left"></i> 回到栽培小知識</a>
+        <div class="knowledge-article-header">
+            ${article.category ? `<a class="knowledge-card-category" href="/knowledge.html?category=${encodeURIComponent(article.category)}">${escapeHtml(article.category)}</a>` : ''}
+            <h1>${escapeHtml(article.title)}</h1>
+            <p class="knowledge-article-date"><i class="far fa-calendar"></i> ${escapeHtml(article.date)}</p>
+        </div>
+        ${article.coverImageUrl ? `<figure class="knowledge-cover"><img src="${escapeHtml(article.coverImageUrl)}" alt="${escapeHtml(article.title)}" fetchpriority="high"></figure>` : ''}
+        ${article.summary ? `<p class="knowledge-summary">${escapeHtml(article.summary)}</p>` : ''}
+        <div class="knowledge-content">${sectionsHTML}</div>
+        <div class="knowledge-cta">
+            <p>想開始種植了嗎？看看目前開團中的球根與種子。</p>
+            <a href="/products.html" class="btn btn-primary">前往選購</a>
+        </div>
+        ${related.length > 0 ? `
+            <section class="knowledge-related">
+                <h2>更多栽培小知識</h2>
+                <div class="knowledge-grid">${related.map(buildCard).join('')}</div>
+            </section>
+        ` : ''}
+    `;
+    window.scrollTo(0, 0);
+}
+    </script>
+</body>
+</html>
