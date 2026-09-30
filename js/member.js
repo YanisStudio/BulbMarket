@@ -12,386 +12,269 @@
     });
 })();
 
-// 修改 CSS 樣式部分
+// ---------- LINE / Facebook / IG 等 App 內建瀏覽器提示 ----------
+// 內建瀏覽器常常無法使用 Google 登入，進站時請顧客改用手機的瀏覽器開啟。
+// 每個分頁只提示一次（sessionStorage），按「繼續瀏覽」就不再出現。
+
 function injectBrowserWarningStyles() {
     if (document.querySelector('#browser-warning-styles')) return;
-    
+
     const styles = document.createElement('style');
     styles.id = 'browser-warning-styles';
     styles.textContent = `
-        /* 瀏覽器檢測相關樣式 */
         .browser-warning {
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
+            inset: 0;
             z-index: 99999;
             display: flex;
-            align-items: center;
+            align-items: flex-end;
             justify-content: center;
-            padding: 20px;
-            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.45);
         }
 
         .browser-warning-content {
-            background: white;
-            border-radius: 15px;
-            padding: 30px;
-            text-align: center;
-            max-width: 420px;
             width: 100%;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-            animation: browserSlideIn 0.3s ease-out;
-            position: relative;
-        }
-
-        .browser-warning-icon {
-            font-size: 3rem;
-            color: #4caf50;
-            margin-bottom: 20px;
+            max-width: 420px;
+            background: #fff;
+            border-radius: 14px 14px 0 0;
+            padding: 22px 20px calc(18px + env(safe-area-inset-bottom));
+            text-align: left;
+            box-sizing: border-box;
         }
 
         .browser-warning-content h2 {
+            margin: 0 0 6px;
+            font-size: 1.1rem;
             color: #333;
-            margin: 0 0 15px 0;
-            font-size: 1.5rem;
         }
 
         .browser-warning-content p {
-            color: #666;
+            margin: 0 0 18px;
+            font-size: 0.95rem;
             line-height: 1.6;
-            margin: 10px 0;
+            color: #666;
         }
 
-        .browser-buttons {
+        .browser-warning-actions {
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            margin-top: 25px;
+            gap: 8px;
         }
 
-        .browser-btn {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            border: none;
-            border-radius: 10px;
-            font-weight: 600;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            font-family: inherit;
-        }
-
-        .browser-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
-        }
-
-        /* Chrome 按鈕 - 主要行動按鈕 */
-        .chrome-btn {
-            background: linear-gradient(135deg, #4caf50, #2e7d32);
-            color: white;
-            padding: 18px 25px;
-            font-size: 1.1rem;
-            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
-        }
-
-        .chrome-btn:hover {
-            background: linear-gradient(135deg, #43a047, #1b5e20);
-            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
-            transform: translateY(-3px);
-        }
-
-        .chrome-btn i {
-            margin-right: 12px;
-            font-size: 1.3rem;
-        }
-
-        /* 繼續使用按鈕 - 次要選項 */
-        .continue-btn {
-            background: transparent;
-            color: #999;
-            border: 1px solid #ddd;
-            padding: 10px 15px;
-            font-size: 0.85rem;
-            margin-top: 15px;
-        }
-
-        .continue-btn:hover {
-            background: #f5f5f5;
-            color: #666;
-            transform: translateY(-1px);
-            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-        }
-
-        .continue-btn i {
-            margin-right: 8px;
-            font-size: 0.9rem;
-        }
-
-        @keyframes browserSlideIn {
-            from { opacity: 0; transform: scale(0.9) translateY(-20px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
-        }
-
-        /* 添加說明文字 */
-        .chrome-benefits {
-            background: #e8f5e9;
-            border-left: 4px solid #4caf50;
-            padding: 12px 15px;
-            margin: 15px 0;
-            border-radius: 5px;
-            text-align: left;
-            font-size: 0.9rem;
-        }
-
-        .chrome-benefits h4 {
-            margin: 0 0 8px 0;
-            color: #2e7d32;
+        .browser-warning-actions button {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
             font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
         }
 
-        .chrome-benefits p {
-            margin: 0;
-            color: #555;
-            line-height: 1.4;
+        .browser-warning-primary {
+            border: none;
+            background: #2e7d32;
+            color: #fff;
         }
 
-        @media (max-width: 480px) {
+        .browser-warning-secondary {
+            border: none;
+            background: none;
+            color: #888;
+        }
+
+        @media (min-width: 600px) {
+            .browser-warning {
+                align-items: center;
+            }
+
             .browser-warning-content {
-                padding: 20px;
-                margin: 10px;
-            }
-            
-            .browser-warning-content h2 {
-                font-size: 1.3rem;
-            }
-            
-            .chrome-btn {
-                padding: 16px 20px;
-                font-size: 1rem;
-            }
-            
-            .continue-btn {
-                padding: 8px 12px;
-                font-size: 0.8rem;
+                border-radius: 14px;
             }
         }
     `;
     document.head.appendChild(styles);
 }
 
-// 修改 HTML 內容部分
 function injectBrowserWarningHTML() {
     if (document.querySelector('#browser-warning')) return;
-    
-    const warningHTML = `
-        <div id="browser-warning" class="browser-warning" style="display: none;">
-            <div class="browser-warning-content">
-                <div class="browser-warning-icon">
-                    <i class="fas fa-exclamation-triangle"></i>
-                </div>
-                
-                <h2>建議使用外部瀏覽器</h2>
-                <p>您目前使用的是 ${window.BrowserDetection ? window.BrowserDetection.getBrowserName() : 'LINE'} 內建瀏覽器，某些功能可能無法正常使用。</p>
-                
-                <div class="chrome-benefits">
-                    <h4>使用外部瀏覽器的優勢：</h4>
-                    <p>• 完整功能支援，登入更順暢<br>• 更快的載入速度<br>• 更安全的瀏覽體驗</p>
-                </div>
 
-                <div class="browser-buttons">
-                    <button class="browser-btn chrome-btn" onclick="window.BrowserDetection.openInGoogleChrome()">
-                        <i class="fab fa-chrome"></i>
-                        立即使用 Google Chrome 開啟
-                    </button>
-                    <button class="browser-btn continue-btn" onclick="window.BrowserDetection.continueWithCurrentBrowser()">
-                        <i class="fas fa-forward"></i>
-                        略過並繼續
-                    </button>
+    const appName = BrowserDetection.getBrowserName();
+    const primaryText = BrowserDetection.canOpenExternally() ? '用瀏覽器開啟' : '複製網址';
+    const hint = BrowserDetection.canOpenExternally()
+        ? `在 ${appName} 裡可能無法登入，建議用手機的瀏覽器開啟。`
+        : `在 ${appName} 裡可能無法登入，可點右上角「⋯」改用瀏覽器開啟。`;
+
+    document.body.insertAdjacentHTML('beforeend', `
+        <div id="browser-warning" class="browser-warning" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="browser-warning-title">
+            <div class="browser-warning-content">
+                <h2 id="browser-warning-title">請用瀏覽器開啟</h2>
+                <p>${hint}</p>
+                <div class="browser-warning-actions">
+                    <button type="button" class="browser-warning-primary" id="browser-warning-open">${primaryText}</button>
+                    <button type="button" class="browser-warning-secondary" id="browser-warning-continue">繼續瀏覽</button>
                 </div>
             </div>
         </div>
-    `;
-    
-    document.body.insertAdjacentHTML('beforeend', warningHTML);
+    `);
+
+    document.getElementById('browser-warning-open').addEventListener('click', function() {
+        BrowserDetection.openInExternalBrowser(this);
+    });
+    document.getElementById('browser-warning-continue').addEventListener('click', function() {
+        BrowserDetection.closeBrowserWarning();
+    });
 }
 
-// 瀏覽器檢測功能（使用會話級記憶）
 const BrowserDetection = {
-    // 檢測是否為 LINE 瀏覽器
     isLINEBrowser() {
         const userAgent = navigator.userAgent.toLowerCase();
-        return userAgent.includes('line/') || 
+        return userAgent.includes('line/') ||
                userAgent.includes('linewebview') ||
                userAgent.includes('linelite');
     },
 
-    // 檢測是否為手機
+    isAndroid() {
+        return /android/i.test(navigator.userAgent);
+    },
+
     isMobile() {
         return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     },
 
-    // 檢測其他常見的內建瀏覽器
+    // 常見 App 內建瀏覽器（Facebook、Instagram、LINE、微信、KakaoTalk…）
     isInAppBrowser() {
         const userAgent = navigator.userAgent.toLowerCase();
-        return userAgent.includes('fbav') ||     // Facebook
-               userAgent.includes('fban') ||     // Facebook
-               userAgent.includes('instagram') || // Instagram
-               userAgent.includes('twitter') ||   // Twitter
-               userAgent.includes('tiktok') ||    // TikTok
-               userAgent.includes('micromessenger') || // WeChat
-               userAgent.includes('line/') ||     // LINE
-               userAgent.includes('kakaotalk');   // KakaoTalk
+        return userAgent.includes('fbav') ||
+               userAgent.includes('fban') ||
+               userAgent.includes('instagram') ||
+               userAgent.includes('twitter') ||
+               userAgent.includes('tiktok') ||
+               userAgent.includes('micromessenger') ||
+               userAgent.includes('line/') ||
+               userAgent.includes('kakaotalk');
     },
 
-    // 檢測具體的瀏覽器類型
     getBrowserName() {
         const userAgent = navigator.userAgent.toLowerCase();
-        
-        if (userAgent.includes('line/') || userAgent.includes('linewebview') || userAgent.includes('linelite')) {
-            return 'LINE';
-        } else if (userAgent.includes('fbav') || userAgent.includes('fban')) {
-            return 'Facebook';
-        } else if (userAgent.includes('instagram')) {
-            return 'Instagram';
-        } else if (userAgent.includes('twitter')) {
-            return 'Twitter';
-        } else if (userAgent.includes('tiktok')) {
-            return 'TikTok';
-        } else if (userAgent.includes('micromessenger')) {
-            return 'WeChat';
-        } else if (userAgent.includes('kakaotalk')) {
-            return 'KakaoTalk';
-        } else {
-            return '內建';
-        }
+        if (this.isLINEBrowser()) return 'LINE';
+        if (userAgent.includes('fbav') || userAgent.includes('fban')) return 'Facebook';
+        if (userAgent.includes('instagram')) return 'Instagram';
+        if (userAgent.includes('twitter')) return 'Twitter';
+        if (userAgent.includes('tiktok')) return 'TikTok';
+        if (userAgent.includes('micromessenger')) return 'WeChat';
+        if (userAgent.includes('kakaotalk')) return 'KakaoTalk';
+        return 'App 內建瀏覽器';
     },
 
-    // 新增：直接開啟 Google Chrome
-    openInGoogleChrome() {
+    // LINE 有官方參數可以直接跳到手機瀏覽器；Android 可以用 intent 開預設瀏覽器。
+    // 其他情況（例如 iPhone 的 Facebook / IG）沒有可靠的方法，只能複製網址
+    canOpenExternally() {
+        return this.isLINEBrowser() || this.isAndroid();
+    },
+
+    openInExternalBrowser(button) {
         const currentUrl = window.location.href;
-        
-        try {
-            // 檢測平台並使用對應的方法
-            if (this.isMobile()) {
-                // 手機平台
-                if (navigator.userAgent.match(/iPhone|iPad/)) {
-                    // iOS 設備
-                    // 嘗試使用 Chrome 的 URL scheme
-                    const chromeUrl = `googlechrome://${currentUrl.replace(/^https?:\/\//, '')}`;
-                    window.location.href = chromeUrl;
-                    
-                    // 如果 Chrome 沒有安裝，回退到 Safari
-                    setTimeout(() => {
-                        window.location.href = currentUrl;
-                    }, 1500);
-                } else if (navigator.userAgent.match(/Android/)) {
-                    // Android 設備
-                    // 使用 Intent 嘗試開啟 Chrome
-                    const intentUrl = `intent://${currentUrl.replace(/^https?:\/\//, '')}#Intent;scheme=https;package=com.android.chrome;end`;
-                    window.location.href = intentUrl;
-                    
-                    // 如果 Chrome 沒有安裝，回退到默認瀏覽器
-                    setTimeout(() => {
-                        window.location.href = currentUrl;
-                    }, 1500);
-                }
-            } else {
-                // 桌面平台 - 開啟新分頁
-                window.open(currentUrl, '_blank');
-            }
-            
-            // 關閉警告彈窗
-            this.closeBrowserWarning();
-            
-        } catch (error) {
-            console.error('開啟外部瀏覽器失敗:', error);
-            // 如果所有方法都失敗，嘗試直接開啟連結
-            try {
-                window.open(currentUrl, '_blank');
-            } catch (fallbackError) {
-                console.error('備用方案也失敗:', fallbackError);
-                alert('無法自動開啟外部瀏覽器，請手動複製網址到 Chrome 瀏覽器中開啟：\n\n' + currentUrl);
-            }
-        }
-    },
 
-    // 顯示瀏覽器警告（使用 sessionStorage 記憶）
-    showBrowserWarning() {
-        // 檢查會話期間是否已經顯示過警告
-        const hasShownWarning = sessionStorage.getItem('browserWarningShown');
-        
-        // 如果這個會話中已經顯示過，就不再顯示
-        if (hasShownWarning === 'true') {
-            console.log('本次會話已顯示過瀏覽器警告，跳過顯示');
+        if (this.isLINEBrowser()) {
+            // LINE 內建瀏覽器看到 openExternalBrowser=1 會改用手機預設瀏覽器開啟
+            const url = new URL(currentUrl);
+            url.searchParams.set('openExternalBrowser', '1');
+            window.location.href = url.toString();
             return;
         }
 
-        // 確保 HTML 已注入
-        injectBrowserWarningHTML();
+        if (this.isAndroid()) {
+            const url = new URL(currentUrl);
+            window.location.href = `intent://${url.host}${url.pathname}${url.search}${url.hash}#Intent;scheme=${url.protocol.replace(':', '')};end`;
+            return;
+        }
 
+        this.copyUrl(currentUrl, button);
+    },
+
+    copyUrl(url, button) {
+        const done = () => {
+            if (button) button.textContent = '已複製，請貼到瀏覽器';
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(url).then(done).catch(() => this.copyUrlFallback(url, done));
+        } else {
+            this.copyUrlFallback(url, done);
+        }
+    },
+
+    // 舊版內建瀏覽器沒有 Clipboard API：用隱藏的輸入框複製，還是不行就直接顯示網址
+    copyUrlFallback(url, done) {
+        const input = document.createElement('input');
+        input.value = url;
+        input.setAttribute('readonly', '');
+        input.style.position = 'fixed';
+        input.style.opacity = '0';
+        document.body.appendChild(input);
+        input.select();
+        let copied = false;
+        try {
+            copied = document.execCommand('copy');
+        } catch (error) {
+            copied = false;
+        }
+        input.remove();
+        if (copied) {
+            done();
+        } else {
+            window.prompt('請複製網址，貼到瀏覽器開啟：', url);
+        }
+    },
+
+    showBrowserWarning() {
+        if (sessionStorage.getItem('browserWarningShown') === 'true') return;
+        injectBrowserWarningHTML();
         const warningElement = document.getElementById('browser-warning');
         if (warningElement) {
             warningElement.style.display = 'flex';
-            
-            // 標記這個會話已經顯示過警告
             sessionStorage.setItem('browserWarningShown', 'true');
-            console.log('已顯示瀏覽器警告，並標記會話狀態');
         }
     },
 
-    // 關閉瀏覽器警告
     closeBrowserWarning() {
         const warningElement = document.getElementById('browser-warning');
-        if (warningElement) {
-            warningElement.style.display = 'none';
-        }
+        if (warningElement) warningElement.style.display = 'none';
     },
 
-    // 繼續使用當前瀏覽器
+    // 相容舊名稱
     continueWithCurrentBrowser() {
         this.closeBrowserWarning();
     },
 
-    // 修改登入按鈕行為，在 LINE 瀏覽器中優先引導使用電話登入
+    openInGoogleChrome() {
+        this.openInExternalBrowser(document.getElementById('browser-warning-open'));
+    },
+
+    // LINE 內建瀏覽器無法使用 Google / Facebook 登入，按下時改提示其他方式
     handleLoginButtonClick(loginType) {
         if (this.isLINEBrowser() && (loginType === 'google' || loginType === 'facebook')) {
-            // 在 LINE 瀏覽器中，如果用戶點擊 Google 或 Facebook 登入
+            const message = 'LINE 裡無法使用 Google 登入。\n請改用電話號碼登入，或用瀏覽器開啟本頁。';
             if (window.showMemberWarningModal) {
-                window.showMemberWarningModal(
-                    '建議使用其他登入方式',
-                    '在 LINE 瀏覽器中，Google 和 Facebook 登入可能無法正常運作。建議您：\n\n1. 使用電話號碼登入\n2. 或在外部瀏覽器中開啟此網頁'
-                );
+                window.showMemberWarningModal('請改用電話登入', message);
             } else {
-                alert('在 LINE 瀏覽器中，Google 和 Facebook 登入可能無法正常運作。建議您：\n\n1. 使用電話號碼登入\n2. 或在外部瀏覽器中開啟此網頁');
+                alert(message);
             }
-            return false; // 阻止繼續執行登入
+            return false;
         }
-        return true; // 允許繼續執行登入
+        return true;
     },
 
-    // 初始化瀏覽器檢測
     init() {
-        // 注入樣式
         injectBrowserWarningStyles();
-        
-        // 如果是 LINE 瀏覽器或其他內建瀏覽器，顯示警告
         if (this.isLINEBrowser() || this.isInAppBrowser()) {
-            // 延遲 1 秒顯示，讓頁面有時間載入
-            setTimeout(() => {
-                this.showBrowserWarning();
-            }, 1000);
+            // 稍等一下再顯示，讓頁面先載入完成
+            setTimeout(() => this.showBrowserWarning(), 800);
         }
     },
 
-    // 新增：重置會話記憶（供測試使用）
+    // 測試用：清除「已經提示過」的紀錄
     resetSessionMemory() {
         sessionStorage.removeItem('browserWarningShown');
-        console.log('已重置瀏覽器警告會話記憶');
     }
 };
 
