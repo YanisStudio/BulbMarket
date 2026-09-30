@@ -1,0 +1,120 @@
+rules_version = '2';
+
+// 球根花卉團購 flowerbulb.tw - Firestore 安全規則
+// 部署方式：整段貼到 Firebase Console → Firestore → 規則 → 發布
+// （故意沒有寫進 firebase.json，避免 firebase deploy 時意外覆蓋）
+// 管理員 = Firebase Auth custom claim admin: true
+//
+// ⚠️ 這版規則禁止網頁端直接建立訂單，必須先部署 Cloud Function createOrder
+//    （functions/create-order.js）並讓結帳頁改用它之後，才能發布這版規則。
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+
+    // 只改了指定的欄位
+    function onlyChanges(fields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
+    }
+
+    // 登入者的手機號碼（+8869xxxxxxxx → 09xxxxxxxx，跟訂單上存的格式一致）
+    function myPhone() {
+      return request.auth.token.phone_number.replace('^\\+886', '0');
+    }
+
+    // 訂單記錄列表（orders.html）能不能看到這筆訂單：會員訂單看 userId；
+    // 也可以用登入的信箱／手機找到以同一個信箱／手機下的訂單（例如登入前以訪客身分下的單）。
+    // Firestore 規則不是篩選器，查詢條件必須能保證每一筆結果都符合規則，
+    // 所以這裡不能加「沒有 userId」這種查詢表達不出來的條件，否則用信箱查詢會整個被拒絕
+    function canListOrder(data) {
+      return signedIn() && (
+        data.get('userId', '') == request.auth.uid
+        || (request.auth.token.get('email', '') != ''
+            && request.auth.token.get('email_verified', false) == true
+            && data.customer.email == request.auth.token.email)
+        || (request.auth.token.get('phone_number', '') != ''
+            && data.customer.phone == myPhone())
+      );
+    }
+
+    // ---------- 網站設定：布告欄、分類、栽培小知識 ----------
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------- 運費設定（購物車、結帳頁要讀） ----------
+    match /shippingSettings/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /shippingRates/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+    match /tieredRates/{docId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // ---------- 商品 ----------
+    match /products/{productId} {
+      allow read: if true;
+      // 結帳扣庫存改由 Cloud Function 處理（伺服器端不受規則限制），網頁端只有管理員能修改商品
+      allow write: if isAdmin();
+    }
+
+    // ---------- 訂單 ----------
+    match /orders/{orderId} {
+      // 用訂單 ID 讀單筆（訂單完成頁要讓剛下單的訪客讀到）。訂單 ID 是 20 碼隨機字串，無法猜測
+      allow get: if true;
+      // 查詢清單只能查到自己的訂單
+      allow list: if isAdmin() || canListOrder(resource.data);
+
+      // 下單一律透過 Cloud Function createOrder：金額、運費、庫存都在伺服器端計算，
+      // 網頁端不能直接建立訂單，避免有人繞過網站送出自訂價格的訂單
+      allow create: if false;
+
+      // 顧客只能追加備註（回報匯款、補充需求），不能改金額、狀態或付款確認；
+      // 付款確認由管理員在後台對帳後修改
+      allow update: if isAdmin() || (
+        onlyChanges(['notes'])
+        && (!('userId' in resource.data)
+            || (signedIn() && resource.data.userId == request.auth.uid))
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ---------- 會員資料 ----------
+    match /users/{userId} {
+      allow read, write: if isAdmin() || (signedIn() && request.auth.uid == userId);
+    }
+
+    // ---------- 聯絡我們的訊息 ----------
+    match /messages/{messageId} {
+      allow create: if request.resource.data.get('read', false) == false
+        && !('reply' in request.resource.data)
+        && (!('userId' in request.resource.data)
+            || (signedIn() && request.resource.data.userId == request.auth.uid));
+      allow read: if isAdmin()
+        || (signedIn() && resource.data.get('userId', '') == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    // ---------- 商品管理頁的寫入測試 ----------
+    match /test_writes/{docId} {
+      allow read, write: if isAdmin();
+    }
+
+    // 其他集合一律拒絕
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -6,6 +6,9 @@ const { sendEmail } = require("./brevo");
 
 initializeApp();
 
+// 建立訂單（結帳頁呼叫）：金額、運費、庫存都在伺服器端計算與檢查，見 create-order.js
+exports.createOrder = require("./create-order").createOrder;
+
 const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
 
 function formatCurrency(amount) {

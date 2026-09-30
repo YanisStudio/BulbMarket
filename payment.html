@@ -370,6 +370,7 @@
         where,
         serverTimestamp
     } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
         // Firebase配置 - 統一使用與其他頁面相同的配置
         const firebaseConfig = window.FIREBASE_CONFIG;
@@ -380,8 +381,11 @@
         // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
         // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
         const db = initializeFirestore(app, { experimentalForceLongPolling: true });
-        
+        // 建立訂單的 Cloud Function（functions/create-order.js）部署在台灣機房 asia-east1
+        const functions = getFunctions(app, 'asia-east1');
+
         window.firebaseServices = {
+            createOrder: httpsCallable(functions, 'createOrder'),
             auth: auth,
             db: db,
             getAuth,
@@ -1422,39 +1426,6 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
             // 啟動初始化
             initializeCheckout();
             
-            // 智能訂單編號生成系統
-            async function generateOrderNumber() {
-                try {
-                    const today = new Date();
-                    const dateStr = today.getFullYear().toString() + 
-                                   (today.getMonth() + 1).toString().padStart(2, '0') + 
-                                   today.getDate().toString().padStart(2, '0');
-                    
-                    // 查詢今天已有的訂單數量
-                    const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-                    const todayEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
-                    
-                    const ordersQuery = firebaseServices.query(
-                        firebaseServices.collection(firebaseServices.db, 'orders'),
-                        firebaseServices.where('orderDate', '>=', todayStart),
-                        firebaseServices.where('orderDate', '<', todayEnd)
-                    );
-                    
-                    const querySnapshot = await firebaseServices.getDocs(ordersQuery);
-                    const todayOrderCount = querySnapshot.size;
-                    
-                    // 生成流水號 (從001開始)
-                    const serialNumber = (todayOrderCount + 1).toString().padStart(3, '0');
-                    
-                    return `BG${dateStr}${serialNumber}`;
-                    // 例如：BG20250110001, BG20250110002...
-                } catch (error) {
-                    console.error('生成訂單編號失敗:', error);
-                    // fallback 到簡單方案
-                    return 'BG' + Date.now().toString().slice(-8);
-                }
-            }
-            
             // 檢查庫存、並用 Firestore 裡的真實價格驗證購物車
             //（購物車存在瀏覽器 localStorage，價格欄位使用者端可以任意竄改，
             //  不能拿來直接算訂單金額，一定要用這裡查回來的 Firestore 資料為準）
@@ -1635,153 +1606,52 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                         mobileSubmitOrderBtn.textContent = '建立訂單中...';
                     }
                     
-                    // 第二步：生成智能訂單編號
-                    const orderNumber = await generateOrderNumber();
-                    
-                    // 第三步：收集訂單數據
+                    // 第二步：送出訂單給 Cloud Function（functions/create-order.js 的 createOrder）。
+                    // 單價、小計、運費、總額、訂單編號都由伺服器依資料庫重新計算，
+                    // 建訂單與扣庫存也在伺服器端同一個 transaction 完成；
+                    // Firestore 規則禁止網頁端直接建立訂單或修改庫存，避免有人送出自訂價格的訂單。
+                    // 這裡只送出顧客填的資料，單價只讓伺服器判斷「價格是否已更新」
                     const name = document.getElementById('name').value;
                     const phone = document.getElementById('phone').value;
-const email = document.getElementById('email').value;
-const city = document.getElementById('city').value;
-const district = document.getElementById('district').value;
-const address = document.getElementById('address').value;
-const shipping = document.querySelector('input[name="shipping"]:checked').value;
-const payment = document.querySelector('input[name="payment"]:checked').value;
-const notes = document.getElementById('notes').value;
-
-let customerAddress;
-if (shipping === 'store') {
-    // 超商取貨：只使用門市名稱
-    customerAddress = address;
-} else {
-    // 宅配到府：組合完整地址
-    customerAddress = `${city}${district}${address}`;
-}
-                    
-                    // 金額一律用 validateCartStock() 向 Firestore 驗證過的商品明細計算，
-                    // 不要相信購物車（localStorage，使用者端可竄改）或畫面上顯示的小計文字
-                    if (!verifiedCartItems || verifiedCartItems.length === 0) {
-                        alert('商品資料驗證失敗，請重新整理頁面後再試一次');
-                        if (submitOrderBtn) {
-                            submitOrderBtn.disabled = false;
-                            submitOrderBtn.textContent = '提交訂單';
-                        }
-                        if (mobileSubmitOrderBtn) {
-                            mobileSubmitOrderBtn.disabled = false;
-                            mobileSubmitOrderBtn.textContent = '提交訂單';
-                        }
-                        return;
-                    }
-                    const subtotal = verifiedCartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-                    const shippingFee = window.currentShippingResult ? window.currentShippingResult.fee : 0;
-                    const total = subtotal + shippingFee;
-
-                    // 建立訂單對象
-                    const orderData = {
+                    const shipping = document.querySelector('input[name="shipping"]:checked').value;
+                    const payment = document.querySelector('input[name="payment"]:checked').value;
+                    const request = {
+                        items: cart.map(item => ({ id: item.id, quantity: item.quantity, price: item.price })),
                         customer: {
                             name: name,
                             phone: phone,
-                            email: email,
-                            address: customerAddress
+                            email: document.getElementById('email').value
                         },
                         shipping: shipping,
-                        shippingFee: shippingFee,
-                        shippingDetails: window.currentShippingResult || {},
+                        address: {
+                            city: document.getElementById('city').value,
+                            district: document.getElementById('district').value,
+                            detail: document.getElementById('address').value
+                        },
                         payment: payment,
-                        items: verifiedCartItems,
-                        subtotal: subtotal,
-                        total: total,
-                        notes: notes,
-                        orderDate: firebaseServices.serverTimestamp(),
-                        status: 'pending',
-                        orderNumber: orderNumber,
-                        // 是否已經完成匯款確認（不論是 ATM 轉帳當下填、還是稍後轉帳合併付款），
-                        // 訂單記錄頁面靠這個欄位判斷要不要顯示「未付款」標記、能不能勾選去合併付款
-                        paymentConfirmed: false
+                        notes: document.getElementById('notes').value
                     };
-                    
-                    // 如果用戶已登入，記錄用戶ID
-                    const currentUser = firebaseServices.auth.currentUser;
-                    if (currentUser) {
-                        orderData.userId = currentUser.uid;
-                    }
-                    
-                    console.log('準備提交訂單資料:', orderData);
-                    
-                    // 第四、五步：建立訂單＋扣庫存，包在同一個 Firestore transaction 裡
-                    // 原子性完成。之前是先查庫存夠不夠、再分開建立訂單、再分開扣庫存，
-                    // 兩個顧客幾乎同時結帳時，有機會兩邊都查到庫存足夠、都成功建立訂單、
-                    // 都扣庫存成功，結果賣超（例如庫存只剩 1 件卻賣出 2 件）。改成
-                    // transaction 之後，Firestore 會保證同一時間只有一個能成功提交，
-                    // 提交當下才重新確認一次庫存是否足夠
-                    if (submitOrderBtn) {
-                        submitOrderBtn.textContent = '確認庫存並建立訂單中...';
-                    }
-                    if (mobileSubmitOrderBtn) {
-                        mobileSubmitOrderBtn.textContent = '確認庫存並建立訂單中...';
-                    }
 
-                    const ordersCollectionRef = firebaseServices.collection(firebaseServices.db, 'orders');
-                    const orderRef = firebaseServices.doc(ordersCollectionRef);
+                    const result = (await firebaseServices.createOrder(request)).data;
+                    console.log('訂單已創建，ID:', result.orderId, '訂單編號:', result.orderNumber);
 
-                    await firebaseServices.runTransaction(firebaseServices.db, async (transaction) => {
-                        // transaction 規定所有讀取要在所有寫入之前，所以先把訂單會用到的
-                        // 每個商品都讀一次，確認提交這一刻庫存仍然足夠
-                        const productRefs = orderData.items.map(item =>
-                            firebaseServices.doc(firebaseServices.db, 'products', item.id)
-                        );
-                        const productSnaps = await Promise.all(
-                            productRefs.map(ref => transaction.get(ref))
-                        );
-
-                        const insufficientItems = [];
-                        productSnaps.forEach((snap, index) => {
-                            const item = orderData.items[index];
-                            const isActive = snap.exists() && snap.data().status === 'active';
-                            const currentStock = snap.exists() ? (snap.data().stock || 0) : 0;
-                            if (!isActive) {
-                                insufficientItems.push(`${item.name}（已下架）`);
-                            } else if (currentStock < item.quantity) {
-                                insufficientItems.push(`${item.name}（剩 ${currentStock} 件）`);
-                            }
-                        });
-
-                        if (insufficientItems.length > 0) {
-                            throw new Error(
-                                `以下商品在您結帳的同時已售完或下架：${insufficientItems.join('、')}，請返回購物車調整數量`
-                            );
-                        }
-
-                        transaction.set(orderRef, orderData);
-                        productRefs.forEach((ref, index) => {
-                            transaction.update(ref, {
-                                stock: firebaseServices.increment(-orderData.items[index].quantity),
-                                lastUpdated: firebaseServices.serverTimestamp()
-                            });
-                        });
-                    });
-
-                    const docRef = orderRef;
-                    console.log('訂單已創建，ID:', docRef.id);
-                    console.log('訂單編號:', orderNumber);
-
-                    // 第六步：清空購物車
+                    // 第三步：清空購物車
                     localStorage.removeItem('cart');
-                    
-                    // 第七步：保存訂單號到 sessionStorage
+
+                    // 第四步：保存訂單號到 sessionStorage
                     sessionStorage.setItem('lastOrder', JSON.stringify({
-                        id: docRef.id,
-                        orderNumber: orderNumber,
-                        total: orderData.total,
-                        items: cart.length,
-                        customerName: orderData.customer.name,
-                        customerPhone: orderData.customer.phone,
+                        id: result.orderId,
+                        orderNumber: result.orderNumber,
+                        total: result.total,
+                        items: result.itemCount,
+                        customerName: name.trim(),
+                        customerPhone: phone.trim(),
                         orderDate: localDateString()
                     }));
-                    
-                    // 第八步：顯示成功訊息並跳轉
-                    showSuccessMessage(orderNumber, orderData.total);
-                    
+
+                    // 第五步：顯示成功訊息並跳轉（金額用伺服器算出的總額）
+                    showSuccessMessage(result.orderNumber, result.total);
+
                     // 3秒後跳轉到成功頁面
                     setTimeout(() => {
                         window.location.href = '/order-success.html?payment=' + encodeURIComponent(payment);
@@ -1789,7 +1659,12 @@ if (shipping === 'store') {
                     
                 } catch (error) {
                     console.error('提交訂單時出錯:', error);
-                    showErrorMessage(error.message);
+                    // Cloud Function 回傳的 failed-precondition / invalid-argument 是給顧客看的說明
+                    // （例如商品已售完、價格已更新），其他錯誤（連線失敗、伺服器錯誤）顯示通用訊息
+                    const code = String(error && error.code || '');
+                    showErrorMessage(code === 'functions/failed-precondition' || code === 'functions/invalid-argument'
+                        ? error.message
+                        : '訂單送出失敗，請檢查網路連線後再試');
                     
                     // 重新啟用提交按鈕
                     if (submitOrderBtn) {
