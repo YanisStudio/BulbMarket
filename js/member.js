@@ -27,29 +27,45 @@ function injectBrowserWarningStyles() {
             inset: 0;
             z-index: 99999;
             display: flex;
-            align-items: flex-end;
+            align-items: center;
             justify-content: center;
-            background: rgba(0, 0, 0, 0.45);
+            padding: 20px;
+            box-sizing: border-box;
+            background: rgba(0, 0, 0, 0.55);
         }
 
         .browser-warning-content {
             width: 100%;
-            max-width: 420px;
+            max-width: 340px;
             background: #fff;
-            border-radius: 14px 14px 0 0;
-            padding: 22px 20px calc(18px + env(safe-area-inset-bottom));
-            text-align: left;
+            border-radius: 14px;
+            padding: 26px 22px 18px;
+            text-align: center;
             box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+        }
+
+        .browser-warning-icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 12px;
+            border-radius: 50%;
+            background: #e8f5e9;
+            color: #2e7d32;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.3rem;
         }
 
         .browser-warning-content h2 {
-            margin: 0 0 6px;
-            font-size: 1.1rem;
+            margin: 0 0 8px;
+            font-size: 1.15rem;
             color: #333;
         }
 
         .browser-warning-content p {
-            margin: 0 0 18px;
+            margin: 0 0 20px;
             font-size: 0.95rem;
             line-height: 1.6;
             color: #666;
@@ -76,52 +92,98 @@ function injectBrowserWarningStyles() {
             color: #fff;
         }
 
+        .browser-warning-outline {
+            border: 1px solid #2e7d32;
+            background: #fff;
+            color: #2e7d32;
+        }
+
         .browser-warning-secondary {
             border: none;
             background: none;
             color: #888;
         }
-
-        @media (min-width: 600px) {
-            .browser-warning {
-                align-items: center;
-            }
-
-            .browser-warning-content {
-                border-radius: 14px;
-            }
-        }
     `;
     document.head.appendChild(styles);
 }
 
+/**
+ * 建立一個內建瀏覽器用的小彈窗（進站提示、Google 登入被擋時共用）
+ * @param {string} id
+ * @param {{icon: string, title: string, text: string, buttons: Array<{text: string, style: string, onClick: function(HTMLButtonElement)}>}} options
+ */
+function createBrowserDialog(id, options) {
+    injectBrowserWarningStyles();
+    const existing = document.getElementById(id);
+    if (existing) existing.remove();
+
+    const dialog = document.createElement('div');
+    dialog.id = id;
+    dialog.className = 'browser-warning';
+    dialog.setAttribute('role', 'dialog');
+    dialog.setAttribute('aria-modal', 'true');
+    dialog.innerHTML = `
+        <div class="browser-warning-content">
+            <div class="browser-warning-icon"><i class="fas ${options.icon}"></i></div>
+            <h2>${options.title}</h2>
+            <p>${options.text}</p>
+            <div class="browser-warning-actions"></div>
+        </div>
+    `;
+    const actions = dialog.querySelector('.browser-warning-actions');
+    options.buttons.forEach(function(button) {
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'browser-warning-' + button.style;
+        el.textContent = button.text;
+        el.addEventListener('click', function() { button.onClick(el); });
+        actions.appendChild(el);
+    });
+    document.body.appendChild(dialog);
+    return dialog;
+}
+
+// 進站提示：請改用瀏覽器開啟
 function injectBrowserWarningHTML() {
     if (document.querySelector('#browser-warning')) return;
-
-    const appName = BrowserDetection.getBrowserName();
-    const primaryText = BrowserDetection.canOpenExternally() ? '用瀏覽器開啟' : '複製網址';
-    const hint = BrowserDetection.canOpenExternally()
-        ? `在 ${appName} 裡可能無法登入，建議用手機的瀏覽器開啟。`
-        : `在 ${appName} 裡可能無法登入，可點右上角「⋯」改用瀏覽器開啟。`;
-
-    document.body.insertAdjacentHTML('beforeend', `
-        <div id="browser-warning" class="browser-warning" style="display: none;" role="dialog" aria-modal="true" aria-labelledby="browser-warning-title">
-            <div class="browser-warning-content">
-                <h2 id="browser-warning-title">請用瀏覽器開啟</h2>
-                <p>${hint}</p>
-                <div class="browser-warning-actions">
-                    <button type="button" class="browser-warning-primary" id="browser-warning-open">${primaryText}</button>
-                    <button type="button" class="browser-warning-secondary" id="browser-warning-continue">繼續瀏覽</button>
-                </div>
-            </div>
-        </div>
-    `);
-
-    document.getElementById('browser-warning-open').addEventListener('click', function() {
-        BrowserDetection.openInExternalBrowser(this);
+    const canOpen = BrowserDetection.canOpenExternally();
+    const dialog = createBrowserDialog('browser-warning', {
+        icon: 'fa-external-link-alt',
+        title: '請用瀏覽器開啟',
+        text: canOpen
+            ? `在 ${BrowserDetection.getBrowserName()} 裡可能無法登入，建議用手機的瀏覽器開啟。`
+            : `在 ${BrowserDetection.getBrowserName()} 裡可能無法登入，可點右上角「⋯」改用瀏覽器開啟。`,
+        buttons: [
+            { text: canOpen ? '用瀏覽器開啟' : '複製網址', style: 'primary', onClick: (el) => BrowserDetection.openInExternalBrowser(el) },
+            { text: '繼續瀏覽', style: 'secondary', onClick: () => BrowserDetection.closeBrowserWarning() }
+        ]
     });
-    document.getElementById('browser-warning-continue').addEventListener('click', function() {
-        BrowserDetection.closeBrowserWarning();
+    dialog.style.display = 'none';
+}
+
+// 在 App 內建瀏覽器按「使用 Google 登入」時：Google 不允許在這裡登入，
+// 讓顧客選擇用瀏覽器開啟，或直接改用電話登入
+function showGoogleLoginBlockedDialog() {
+    const canOpen = BrowserDetection.canOpenExternally();
+    const dialog = createBrowserDialog('google-login-blocked', {
+        icon: 'fa-exclamation',
+        title: `${BrowserDetection.getBrowserName()} 裡無法用 Google 登入`,
+        text: canOpen ? '請用瀏覽器開啟，或改用電話號碼登入。' : '請複製網址到瀏覽器開啟，或改用電話號碼登入。',
+        buttons: [
+            { text: canOpen ? '用瀏覽器開啟' : '複製網址', style: 'primary', onClick: (el) => BrowserDetection.openInExternalBrowser(el) },
+            {
+                text: '改用電話登入',
+                style: 'outline',
+                onClick: () => {
+                    dialog.remove();
+                    if (window.authModals) {
+                        window.authModals.hideModal('login-modal');
+                        window.authModals.showModal('phone-modal');
+                    }
+                }
+            },
+            { text: '取消', style: 'secondary', onClick: () => dialog.remove() }
+        ]
     });
 }
 
@@ -250,15 +312,13 @@ const BrowserDetection = {
         this.openInExternalBrowser(document.getElementById('browser-warning-open'));
     },
 
-    // LINE 內建瀏覽器無法使用 Google / Facebook 登入，按下時改提示其他方式
+    // Google 不允許在 App 內建瀏覽器（LINE、Facebook、IG…）裡登入，會顯示 403 disallowed_useragent；
+    // Facebook 登入在 LINE 裡也常失敗。按下時改跳出彈窗，讓顧客用瀏覽器開啟或改用電話登入
     handleLoginButtonClick(loginType) {
-        if (this.isLINEBrowser() && (loginType === 'google' || loginType === 'facebook')) {
-            const message = 'LINE 裡無法使用 Google 登入。\n請改用電話號碼登入，或用瀏覽器開啟本頁。';
-            if (window.showMemberWarningModal) {
-                window.showMemberWarningModal('請改用電話登入', message);
-            } else {
-                alert(message);
-            }
+        const blocked = (loginType === 'google' && this.isInAppBrowser())
+            || (loginType === 'facebook' && this.isLINEBrowser());
+        if (blocked) {
+            showGoogleLoginBlockedDialog();
             return false;
         }
         return true;
