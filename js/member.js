@@ -143,6 +143,11 @@ function createBrowserDialog(id, options) {
     return dialog;
 }
 
+// Facebook、IG 等沒有官方的跳轉方式，自動跳轉可能失敗，順便提示右上角選單（LINE 不需要）
+function menuHint() {
+    return BrowserDetection.isLINEBrowser() ? '' : '<br>也可點右上角「⋯」選瀏覽器開啟。';
+}
+
 // 進站提示：請改用瀏覽器開啟
 function injectBrowserWarningHTML() {
     if (document.querySelector('#browser-warning')) return;
@@ -150,9 +155,7 @@ function injectBrowserWarningHTML() {
     const dialog = createBrowserDialog('browser-warning', {
         icon: 'fa-external-link-alt',
         title: '請用瀏覽器開啟',
-        text: canOpen
-            ? `在 ${BrowserDetection.getBrowserName()} 裡可能無法登入，建議用手機的瀏覽器開啟。`
-            : `在 ${BrowserDetection.getBrowserName()} 裡可能無法登入，可點右上角「⋯」改用瀏覽器開啟。`,
+        text: `在 ${BrowserDetection.getBrowserName()} 裡可能無法登入。` + menuHint(),
         buttons: [
             { text: canOpen ? '用瀏覽器開啟' : '複製網址', style: 'primary', onClick: (el) => BrowserDetection.openInExternalBrowser(el) },
             { text: '繼續瀏覽', style: 'secondary', onClick: () => BrowserDetection.closeBrowserWarning() }
@@ -168,7 +171,7 @@ function showGoogleLoginBlockedDialog() {
     const dialog = createBrowserDialog('google-login-blocked', {
         icon: 'fa-exclamation',
         title: `${BrowserDetection.getBrowserName()} 裡無法用 Google 登入`,
-        text: canOpen ? '請用瀏覽器開啟，或改用電話號碼登入。' : '請複製網址到瀏覽器開啟，或改用電話號碼登入。',
+        text: (canOpen ? '請用瀏覽器開啟，或改用電話登入。' : '請複製網址到瀏覽器開啟，或改用電話登入。') + menuHint(),
         buttons: [
             { text: canOpen ? '用瀏覽器開啟' : '複製網址', style: 'primary', onClick: (el) => BrowserDetection.openInExternalBrowser(el) },
             {
@@ -197,6 +200,12 @@ const BrowserDetection = {
 
     isAndroid() {
         return /android/i.test(navigator.userAgent);
+    },
+
+    // iPadOS 13 以後的 User-Agent 會偽裝成 Mac，要再看是不是觸控螢幕
+    isIOS() {
+        return /iPhone|iPad|iPod/i.test(navigator.userAgent) ||
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     },
 
     isMobile() {
@@ -228,10 +237,10 @@ const BrowserDetection = {
         return 'App 內建瀏覽器';
     },
 
-    // LINE 有官方參數可以直接跳到手機瀏覽器；Android 可以用 intent 開預設瀏覽器。
-    // 其他情況（例如 iPhone 的 Facebook / IG）沒有可靠的方法，只能複製網址
+    // LINE 有官方參數可以直接跳到手機瀏覽器；Android 可以用 intent 開預設瀏覽器；
+    // iPhone 用 x-safari-https://（iOS 17 起支援，非 Apple 公開文件）跳到 Safari，失敗就改成複製網址
     canOpenExternally() {
-        return this.isLINEBrowser() || this.isAndroid();
+        return this.isLINEBrowser() || this.isAndroid() || this.isIOS();
     },
 
     openInExternalBrowser(button) {
@@ -248,6 +257,25 @@ const BrowserDetection = {
         if (this.isAndroid()) {
             const url = new URL(currentUrl);
             window.location.href = `intent://${url.host}${url.pathname}${url.search}${url.hash}#Intent;scheme=${url.protocol.replace(':', '')};end`;
+            return;
+        }
+
+        if (this.isIOS()) {
+            // 先趁還在點擊事件裡複製網址（之後才複製會被 iOS 擋），再試著跳到 Safari
+            let copied = false;
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(currentUrl).then(() => { copied = true; }).catch(() => {});
+            }
+            window.location.href = 'x-safari-' + currentUrl;
+            // 1.5 秒後頁面還在前景，代表沒跳過去（iOS 太舊或被擋）
+            setTimeout(() => {
+                if (document.hidden) return;
+                if (copied) {
+                    if (button) button.textContent = '已複製，請貼到瀏覽器';
+                } else {
+                    this.copyUrl(currentUrl, button);
+                }
+            }, 1500);
             return;
         }
 
