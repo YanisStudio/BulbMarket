@@ -266,7 +266,7 @@
 // 由後台「內容管理 → 栽培小知識」編輯。網址 ?category=分類名稱 篩選列表、?id=文章ID 顯示單篇
 const PAGE_SIZE = 9;
 let lastConnectionResetAt = 0;
-const CONNECTION_RESET_COOLDOWN_MS = 60000;
+const CONNECTION_RESET_COOLDOWN_MS = 20000;
 
 document.addEventListener('DOMContentLoaded', function() {
     initCommonFeatures();
@@ -290,7 +290,7 @@ async function loadKnowledge(attempt = 1) {
     } catch (error) {
         console.error(`載入栽培小知識失敗（第 ${attempt} 次嘗試）:`, error);
         // 跟商品頁一樣：連續失敗才重建 Firestore 連線，60 秒內不重複重建
-        if (attempt >= 2 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
+        if (Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
             lastConnectionResetAt = Date.now();
             if (window.resetFirestoreConnection) await window.resetFirestoreConnection();
         }

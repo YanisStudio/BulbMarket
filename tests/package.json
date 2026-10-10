@@ -1,0 +1,10 @@
+{
+  "name": "bulbmarket-tests",
+  "private": true,
+  "type": "module",
+  "description": "一致性檢查、單元測試、Firestore 規則權限矩陣、連線問題重現腳本",
+  "dependencies": {
+    "jsdom": "^27.0.0",
+    "puppeteer": "^25.13.0"
+  }
+}

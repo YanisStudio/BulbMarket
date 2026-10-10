@@ -420,7 +420,7 @@ let currentPageNum = 1;
 
 // 記錄上次自動重建 Firestore 連線的時間，避免網路真的斷線很久時無限重建
 let lastConnectionResetAt = 0;
-const CONNECTION_RESET_COOLDOWN_MS = 60000;
+const CONNECTION_RESET_COOLDOWN_MS = 20000;
 
 // DOM 載入完成後初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -441,6 +441,8 @@ function initProductsPage() {
     // 先用瀏覽器記住的分類清單填好下拉選單（網址帶的 ?category= 才能馬上對得上），
     // 讀到最新清單後再更新一次
     populateCategoryFilter(ProductCategories.getCached());
+    // 連線不穩時第一次會讀不到分類、只能先用預設清單，背景重試成功後補上正確的
+    ProductCategories.onUpdate(populateCategoryFilter);
     ProductCategories.load().then(populateCategoryFilter);
 
     loadProducts();
@@ -531,7 +533,7 @@ async function loadProducts(attempt = 1) {
         // 是同一個原因）。用 resetFirestoreConnection() 換一個全新的連線
         // 物件，不用真的重新整理整頁。60 秒節流，避免網路真的斷線很久時
         // 一直重建連線
-        if (attempt >= 2 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
+        if (Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
             lastConnectionResetAt = Date.now();
             if (window.resetFirestoreConnection) {
                 await window.resetFirestoreConnection();

@@ -93,9 +93,37 @@
         return readCache() || cloneDefaults();
     }
 
-    // 從 Firestore 讀取最新清單；文件不存在（後台還沒存過）就用預設值，
-    // 讀取失敗則退回 getCached()，不讓分類問題影響整個頁面
-    async function load() {
+    // 連線恢復、背景重試成功後要通知誰重畫
+    const updateListeners = [];
+
+    /**
+     * 註冊「分類清單更新了」的回呼。
+     * load() 第一次失敗時只能先回傳預設值，畫面上的分類會變成內建的那幾個
+     *（而且大多沒有圖片）。等背景重試成功，這裡註冊的函數就會被呼叫，
+     * 畫面自動補上正確的分類，使用者不用重新整理。
+     */
+    function onUpdate(listener) {
+        if (typeof listener === 'function') updateListeners.push(listener);
+    }
+
+    function notifyUpdate(list) {
+        updateListeners.forEach(function(listener) {
+            try {
+                listener(list);
+            } catch (error) {
+                console.error('分類更新回呼出錯:', error);
+            }
+        });
+    }
+
+    // 從 Firestore 讀取最新清單；文件不存在（後台還沒存過）就用預設值。
+    //
+    // 讀取失敗時會「在背景持續重試」，不是失敗一次就放棄——Firestore 連線偶爾會卡住
+    // 十幾秒（見 common.js 的 resetFirestoreConnection），商品列表本來就會自動重試到
+    // 成功，但分類以前只試一次，結果變成「商品都load出來了，分類卻一直停在預設清單」，
+    // 畫面上就是一排沒有圖片的幼苗圖示。重試成功後透過 onUpdate 通知畫面重畫。
+    async function load(attempt) {
+        const tryCount = attempt || 1;
         const services = window.firebaseServices;
         if (!services || !services.db || !services.doc || !services.getDoc) {
             return getCached();
@@ -106,9 +134,16 @@
             const list = items || cloneDefaults();
             writeCache(list);
             renderFooterLinks(list);
+            // 第一次就成功的話，呼叫端自己的 .then() 會處理；這裡只在重試成功時通知
+            if (tryCount > 1) {
+                console.log('商品分類已在第 ' + tryCount + ' 次嘗試載入成功');
+                notifyUpdate(list);
+            }
             return list;
         } catch (error) {
-            console.warn('讀取商品分類失敗，改用先前的分類清單:', error);
+            console.warn('讀取商品分類失敗（第 ' + tryCount + ' 次嘗試），將在背景重試:', error);
+            // 間隔漸增、封頂 8 秒，跟商品列表的重試節奏一致
+            setTimeout(function() { load(tryCount + 1); }, Math.min(tryCount * 1000, 8000));
             return getCached();
         }
     }
@@ -170,6 +205,7 @@
         DEFAULT_CATEGORIES: DEFAULT_CATEGORIES,
         getCached: getCached,
         load: load,
+        onUpdate: onUpdate,
         productCategoryIds: productCategoryIds,
         productInCategory: productInCategory,
         findById: findById,
