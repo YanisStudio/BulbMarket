@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head><meta charset="UTF-8"><title>Firestore 連線模式比較</title></head>
+<body>
+<div id="out">測試中…</div>
+<script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { initializeFirestore, collection, query, where, getDocsFromServer }
+        from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+    // ?mode=force  → experimentalForceLongPolling: true（目前正式站的設定）
+    // ?mode=auto   → 不指定，用 SDK 預設的自動偵測
+    const mode = new URLSearchParams(location.search).get('mode') || 'auto';
+
+    const app = initializeApp({
+        apiKey: "AIzaSyCGej6Feghnsz-J77NrVgFZVP-pPrlvsgU",
+        authDomain: "bulb-market-217c4.firebaseapp.com",
+        projectId: "bulb-market-217c4",
+        storageBucket: "bulb-market-217c4.firebasestorage.app",
+        messagingSenderId: "829365637409",
+        appId: "1:829365637409:web:7e1cb6647af154ca9d6e60"
+    });
+
+    const settings = mode === 'force' ? { experimentalForceLongPolling: true } : {};
+    const db = initializeFirestore(app, settings);
+
+    const t0 = Date.now();
+    try {
+        const snap = await getDocsFromServer(query(collection(db, 'products'), where('status', '==', 'active')));
+        window.__result = { mode, ok: true, ms: Date.now() - t0, count: snap.size };
+    } catch (e) {
+        window.__result = { mode, ok: false, ms: Date.now() - t0, error: String(e.code || e.message).slice(0, 60) };
+    }
+    document.getElementById('out').textContent = JSON.stringify(window.__result);
+    document.title = 'done';
+</script>
+</body>
+</html>

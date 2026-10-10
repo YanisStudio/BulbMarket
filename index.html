@@ -461,8 +461,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化共用功能
     initCommonFeatures();
 
-    // 商品分類入口：先用瀏覽器記住的清單立刻畫出來，讀到最新清單後再更新
+    // 商品分類入口：先用瀏覽器記住的清單立刻畫出來，讀到最新清單後再更新。
+    // onUpdate 是為了連線不穩的情況——第一次讀取失敗只能先顯示預設分類
+    //（大多沒有圖片），背景重試成功後會再呼叫一次把正確的分類補上
     renderCategoryTiles(ProductCategories.getCached());
+    ProductCategories.onUpdate(renderCategoryTiles);
     ProductCategories.load().then(renderCategoryTiles);
 
     // 加載首頁輪播圖片
@@ -500,7 +503,7 @@ function renderCategoryTiles(categories) {
 
 // 從 Firebase 讀取首頁輪播圖片（settings/bulletin 這份固定文件的 items 陣列，
 // 由後台「布告欄管理」上傳）。一張圖片都沒有、或讀取失敗時，改顯示文字版主視覺
-async function loadHomeCarousel() {
+async function loadHomeCarousel(attempt = 1) {
     const carousel = document.getElementById('home-carousel');
     const hero = document.getElementById('home-hero');
     const showHeroInstead = function() {
@@ -537,10 +540,17 @@ async function loadHomeCarousel() {
             return;
         }
 
+        // 前一次嘗試失敗時已經把輪播藏起來、改顯示文字版主視覺，這裡要還原回來
+        if (carousel) carousel.hidden = false;
+        if (hero) hero.style.display = 'none';
         initHomeCarousel(carousel, imageUrls);
     } catch (error) {
-        console.error('載入首頁輪播失敗:', error);
+        // 連線不穩時不要就這樣放棄——以前失敗一次就永久改顯示文字版主視覺，
+        // 即使幾秒後連線恢復、商品都載入成功了，輪播圖還是不會出現，
+        // 要使用者自己重新整理才看得到。先顯示文字版墊著，背景繼續重試
+        console.warn(`載入首頁輪播失敗（第 ${attempt} 次嘗試），將在背景重試:`, error);
         showHeroInstead();
+        setTimeout(() => loadHomeCarousel(attempt + 1), Math.min(attempt * 1000, 8000));
     }
 }
 
@@ -666,7 +676,7 @@ function updateFeaturedSliderArrows() {
 // 但陣列是空的，就直接代表真的沒設定精選商品，不需要再額外重試確認。
 // 記錄上次自動重建 Firestore 連線的時間，避免網路真的斷線很久時無限重建
 let lastConnectionResetAt = 0;
-const CONNECTION_RESET_COOLDOWN_MS = 60000;
+const CONNECTION_RESET_COOLDOWN_MS = 20000;
 
 async function loadFeaturedProducts(attempt = 1) {
     try {
@@ -692,7 +702,7 @@ async function loadFeaturedProducts(attempt = 1) {
         // 第 1 次失敗先不出手，連第 2 次也失敗才換一個全新的 Firestore
         // 連線物件再繼續重試，原因見 products.html 的同一段註解。
         // 60 秒節流避免無限重建
-        if (attempt >= 2 && Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
+        if (Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
             lastConnectionResetAt = Date.now();
             if (window.resetFirestoreConnection) {
                 await window.resetFirestoreConnection();

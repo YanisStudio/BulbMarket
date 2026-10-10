@@ -109,6 +109,9 @@ class AuthModals {
         
         // 電話登入相關事件
         this.bindPhoneLoginEvents();
+
+        // 鍵盤操作（Esc 關閉、Tab 鎖在彈窗內）
+        this.bindKeyboard();
     }
 
     // 綁定登入按鈕
@@ -194,15 +197,62 @@ class AuthModals {
         });
     }
 
+    // 目前開啟中的彈窗（沒有就回傳 null）
+    openModal() {
+        return ['login-modal', 'phone-modal']
+            .map(id => document.getElementById(id))
+            .find(m => m && m.style.display === 'block') || null;
+    }
+
+    /**
+     * 鍵盤操作：Esc 關閉、Tab 鎖在彈窗內。
+     * 原本這兩個彈窗只能用滑鼠點關閉鈕或點背景關掉，用鍵盤的人按 Esc 沒反應，
+     * 而且 Tab 會跑到彈窗後面被遮住的頁面元素上，焦點就消失在看不見的地方。
+     * 商品詳細介紹彈窗（js/common.js）已經有同一套處理，這裡補上讓兩邊一致。
+     */
+    bindKeyboard() {
+        document.addEventListener('keydown', (e) => {
+            const modal = this.openModal();
+            if (!modal) return;
+
+            if (e.key === 'Escape') {
+                this.hideModal(modal.id);
+                if (this.lastTrigger && document.body.contains(this.lastTrigger)) {
+                    this.lastTrigger.focus();
+                }
+                return;
+            }
+
+            if (e.key !== 'Tab') return;
+            const focusables = modal.querySelectorAll(
+                'button:not([disabled]), [href], input:not([disabled]), select, textarea, [tabindex]:not([tabindex="-1"])'
+            );
+            if (focusables.length === 0) return;
+            const first = focusables[0];
+            const last = focusables[focusables.length - 1];
+            if (e.shiftKey && document.activeElement === first) {
+                e.preventDefault();
+                last.focus();
+            } else if (!e.shiftKey && document.activeElement === last) {
+                e.preventDefault();
+                first.focus();
+            }
+        });
+    }
+
     // 顯示彈窗
     showModal(modalId) {
         const modal = document.getElementById(modalId);
         if (modal) {
+            // 記住是從哪裡開啟的，關閉時把焦點還回去
+            if (!this.openModal()) this.lastTrigger = document.activeElement;
             modal.style.display = 'block';
-            // 自動聚焦到第一個輸入框
+            // 自動聚焦到第一個輸入框；沒有輸入框（登入方式選單）就聚焦第一顆按鈕，
+            // 這樣鍵盤使用者一開窗焦點就在彈窗裡，不會還留在背後的頁面上
             const firstInput = modal.querySelector('input[type="tel"], input[type="text"]');
-            if (firstInput) {
-                setTimeout(() => firstInput.focus(), 100);
+            const target = firstInput || modal.querySelector('button:not([disabled])');
+            if (target) {
+                setTimeout(() => target.focus(), 100);
             }
         }
     }
