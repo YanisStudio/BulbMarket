@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="/css/cart.css">
     <link rel="stylesheet" href="/css/order-success.css">
     <link rel="stylesheet" href="/css/auth-modals.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <!-- Firebase SDK引入 -->
     <script src="/js/firebase-config.js"></script>
@@ -59,12 +59,12 @@
             setDoc,
             getDoc,
             getDocs,
-            updateDoc,  // 添加這個重要的引入
             query,
             orderBy,
             where,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
         const firebaseConfig = window.FIREBASE_CONFIG;
 
@@ -74,8 +74,11 @@
         // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
         // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
         const db = initializeFirestore(app, { experimentalForceLongPolling: true });
-        
+        // 追加訂單備註的 Cloud Function（functions/append-order-note.js）部署在台灣機房 asia-east1
+        const functions = getFunctions(app, 'asia-east1');
+
         window.firebaseServices = {
+            appendOrderNote: httpsCallable(functions, 'appendOrderNote'),
             auth: auth,
             db: db,
             getAuth,
@@ -86,7 +89,6 @@
             doc,
             setDoc,
             getDoc,
-            updateDoc,  // 添加到 window.firebaseServices
             collection,
             getDocs,
             query,
@@ -664,7 +666,6 @@
     <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
-    <script src="/js/cart.js"></script>
 
     <!-- 訂單完成頁面功能 -->
     <script>
@@ -962,10 +963,10 @@
             // 檢查用戶是否已登入
             checkLoginStatus();
             
-            // 清空購物車
-            localStorage.removeItem('cart');
-            
-            // 更新購物車計數
+            // 這裡不要清購物車：訂單成立的當下 payment.html 就已經清掉了。
+            // sessionStorage 的 lastOrder 會留在整個分頁工作階段裡，顧客下完單後
+            // 又挑了新商品、再用上一頁／瀏覽紀錄回到這一頁時，原本這行會把那些
+            // 新選的商品一起清空，而且顧客完全不會知道發生了什麼事
             updateCartCount();
             
             // 處理匯款確認表單
@@ -991,7 +992,7 @@
                         submitBtn.textContent = '送出中...';
                     }
 
-                    // 先確認 Firestore 真的寫入成功，才顯示「已收到」的成功畫面——
+                    // 先確認真的寫入成功，才顯示「已收到」的成功畫面——
                     // 之前是先顯示成功、才在背景偷偷寫入，寫入失敗（例如權限被拒）
                     // 顧客完全不會發現，畫面看起來一切正常但資料其實沒存到
                     try {
@@ -1001,29 +1002,32 @@
                         }
                         const lastOrder = JSON.parse(lastOrderJSON);
                         const orderId = lastOrder.id;
-                        if (!orderId || !window.firebaseServices) {
+                        if (!orderId || !window.firebaseServices?.appendOrderNote) {
                             throw new Error('找不到訂單編號，請直接到「訂單記錄」頁面回報匯款');
                         }
 
-                        const paymentNote = `【匯款確認】匯款人姓名: ${remitterName}, 匯款銀行: ${transferBank}, 匯款金額: ${transferAmountInput}, 對帳後五碼: ${lastFiveDigits}, 匯款時間: ${transferDate}, 備註: ${transferNote || '無'}, 確認時間: ${new Date().toLocaleString()}`;
-
-                        const orderRef = window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId);
-                        const orderSnap = await window.firebaseServices.getDoc(orderRef);
-                        if (!orderSnap.exists()) {
-                            throw new Error('找不到訂單資料，請直接到「訂單記錄」頁面回報匯款');
-                        }
-                        const existingNotes = orderSnap.data().notes || '';
-                        const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
-
-                        // 只把匯款資訊寫進備註（【匯款確認】標記），不直接改成已付款：
-                        // 顧客回報不等於款項真的入帳，要等管理員對帳後在後台改成「已付款」，
-                        // 那時 Cloud Function 才會寄出「付款已確認」通知信。
-                        // 訂單記錄頁靠備註裡的標記顯示「已回報匯款，待確認」（見 common.js 的 isPaymentReported）
-                        await window.firebaseServices.updateDoc(orderRef, {
-                            notes: updatedNotes
+                        // 透過 Cloud Function appendOrderNote 追加備註：備註格式
+                        //（【匯款確認】標記、確認時間）由伺服器產生，而且只會往後接，
+                        // 不會覆蓋既有內容。Firestore 規則已經禁止網頁端直接改訂單。
+                        //
+                        // 這裡只把匯款資訊寫進備註，不直接改成已付款：顧客回報不等於
+                        // 款項真的入帳，要等管理員對帳後在後台改成「已付款」，那時
+                        // Cloud Function 才會寄出「付款已確認」通知信。訂單記錄頁靠備註裡的
+                        // 標記顯示「已回報匯款・待確認」（見 common.js 的 isPaymentReported）
+                        await window.firebaseServices.appendOrderNote({
+                            orderIds: [orderId],
+                            kind: 'payment',
+                            payment: {
+                                remitterName: remitterName,
+                                bank: transferBank,
+                                amount: transferAmountInput,
+                                lastFiveDigits: lastFiveDigits,
+                                date: transferDate,
+                                note: transferNote
+                            }
                         });
 
-                        // Firestore 確認寫入成功，才顯示確認畫面
+                        // 確認寫入成功，才顯示確認畫面
                         const confirmationForm = document.getElementById('transfer-confirmation-form');
                         if (confirmationForm) {
                             confirmationForm.classList.add('transfer-confirmed');
@@ -1033,9 +1037,9 @@
                                 <div class="confirmed-info">
                                     <p><strong>匯款人姓名:</strong> ${escapeHtml(remitterName)}</p>
                                     <p><strong>匯款銀行:</strong> ${escapeHtml(transferBank)}</p>
-                                    <p><strong>匯款金額:</strong> ${transferAmountInput}</p>
-                                    <p><strong>對帳後五碼:</strong> ${lastFiveDigits}</p>
-                                    <p><strong>匯款時間:</strong> ${transferDate}</p>
+                                    <p><strong>匯款金額:</strong> ${escapeHtml(transferAmountInput)}</p>
+                                    <p><strong>對帳後五碼:</strong> ${escapeHtml(lastFiveDigits)}</p>
+                                    <p><strong>匯款時間:</strong> ${escapeHtml(transferDate)}</p>
                                     ${transferNote ? `<p><strong>備註:</strong> ${escapeHtml(transferNote)}</p>` : ''}
                                     <p><strong>確認時間:</strong> ${new Date().toLocaleString()}</p>
                                     <p class="confirmation-thankyou">感謝您的匯款確認，我們將盡快處理您的訂單！</p>
@@ -1067,7 +1071,7 @@
                         console.error('匯款確認寫入失敗:', error);
                         confirmationMessage.innerHTML = `
                             <div class="confirmed-info" style="color:#b23a32;">
-                                <p><strong>送出失敗：</strong>${escapeHtml(error.message || '請稍後再試')}</p>
+                                <p><strong>送出失敗：</strong>${escapeHtml(appendNoteErrorMessage(error))}</p>
                                 <p>請確認網路連線後重新送出，或直接到「訂單記錄」頁面回報匯款。</p>
                             </div>
                         `;

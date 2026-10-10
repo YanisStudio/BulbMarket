@@ -25,7 +25,7 @@
     <link rel="stylesheet" href="/css/checkout.css">
     <!-- 新增彈窗樣式 -->
     <link rel="stylesheet" href="/css/auth-modals.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <!-- 載入效果樣式 -->
     <style>
@@ -742,7 +742,6 @@
     <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
-    <script src="/js/cart.js"></script>
     <script src="/js/tw-districts.js"></script>
 
     <!-- 結帳頁面功能 - 含載入動畫 -->
@@ -897,10 +896,6 @@
             // 「7-11取貨」模式下 address 欄位是門市名稱，跟住家地址無關
             let profileHomeAddress = '';
 
-            // 送出訂單時，用這份「向 Firestore 驗證過」的商品明細（id/name/price）
-            // 取代購物車裡使用者端可任意竄改的資料，由 validateCartStock() 填入
-            let verifiedCartItems = null;
-            
             // 顯示主載入覆蓋層
             showMainLoadingOverlay();
             
@@ -1082,8 +1077,8 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
             function loadUserProfile(user) {
                 const uid = user.uid;
                 
-                // 設定電子郵件欄位
-                document.getElementById('email').value = user.email;
+                // 設定電子郵件欄位（手機號碼登入的會員沒有 email）
+                document.getElementById('email').value = user.email || '';
                 
                 // 從 Firestore 獲取用戶資料
                 firebaseServices.getDoc(firebaseServices.doc(firebaseServices.db, 'users', uid))
@@ -1104,8 +1099,14 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                                 document.getElementById('address').value = profileHomeAddress;
                             }
                         } else {
-                            // 使用默認值
-                            document.getElementById('name').value = user.email.split('@')[0];
+                            // 使用默認值。手機號碼登入的會員沒有 email（是 null），
+                            // 直接 .split() 會丟 TypeError，連電話也不會自動填入
+                            if (user.email) {
+                                document.getElementById('name').value = user.email.split('@')[0];
+                            }
+                            if (user.phoneNumber) {
+                                document.getElementById('phone').value = user.phoneNumber.replace(/^\+886/, '0');
+                            }
                         }
                     })
                     .catch((error) => {
@@ -1426,9 +1427,13 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
             // 啟動初始化
             initializeCheckout();
             
-            // 檢查庫存、並用 Firestore 裡的真實價格驗證購物車
-            //（購物車存在瀏覽器 localStorage，價格欄位使用者端可以任意竄改，
-            //  不能拿來直接算訂單金額，一定要用這裡查回來的 Firestore 資料為準）
+            // 送出前先在瀏覽器端查一次庫存與價格，純粹是為了給顧客比較好的提示
+            //（一次列出所有有問題的商品、不用等建立訂單失敗才知道）。
+            //
+            // 這不是安全機制：訂單金額一律由 Cloud Function createOrder
+            //（functions/create-order.js）用 Firestore 上的商品資料在伺服器端重新計算，
+            // 連同扣庫存放在同一個 transaction，而且 Firestore 規則禁止網頁端直接寫入
+            // orders。這裡查到的結果只用來顯示訊息，不會被拿去算錢
             async function validateCartStock() {
                 try {
                     console.log('開始驗證庫存與價格...');
@@ -1447,7 +1452,6 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                     // 獲取所有商品目前的真實庫存與價格
                     const stockValidationResults = [];
                     const priceMismatchItems = [];
-                    const verifiedItems = [];
 
                     for (const item of mergedCart) {
                         try {
@@ -1480,13 +1484,6 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                                         newPrice: realPrice
                                     });
                                 }
-
-                                verifiedItems.push({
-                                    id: item.id,
-                                    name: productData.name || item.name,
-                                    price: realPrice,
-                                    quantity: item.quantity
-                                });
                             } else {
                                 stockValidationResults.push({
                                     id: item.id,
@@ -1535,9 +1532,6 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                         alert(errorMessage);
                         return false;
                     }
-
-                    // 儲存驗證過的商品明細，提交訂單時改用這份資料，不要用購物車原始資料
-                    verifiedCartItems = verifiedItems;
 
                     console.log('庫存與價格驗證通過');
                     return true;

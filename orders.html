@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/cart.css">
     <link rel="stylesheet" href="/css/auth-modals.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
     
     <style>
 /* 訂單記錄頁面特有樣式 */
@@ -603,13 +603,12 @@
             setDoc,
             getDoc,
             getDocs,
-            updateDoc,
-            writeBatch,
             query,
             orderBy,
             where,
             serverTimestamp
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
 
         // Firebase配置 - 統一使用與其他頁面相同的配置
         const firebaseConfig = window.FIREBASE_CONFIG;
@@ -620,8 +619,11 @@
         // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
         // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
         const db = initializeFirestore(app, { experimentalForceLongPolling: true });
-        
+        // 追加訂單備註的 Cloud Function（functions/append-order-note.js）部署在台灣機房 asia-east1
+        const functions = getFunctions(app, 'asia-east1');
+
         window.firebaseServices = {
+            appendOrderNote: httpsCallable(functions, 'appendOrderNote'),
             auth: auth,
             db: db,
             getAuth,
@@ -632,8 +634,6 @@
             doc,
             setDoc,
             getDoc,
-            updateDoc,
-            writeBatch,
             collection,
             getDocs,
             query,
@@ -912,7 +912,6 @@
     <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
-    <script src="/js/cart.js"></script>
 
     <script>
 // loadUserOrders() 找到的「屬於我的訂單」ID 清單，包含訪客訂單（沒有 userId，
@@ -1115,39 +1114,12 @@ async function loadUserOrders(user) {
             });
             
         } catch (fieldError) {
+            // 這條查詢失敗時沒有備用方案可用：Firestore 安全規則不是篩選器，
+            // 「抓回整個 orders 集合再自己比對」那種無條件查詢一定會被規則擋掉
+            //（規則要求查詢條件本身就能保證每一筆結果都屬於自己），
+            // 所以原本寫在這裡的備用查詢永遠不會成功，只是多送一次註定失敗的請求。
+            // 真正會讓這裡失敗的情況是信箱未驗證或網路問題，重新整理才有意義
             console.warn(`透過 ${searchField} 查詢失敗:`, fieldError);
-            
-            // 方法3：備用查詢 - 獲取所有訂單並手動篩選
-            console.log('使用備用查詢方法...');
-            try {
-                const allOrdersSnapshot = await window.firebaseServices.getDocs(
-                    window.firebaseServices.collection(window.firebaseServices.db, 'orders')
-                );
-                
-                allOrdersSnapshot.forEach(doc => {
-                    const orderData = doc.data();
-                    orderData.id = doc.id;
-                    
-                    let isMatch = false;
-                    
-                    // 檢查是否匹配
-                    if (searchField === 'customer.email' && orderData.customer && orderData.customer.email === searchValue) {
-                        isMatch = true;
-                    } else if (searchField === 'customer.phone' && orderData.customer && orderData.customer.phone === searchValue) {
-                        isMatch = true;
-                    } else if (orderData.userId === user.uid) {
-                        isMatch = true;
-                    }
-                    
-                    if (isMatch && !allOrders.some(order => order.id === orderData.id)) {
-                        allOrders.push(orderData);
-                        console.log('透過備用方法找到訂單:', orderData.orderNumber || doc.id);
-                    }
-                });
-                
-            } catch (backupError) {
-                console.error('備用查詢也失敗:', backupError);
-            }
         }
         
         console.log(`總共找到 ${allOrders.length} 筆訂單`);
@@ -1322,12 +1294,6 @@ async function submitMergePayment(e) {
     const transferNote = document.getElementById('merge-note').value;
 
     const orderIds = checked.map(cb => cb.dataset.id);
-    const orderNumbers = checked
-        .map(cb => {
-            const numberEl = cb.closest('.order-item')?.querySelector('.order-number');
-            return numberEl ? numberEl.textContent : '';
-        })
-        .filter(Boolean);
 
     const submitBtn = document.getElementById('merge-payment-submit-btn');
     const originalBtnText = submitBtn.textContent;
@@ -1335,43 +1301,39 @@ async function submitMergePayment(e) {
     submitBtn.textContent = '送出中...';
 
     try {
-        const db = window.firebaseServices.db;
-        const doc = window.firebaseServices.doc;
-        const getDoc = window.firebaseServices.getDoc;
-        const writeBatch = window.firebaseServices.writeBatch;
-
-        const paymentNote = `【合併匯款確認】匯款人姓名: ${remitterName}, 匯款銀行: ${transferBank}, 匯款金額: ${transferAmount}, 對帳後五碼: ${lastFiveDigits}, 匯款時間: ${transferDate}, 合併訂單: ${orderNumbers.join('、') || '無'}, 備註: ${transferNote || '無'}, 確認時間: ${new Date().toLocaleString()}`;
-
-        // notes 是既有欄位內容的接續，要先個別讀出來才能算出新的完整文字，
-        // 寫入的部分再用 batch 一次送出、確保這幾筆訂單一起成功或一起失敗
-        const batch = writeBatch(db);
-        for (const orderId of orderIds) {
-            const orderRef = doc(db, 'orders', orderId);
-            const orderSnap = await getDoc(orderRef);
-            const existingNotes = orderSnap.exists() ? (orderSnap.data().notes || '') : '';
-            const updatedNotes = existingNotes ? existingNotes + '\n\n' + paymentNote : paymentNote;
-            // 只寫入匯款資訊（【合併匯款確認】標記），不直接改成已付款；
-            // 管理員對帳後在後台改成「已付款」，才會寄出付款確認信
-            batch.update(orderRef, {
-                notes: updatedNotes
-            });
-        }
-        await batch.commit();
+        // 透過 Cloud Function appendOrderNote 一次處理所有勾選的訂單：
+        // 備註格式（【合併匯款確認】標記、合併訂單編號、確認時間）由伺服器產生，
+        // 讀取與追加在同一個 transaction 裡，而且只會往後接、不會覆蓋既有備註。
+        // 「合併訂單」清單也改由伺服器用真正的 orderNumber 組出來，不再從畫面上刮取。
+        //
+        // 只寫入匯款資訊，不直接改成已付款；管理員對帳後在後台改成「已付款」，
+        // 才會寄出付款確認信
+        await window.firebaseServices.appendOrderNote({
+            orderIds: orderIds,
+            kind: 'mergePayment',
+            payment: {
+                remitterName: remitterName,
+                bank: transferBank,
+                amount: transferAmount,
+                lastFiveDigits: lastFiveDigits,
+                date: transferDate,
+                note: transferNote
+            }
+        });
 
         const messageEl = document.getElementById('merge-payment-message');
         messageEl.innerHTML = `<p style="color:#2e7d32;"><i class="fas fa-check-circle"></i> 已為 ${orderIds.length} 筆訂單登記匯款資訊，我們將盡快為您確認付款。</p>`;
         messageEl.style.display = 'block';
         document.getElementById('merge-payment-form').style.display = 'none';
 
-        // 重新載入訂單列表，已付款的訂單就不會再顯示未付款標記、也不能再勾選
-        // batch.commit() 已經 await 過，伺服器已確認寫入，不需要再額外等待
+        // 重新載入訂單列表，已回報匯款的訂單就會改顯示「待確認」、也不能再勾選
         const currentUser = window.firebaseServices.auth.currentUser;
         if (currentUser) {
             loadUserOrders(currentUser);
         }
     } catch (error) {
         console.error('送出合併匯款失敗:', error);
-        alert('送出失敗，請稍後再試：' + error.message);
+        alert(appendNoteErrorMessage(error));
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalBtnText;
@@ -1625,61 +1587,33 @@ async function updateOrderNotes(orderId, notes) {
     updateBtn.textContent = '新增中...';
     
     try {
-        const orderDoc = await window.firebaseServices.getDoc(
-            window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId)
-        );
-
-        // 同樣要檢查這筆訂單是不是目前登入的人下的，避免用別人的 orderId
-        // 也能寫入備註到對方的訂單裡。用 myOrderIds 判斷（涵蓋訪客訂單），
-        // 不能只看 userId 是否相符
+        // 這筆訂單是不是自己的，由 Cloud Function appendOrderNote 在伺服器端判斷
+        //（會員訂單要求呼叫者就是該會員本人），不再靠網頁端自己檢查——
+        // 網頁端的檢查只是體驗上的早期提醒，真正的把關一定要在伺服器。
+        // 時間戳和「只往後接、不覆蓋既有備註」也都由伺服器處理
         const currentUser = window.firebaseServices.auth.currentUser;
-        const isMyOrder = myOrderIds.has(orderId) ||
-            (!!currentUser && orderDoc.exists() && orderDoc.data().userId === currentUser.uid);
-        if (orderDoc.exists() && !isMyOrder) {
-            showToast('找不到訂單資料');
-            updateBtn.disabled = false;
-            updateBtn.textContent = originalBtnText;
+        if (!myOrderIds.has(orderId) && !currentUser) {
+            showToast('請先登入再新增備註');
             return;
         }
 
-        if (orderDoc.exists()) {
-            const orderData = orderDoc.data();
+        await window.firebaseServices.appendOrderNote({
+            orderIds: [orderId],
+            kind: 'note',
+            text: notes
+        });
 
-            const now = new Date();
-            const timestamp = now.toLocaleString('zh-TW');
-            const newNoteEntry = `[${timestamp}] ${notes}`;
-            
-            const existingNotes = orderData.notes || '';
-            let updatedNotes;
-            
-            if (existingNotes.trim() === '') {
-                updatedNotes = newNoteEntry;
-            } else {
-                updatedNotes = existingNotes + '\n' + newNoteEntry;
-            }
-            
-            await window.firebaseServices.updateDoc(
-                window.firebaseServices.doc(window.firebaseServices.db, 'orders', orderId),
-                { notes: updatedNotes }
-            );
-            
-            // 清空備註欄位
-            document.getElementById('order-notes').value = '';
-            
-            // 顯示成功彈窗
-            showNotesSuccessModal();
-            
-            // 重新載入訂單詳情以顯示新備註
-            setTimeout(() => {
-                showOrderDetail(orderId);
-            }, 500);
-            
-        } else {
-            throw new Error('找不到訂單文檔');
-        }
+        // 清空備註欄位
+        document.getElementById('order-notes').value = '';
+
+        // 顯示成功彈窗
+        showNotesSuccessModal();
+
+        // 重新載入訂單詳情以顯示新備註
+        showOrderDetail(orderId);
     } catch (error) {
         console.error('更新訂單備註時出錯:', error);
-        showToast('更新備註時出錯，請稍後再試');
+        showToast(appendNoteErrorMessage(error));
     } finally {
         // 恢復按鈕狀態
         updateBtn.disabled = false;
