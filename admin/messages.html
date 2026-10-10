@@ -13,17 +13,17 @@
 <link rel="shortcut icon" href="/images/logo.png">
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/admin-common.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <!-- 保持原版的 Firebase 初始化方式以確保兼容性 -->
     <script src="/js/firebase-config.js"></script>
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { 
           getAuth, 
           onAuthStateChanged,
           signOut
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import {
           initializeFirestore,
           collection,
@@ -36,7 +36,7 @@
           orderBy,
           where,
           serverTimestamp
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = window.FIREBASE_CONFIG;
 
@@ -171,7 +171,6 @@
         </div>
     </footer>
     
-    <script src="/js/member.js"></script>
     <script src="/js/admin-common.js"></script>
     
     <style>

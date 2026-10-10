@@ -24,7 +24,7 @@
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/cart.css">
     <link rel="stylesheet" href="/css/auth-modals.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
 
     <!-- Firebase SDK引入 -->
     <script src="/js/firebase-config.js"></script>
@@ -354,7 +354,10 @@
     </footer>
 
     <!-- 商品詳細介紹彈跳視窗 -->
-    <div id="product-detail-modal" class="product-detail-modal">
+    <!-- role/aria-modal/aria-labelledby 讓讀螢幕知道這是一個對話框，
+         並用商品名稱（#pd-name）當標題唸出來 -->
+    <div id="product-detail-modal" class="product-detail-modal"
+         role="dialog" aria-modal="true" aria-labelledby="pd-name">
         <div class="product-detail-backdrop"></div>
         <div class="product-detail-panel">
             <button type="button" class="product-detail-close" aria-label="關閉"><i class="fas fa-times"></i></button>
@@ -392,7 +395,6 @@
     <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
-    <script src="/js/cart.js"></script>
 
     <!-- 產品頁面專用 JavaScript -->
     <script>
@@ -632,7 +634,7 @@ function buildProductCardHTML(product) {
                 <div class="product-content">
                     <h3>${escapeHtml(product.name)}</h3>
                     <p class="product-desc">${escapeHtml(product.description)}</p>
-                    <p class="product-detail-hint"><i class="fas fa-search"></i> 查看詳細介紹</p>
+                    <button type="button" class="product-detail-hint" aria-label="查看 ${escapeHtml(product.name)} 的詳細介紹"><i class="fas fa-search" aria-hidden="true"></i> 查看詳細介紹</button>
                     <p class="product-price">$${product.price}/${product.unit}</p>
                     <p class="stock-info ${stockClass}">${stockText}</p>
                 </div>
@@ -907,8 +909,12 @@ function initWishlist() {
 }
 
 // 初始化願望清單按鈕
+// 排除商品詳細介紹彈窗裡的那顆（#pd-wish-btn）：它不在 .product-card 裡，
+// 由 openProductDetailModal() 直接設 onclick，下面的 cloneNode 會把 onclick
+// 一起換掉，彈窗開著時剛好重新渲染商品格（改視窗大小、換頁、篩選）就會讓
+// 彈窗裡的收藏鈕失效
 function initWishlistButtons() {
-    const wishButtons = document.querySelectorAll('.wish-btn');
+    const wishButtons = document.querySelectorAll('.wish-btn:not(#pd-wish-btn)');
     wishButtons.forEach(button => {
         const newButton = button.cloneNode(true);
         button.parentNode.replaceChild(newButton, button);

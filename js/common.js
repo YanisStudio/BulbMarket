@@ -37,6 +37,29 @@ function isPaymentReported(order) {
 }
 
 /**
+ * 把 appendOrderNote Cloud Function 的錯誤轉成給顧客看的說明。
+ *
+ * invalid-argument / failed-precondition / permission-denied / not-found /
+ * resource-exhausted 這幾種是伺服器刻意回傳的、本來就寫給顧客看的訊息
+ *（例如「這筆訂單不屬於目前登入的帳號」），直接顯示原文；
+ * 其他（internal、unavailable、連線失敗）顯示通用訊息，不要把內部錯誤丟到畫面上。
+ */
+const APPEND_NOTE_USER_FACING_CODES = [
+    'functions/invalid-argument',
+    'functions/failed-precondition',
+    'functions/permission-denied',
+    'functions/not-found',
+    'functions/resource-exhausted'
+];
+function appendNoteErrorMessage(error) {
+    const code = String((error && error.code) || '');
+    if (APPEND_NOTE_USER_FACING_CODES.indexOf(code) !== -1 && error.message) {
+        return error.message;
+    }
+    return '送出失敗，請檢查網路連線後再試';
+}
+
+/**
  * 回傳本地時區的 YYYY-MM-DD。toISOString() 是 UTC，台灣早上 8 點前會變成前一天
  */
 function localDateString(date) {
@@ -521,7 +544,12 @@ function addToCart(productId, name, price, quantity = 1, stock = 0) {
  * 初始化加入購物車按鈕
  */
 function initAddToCartButtons() {
-    const addToCartButtons = document.querySelectorAll('.add-to-cart-btn');
+    // 排除商品詳細介紹彈窗裡的那顆按鈕：它雖然也是 .add-to-cart-btn，但不在
+    // .product-card 裡面，用不到下面這套「找最近的 .product-card 讀 data-*」的邏輯，
+    // 而且 openProductDetailModal() 是直接設它的 onclick。這裡 cloneNode 會把
+    // onclick 一起換掉，彈窗開著時剛好重新渲染商品格（改視窗大小、換頁、篩選）
+    // 就會讓彈窗裡的「加入購物車」失效
+    const addToCartButtons = document.querySelectorAll('.add-to-cart-btn:not(#pd-add-to-cart)');
     addToCartButtons.forEach(button => {
         // 移除現有事件監聽器
         const newButton = button.cloneNode(true);
@@ -644,12 +672,27 @@ function openProductDetailModal(productId) {
 
     modal.style.display = 'flex';
     document.body.classList.add('modal-open-noscroll');
+
+    // 記住是從哪個元素開啟的，關閉時把焦點還回去；否則用鍵盤開啟彈窗後，
+    // 焦點還留在後面被遮住的卡片上，Tab 會跑到看不見的地方去
+    lastProductDetailTrigger = document.activeElement;
+    const closeBtn = modal.querySelector('.product-detail-close');
+    if (closeBtn) closeBtn.focus();
 }
+
+// openProductDetailModal() 開窗前的焦點位置，closeProductDetailModal() 用它還原
+let lastProductDetailTrigger = null;
 
 function closeProductDetailModal() {
     const modal = document.getElementById('product-detail-modal');
     if (modal) modal.style.display = 'none';
     document.body.classList.remove('modal-open-noscroll');
+
+    // 卡片可能已經被重新渲染掉（換頁、篩選），所以要確認元素還在畫面上才聚焦
+    if (lastProductDetailTrigger && document.body.contains(lastProductDetailTrigger)) {
+        lastProductDetailTrigger.focus();
+    }
+    lastProductDetailTrigger = null;
 }
 
 function initProductDetailModal() {
@@ -673,7 +716,29 @@ function initProductDetailModal() {
     if (backdrop) backdrop.addEventListener('click', closeProductDetailModal);
 
     document.addEventListener('keydown', function(e) {
-        if (e.key === 'Escape' && modal.style.display !== 'none') closeProductDetailModal();
+        if (modal.style.display === 'none') return;
+
+        if (e.key === 'Escape') {
+            closeProductDetailModal();
+            return;
+        }
+
+        // 把 Tab 鎖在彈窗裡。aria-modal="true" 只讓讀螢幕忽略後面的內容，
+        // 用鍵盤的人還是會 Tab 到被遮住的卡片上，焦點就跑到看不見的地方了
+        if (e.key !== 'Tab') return;
+        const focusables = modal.querySelectorAll(
+            'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault();
+            last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault();
+            first.focus();
+        }
     });
 }
 

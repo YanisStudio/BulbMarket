@@ -66,12 +66,12 @@ function localDateString(date) {
 async function initializeFirebase() {
     try {
         // 動態導入 Firebase 模組
-        const { initializeApp, getApps, getApp } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js");
+        const { initializeApp, getApps, getApp } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js");
         const { 
             getAuth, 
             onAuthStateChanged,
             signOut
-        } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js");
+        } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
         const {
             getFirestore,
             collection,
@@ -90,13 +90,13 @@ async function initializeFirebase() {
             writeBatch,
             deleteField,
             increment
-        } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js");
+        } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
         const {
             getStorage,
             ref,
             uploadBytes,
             getDownloadURL
-        } = await import("https://www.gstatic.com/firebasejs/9.22.0/firebase-storage.js");
+        } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-storage.js");
 
         // 頁面內嵌的 <script type="module"> 可能已經初始化過 Firebase，
         // 沿用同一個 app 實例，避免重複呼叫 initializeApp() 觸發 duplicate-app 錯誤

@@ -841,7 +841,12 @@ nav ul li a:hover::after {
     overflow: hidden;
 }
 
-/* 「查看詳細介紹」提示 - 讓外人一眼就看得出卡片可以點進去看更多 */
+/* 「查看詳細介紹」提示 - 讓外人一眼就看得出卡片可以點進去看更多。
+   這是一顆真的 <button>：整張卡片雖然都可以用滑鼠點，但卡片本身是 <div>，
+   鍵盤的 Tab 走不到，純鍵盤或使用讀螢幕的人就看不到完整商品描述。
+   做成按鈕之後 Tab 走得到、Enter/Space 也能開啟彈窗（事件會照常往上冒泡到
+   js/common.js 的卡片點擊代理），下面只是把瀏覽器預設的按鈕外觀清掉，
+   維持原本那行小字的樣子 */
 .product-detail-hint {
     color: #4caf50;
     font-size: 0.8em;
@@ -850,10 +855,27 @@ nav ul li a:hover::after {
     display: flex;
     align-items: center;
     gap: 0.3em;
+    /* 按鈕外觀重置（舊版 iOS Safari 需要 -webkit- 前綴，否則會留下系統按鈕樣式） */
+    -webkit-appearance: none;
+    appearance: none;
+    border: 0;
+    background: none;
+    padding: 0;
+    font-family: inherit;
+    line-height: inherit;
+    text-align: left;
+    cursor: pointer;
 }
 
 .product-detail-hint i {
     font-size: 0.85em;
+}
+
+/* 只有鍵盤操作時才顯示焦點框，滑鼠點擊不會跳出外框 */
+.product-detail-hint:focus-visible {
+    outline: 2px solid #2e7d32;
+    outline-offset: 3px;
+    border-radius: 3px;
 }
 
 /* 商品價格 */

@@ -17,7 +17,7 @@
 
 import { initializeApp, cert, applicationDefault } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 const PROJECT_ID = 'bulb-market-217c4';
 
@@ -114,17 +114,25 @@ async function main() {
     const authUsers = await listAllAuthUsers(auth);
     console.log(`共 ${authUsers.length} 位 Authentication 使用者\n`);
 
+    // 整個 users 集合一次讀完。原本是在下面的迴圈裡對每個帳號各做一次 get()，
+    // 帳號數一多就是上百趟網路來回（而且後面找孤兒資料時又把同一個集合整批讀一次），
+    // 現在只讀這一次，兩段邏輯共用
+    console.log('讀取 Firestore users 集合...');
+    const allDocsSnap = await db.collection('users').get();
+    const firestoreDocs = new Map();
+    allDocsSnap.forEach((docSnap) => firestoreDocs.set(docSnap.id, docSnap));
+    console.log(`共 ${firestoreDocs.size} 筆 Firestore 會員資料\n`);
+
     const plannedUpdates = []; // { uid, identifier, changes: {field: value}, isNewDoc }
 
     for (const user of authUsers) {
-        const userRef = db.collection('users').doc(user.uid);
-        const docSnap = await userRef.get();
+        const docSnap = firestoreDocs.get(user.uid);
 
         const authEmail = user.email || '';
         const authPhone = normalizePhone(user.phoneNumber);
         const identifier = user.email || user.phoneNumber || user.uid;
 
-        if (!docSnap.exists) {
+        if (!docSnap) {
             // Firestore 裡完全沒有這位使用者的個人資料文件
             // （例如先前 redirect 登入沒有寫入資料的那個 bug）
             const provider = detectProvider(user);
@@ -193,12 +201,11 @@ async function main() {
 
     console.log('比對 Firestore users 集合，找出帳號已被刪除但資料還留著的孤兒紀錄...');
     const authUidSet = new Set(authUsers.map((u) => u.uid));
-    const allDocsSnap = await db.collection('users').get();
     const orphanDocs = [];
-    allDocsSnap.forEach((docSnap) => {
-        if (!authUidSet.has(docSnap.id)) {
+    firestoreDocs.forEach((docSnap, uid) => {
+        if (!authUidSet.has(uid)) {
             const data = docSnap.data() || {};
-            orphanDocs.push({ uid: docSnap.id, identifier: data.email || data.phone || docSnap.id });
+            orphanDocs.push({ uid, identifier: data.email || data.phone || uid });
         }
     });
     if (orphanDocs.length > 0) {

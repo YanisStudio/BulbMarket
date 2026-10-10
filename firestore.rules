@@ -5,8 +5,11 @@ rules_version = '2';
 // （故意沒有寫進 firebase.json，避免 firebase deploy 時意外覆蓋）
 // 管理員 = Firebase Auth custom claim admin: true
 //
-// ⚠️ 這版規則禁止網頁端直接建立訂單，必須先部署 Cloud Function createOrder
-//    （functions/create-order.js）並讓結帳頁改用它之後，才能發布這版規則。
+// ⚠️ 這版規則禁止網頁端直接建立或修改訂單，發布前必須先部署這兩支 Cloud Function：
+//    - createOrder（functions/create-order.js）：結帳頁建立訂單
+//    - appendOrderNote（functions/append-order-note.js）：顧客追加備註／回報匯款
+//    先 `firebase deploy --only functions` 部署完成，再發布這版規則，
+//    否則顧客會無法下單、也無法回報匯款。
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -16,11 +19,6 @@ service cloud.firestore {
 
     function isAdmin() {
       return signedIn() && request.auth.token.admin == true;
-    }
-
-    // 只改了指定的欄位
-    function onlyChanges(fields) {
-      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(fields);
     }
 
     // 登入者的手機號碼（+8869xxxxxxxx → 09xxxxxxxx，跟訂單上存的格式一致）
@@ -81,13 +79,15 @@ service cloud.firestore {
       // 網頁端不能直接建立訂單，避免有人繞過網站送出自訂價格的訂單
       allow create: if false;
 
-      // 顧客只能追加備註（回報匯款、補充需求），不能改金額、狀態或付款確認；
-      // 付款確認由管理員在後台對帳後修改
-      allow update: if isAdmin() || (
-        onlyChanges(['notes'])
-        && (!('userId' in resource.data)
-            || (signedIn() && resource.data.userId == request.auth.uid))
-      );
+      // 網頁端完全不能寫訂單。顧客追加備註、回報匯款一律走 Cloud Function
+      // appendOrderNote（functions/append-order-note.js），它只會「往後接」，
+      // 不會覆蓋既有備註。
+      //
+      // 以前這裡有一條「沒有 userId 的訂單，只改 notes 就放行」的例外，是為了讓
+      // 訂單完成頁的訪客能回報匯款。但那條例外連登入都不要求，任何人只要知道
+      // 訪客訂單的 ID（會從瀏覽紀錄、截圖外流）就能整段覆寫該訂單的備註——
+      // 抹掉顧客填好的匯款資訊，或塞一個假的【匯款確認】標記進去。
+      allow update: if isAdmin();
       allow delete: if isAdmin();
     }
 

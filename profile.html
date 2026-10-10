@@ -23,7 +23,7 @@
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/auth-modals.css">
     <link rel="stylesheet" href="/css/cart.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" integrity="sha512-Fo3rlrZj/k7ujTnHg4CGR2D7kSs0v4LLanw2qksYuRlEzO+tcaEPQogQ0KaoGN26/zrn20ImR1DfuLWnOo7aBA==" crossorigin="anonymous" referrerpolicy="no-referrer">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
     
     <style>
 /* 會員資料頁面樣式 */
@@ -336,10 +336,10 @@
 }
 </style>
 
-    <!-- Firebase SDK引入 - 使用統一版本 9.22.0 -->
+    <!-- Firebase SDK引入 - 使用統一版本 10.7.1 -->
     <script src="/js/firebase-config.js"></script>
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { 
             getAuth, 
             createUserWithEmailAndPassword, 
@@ -358,7 +358,7 @@
             signInWithPhoneNumber,
             PhoneAuthProvider,
             signInWithCredential
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-auth.js";
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
         import {
             initializeFirestore,
             collection,
@@ -370,7 +370,7 @@
             orderBy,
             where,
             serverTimestamp
-        } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-firestore.js";
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         // Firebase配置 - 統一使用與其他頁面相同的配置
         const firebaseConfig = window.FIREBASE_CONFIG;
@@ -636,7 +636,6 @@
     <script src="/js/common.js"></script>
     <script src="/js/auth-modals.js"></script>
     <script src="/js/member.js"></script>
-    <script src="/js/cart.js"></script>
     <script src="/js/tw-districts.js"></script>
 
     <script>
@@ -648,6 +647,12 @@
             return;
         }
         
+        // 這一頁的選單、下拉選單在下面自己綁（會換漢堡圖示），所以沒有呼叫
+        // common.js 的 initCommonFeatures()。但購物車數量徽章是 initCommonFeatures()
+        // 裡的 updateCartCount() 負責的，少了這一行，購物車裡明明有東西，
+        // 這一頁的徽章卻一直顯示 0
+        updateCartCount();
+
         // 全局變量存儲用戶提供者類型
         let userProvider = 'email';
         
@@ -1129,7 +1134,10 @@
                 
                 mainNav.classList.toggle('active');
                 menuOverlay.classList.toggle('active');
-                
+                // css/style.css 用 body.menu-open 鎖住背景捲動，少了這個類別，
+                // 手機版選單打開時後面的頁面還是會跟著滑動
+                document.body.classList.toggle('menu-open', mainNav.classList.contains('active'));
+
                 const icon = menuToggle.querySelector('i');
                 if (icon) {
                     if (mainNav.classList.contains('active')) {
@@ -1158,7 +1166,8 @@
             if (mainNav && menuOverlay && menuToggle) {
                 mainNav.classList.remove('active');
                 menuOverlay.classList.remove('active');
-                
+                document.body.classList.remove('menu-open');
+
                 const icon = menuToggle.querySelector('i');
                 if (icon) {
                     icon.className = 'fas fa-bars';
