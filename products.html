@@ -466,7 +466,7 @@ function autoScrollToProducts() {
 
 // 從 Firebase 載入產品（使用 common.js 的 FirebaseUtils）
 // attempt 用來做自動重試：網路不穩、或 Firebase SDK 剛好還沒初始化完成時，
-// getDocs() 會拋錯，進到 catch 判定是連線問題，自動重試。
+// getDocsFromServer() 會拋錯，進到 catch 判定是連線問題，自動重試。
 // FirebaseUtils.loadProducts() 內部已經會先等 Auth 狀態確定
 // （見 common.js 的 waitForAuthReady）才送出查詢，避免查詢在 Auth 狀態
 // 還沒確定前就送出，所以這裡不需要再對「查回來是空陣列」額外重試確認。

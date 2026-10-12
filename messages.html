@@ -276,6 +276,7 @@
             setDoc,
             getDoc,
             getDocs,
+            getDocsFromServer,
             updateDoc,
             query,
             orderBy,
@@ -307,6 +308,7 @@
             updateDoc,
             collection,
             getDocs,
+            getDocsFromServer,
             query,
             where,
             orderBy,
@@ -600,13 +602,16 @@ async function loadUserMessages(user) {
         const collection = window.firebaseServices.collection;
         const query = window.firebaseServices.query;
         const where = window.firebaseServices.where;
-        const getDocs = window.firebaseServices.getDocs;
+        const getDocsFromServer = window.firebaseServices.getDocsFromServer;
 
         // 只用 userId 相等過濾，不在 Firestore 查詢裡排序，
         // 避免需要額外設定複合索引；改在瀏覽器端排序
         const messagesCollectionRef = collection(db, 'messages');
         const q = query(messagesCollectionRef, where('userId', '==', user.uid));
-        const querySnapshot = await getDocs(q);
+        // 用 getDocsFromServer 而不是 getDocs：getDocs 連不上後端時會悄悄改讀
+        // 本地快取、回傳「技術上成功但是空」的結果，畫面就會顯示「目前沒有訊息紀錄」，
+        // 顧客以為訊息不見了。改成連不上就 throw，交給下面的 catch 顯示讀取失敗
+        const querySnapshot = await getDocsFromServer(q);
 
         if (querySnapshot.empty) {
             messageList.innerHTML = '<div class="no-messages"><p>目前沒有訊息紀錄</p></div>';

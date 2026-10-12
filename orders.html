@@ -603,6 +603,7 @@
             setDoc,
             getDoc,
             getDocs,
+            getDocsFromServer,
             query,
             orderBy,
             where,
@@ -636,6 +637,7 @@
             getDoc,
             collection,
             getDocs,
+            getDocsFromServer,
             query,
             where,
             orderBy,
@@ -1072,7 +1074,11 @@ async function loadUserOrders(user) {
         console.log(`查詢欄位: ${searchField} = ${searchValue}`);
         
         let allOrders = [];
-        
+        // 兩條查詢是互補的（會員訂單看 userId、訪客訂單靠信箱或電話找），
+        // 任一條成功就算讀得到資料。兩條都失敗時不能顯示「您目前沒有任何訂單」
+        // ——那會讓顧客以為訂單不見了，要明確告訴他是讀取失敗
+        let anyQuerySucceeded = false;
+
         try {
             // 方法1：使用用戶ID查詢（最可靠）
             console.log('嘗試透過 userId 查詢...');
@@ -1080,7 +1086,7 @@ async function loadUserOrders(user) {
                 window.firebaseServices.collection(window.firebaseServices.db, 'orders'),
                 window.firebaseServices.where('userId', '==', user.uid)
             );
-            const userIdSnapshot = await window.firebaseServices.getDocs(userIdQuery);
+            const userIdSnapshot = await window.firebaseServices.getDocsFromServer(userIdQuery);
             
             userIdSnapshot.forEach(doc => {
                 const orderData = doc.data();
@@ -1088,7 +1094,8 @@ async function loadUserOrders(user) {
                 allOrders.push(orderData);
                 console.log('透過 userId 找到訂單:', orderData.orderNumber || doc.id);
             });
-            
+            anyQuerySucceeded = true;
+
         } catch (userIdError) {
             console.warn('透過 userId 查詢失敗:', userIdError);
         }
@@ -1100,7 +1107,7 @@ async function loadUserOrders(user) {
                 window.firebaseServices.collection(window.firebaseServices.db, 'orders'),
                 window.firebaseServices.where(searchField, '==', searchValue)
             );
-            const fieldSnapshot = await window.firebaseServices.getDocs(fieldQuery);
+            const fieldSnapshot = await window.firebaseServices.getDocsFromServer(fieldQuery);
             
             fieldSnapshot.forEach(doc => {
                 const orderData = doc.data();
@@ -1112,7 +1119,8 @@ async function loadUserOrders(user) {
                     console.log(`透過 ${searchField} 找到訂單:`, orderData.orderNumber || doc.id);
                 }
             });
-            
+            anyQuerySucceeded = true;
+
         } catch (fieldError) {
             // 這條查詢失敗時沒有備用方案可用：Firestore 安全規則不是篩選器，
             // 「抓回整個 orders 集合再自己比對」那種無條件查詢一定會被規則擋掉
@@ -1126,6 +1134,12 @@ async function loadUserOrders(user) {
 
         // 更新「屬於我的訂單」清單，讓點進單筆詳情/加備註時能正確判斷訪客訂單
         myOrderIds = new Set(allOrders.map(order => order.id));
+
+        // 兩條查詢都失敗 = 讀不到資料，不是真的沒有訂單。
+        // 以前這裡會直接顯示「您目前沒有任何訂單」，連線不穩時顧客會以為訂單消失了
+        if (!anyQuerySucceeded) {
+            throw new Error('無法連線到伺服器讀取訂單');
+        }
 
         if (allOrders.length === 0) {
             orderListContainer.innerHTML = '<div class="no-orders"><p>您目前沒有任何訂單</p></div>';
