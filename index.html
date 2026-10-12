@@ -465,7 +465,15 @@ document.addEventListener('DOMContentLoaded', function() {
     // onUpdate 是為了連線不穩的情況——第一次讀取失敗只能先顯示預設分類
     //（大多沒有圖片），背景重試成功後會再呼叫一次把正確的分類補上
     renderCategoryTiles(ProductCategories.getCached());
-    ProductCategories.onUpdate(renderCategoryTiles);
+    // js/categories.js 跟這個頁面是分開快取的（GitHub Pages 兩邊都是 max-age=600），
+    // 部署後有最多 10 分鐘，瀏覽器可能拿到新的 HTML 搭配舊的 js。那時候 onUpdate
+    // 還不存在，直接呼叫會丟 TypeError 並中斷整個 DOMContentLoaded——
+    // 連下面的輪播、商品都不會載入，整頁等於空的。
+    // 用 typeof 檢查讓它安靜略過：最多就是這一次不會自動補分類，快取過期就恢復。
+    // 任何「HTML 呼叫共用 js 新增的函式」都要這樣防
+    if (typeof ProductCategories.onUpdate === 'function') {
+        ProductCategories.onUpdate(renderCategoryTiles);
+    }
     ProductCategories.load().then(renderCategoryTiles);
 
     // 加載首頁輪播圖片

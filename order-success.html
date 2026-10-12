@@ -1071,7 +1071,7 @@
                         console.error('匯款確認寫入失敗:', error);
                         confirmationMessage.innerHTML = `
                             <div class="confirmed-info" style="color:#b23a32;">
-                                <p><strong>送出失敗：</strong>${escapeHtml(appendNoteErrorMessage(error))}</p>
+                                <p><strong>送出失敗：</strong>${escapeHtml(typeof appendNoteErrorMessage === 'function' ? appendNoteErrorMessage(error) : '送出失敗，請檢查網路連線後再試')}</p>
                                 <p>請確認網路連線後重新送出，或直接到「訂單記錄」頁面回報匯款。</p>
                             </div>
                         `;

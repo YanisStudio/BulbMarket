@@ -1347,7 +1347,14 @@ async function submitMergePayment(e) {
         }
     } catch (error) {
         console.error('送出合併匯款失敗:', error);
-        alert(appendNoteErrorMessage(error));
+        // appendNoteErrorMessage 定義在 js/common.js，跟這個頁面分開快取。
+        // 部署後短時間內可能拿到舊的 common.js，那時候它還不存在——
+        // 而這裡是 catch 區塊，再丟一次錯會讓錯誤處理本身也壞掉，
+        // 顧客只會看到畫面卡住。先確認函式在不在
+        const msg = typeof appendNoteErrorMessage === 'function'
+            ? appendNoteErrorMessage(error)
+            : '送出失敗，請檢查網路連線後再試';
+        alert(msg);
     } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = originalBtnText;
@@ -1627,7 +1634,13 @@ async function updateOrderNotes(orderId, notes) {
         showOrderDetail(orderId);
     } catch (error) {
         console.error('更新訂單備註時出錯:', error);
-        showToast(appendNoteErrorMessage(error));
+        // appendNoteErrorMessage 定義在 js/common.js，跟這個頁面分開快取。
+        // 部署後短時間內可能拿到舊的 common.js，那時候它還不存在——
+        // 而這裡是 catch 區塊，再丟一次錯會讓錯誤處理本身也壞掉，
+        // 顧客只會看到畫面卡住。先確認函式在不在
+        showToast(typeof appendNoteErrorMessage === 'function'
+            ? appendNoteErrorMessage(error)
+            : '送出失敗，請檢查網路連線後再試');
     } finally {
         // 恢復按鈕狀態
         updateBtn.disabled = false;

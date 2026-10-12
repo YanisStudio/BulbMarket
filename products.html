@@ -442,7 +442,15 @@ function initProductsPage() {
     // 讀到最新清單後再更新一次
     populateCategoryFilter(ProductCategories.getCached());
     // 連線不穩時第一次會讀不到分類、只能先用預設清單，背景重試成功後補上正確的
-    ProductCategories.onUpdate(populateCategoryFilter);
+    // js/categories.js 跟這個頁面是分開快取的（GitHub Pages 兩邊都是 max-age=600），
+    // 部署後有最多 10 分鐘，瀏覽器可能拿到新的 HTML 搭配舊的 js。那時候 onUpdate
+    // 還不存在，直接呼叫會丟 TypeError 並中斷整個 DOMContentLoaded——
+    // 連下面的商品都不會載入，整頁等於空的。
+    // 用 typeof 檢查讓它安靜略過：最多就是這一次不會自動補分類，快取過期就恢復。
+    // 任何「HTML 呼叫共用 js 新增的函式」都要這樣防
+    if (typeof ProductCategories.onUpdate === 'function') {
+        ProductCategories.onUpdate(populateCategoryFilter);
+    }
     ProductCategories.load().then(populateCategoryFilter);
 
     loadProducts();
