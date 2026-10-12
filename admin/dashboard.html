@@ -322,6 +322,20 @@
         // 獲取統計數據
         const STAT_IDS = ['pending-orders', 'completed-orders', 'total-users', 'total-products'];
 
+        // Firestore 連線卡住之後會進入離線模式，之後每次讀取都「立刻」失敗——
+        // 重試再多次也沒用，因為用的還是同一個壞掉的連線。要換一個全新的連線物件
+        // 才會恢復（前台 js/common.js 早就有這套，後台之前完全沒有）。
+        // 兩個載入函式共用同一個冷卻時間，避免各自重建互相打架
+        let lastConnectionResetAt = 0;
+        const CONNECTION_RESET_COOLDOWN_MS = 20000;
+        const tryResetConnection = async function() {
+            if (Date.now() - lastConnectionResetAt <= CONNECTION_RESET_COOLDOWN_MS) return;
+            lastConnectionResetAt = Date.now();
+            if (window.AdminCommon && window.AdminCommon.resetFirestoreConnection) {
+                await window.AdminCommon.resetFirestoreConnection();
+            }
+        };
+
         const fetchStatistics = async function(attempt = 1) {
             try {
                 // 讀取可能要好幾秒（而且連線不穩時會等滿 10 秒的逾時），
@@ -371,6 +385,7 @@
                 // Firestore 連線偶爾會卡住十幾秒（公司網路、VPN 常見），
                 // 連線恢復後這裡會自動補上正確數字，不用重新整理
                 console.warn(`獲取統計數據失敗（第 ${attempt} 次嘗試）:`, error);
+                await tryResetConnection();
                 STAT_IDS.forEach((id) => {
                     const el = document.getElementById(id);
                     if (el) el.textContent = attempt >= 2 ? '連線中…' : '--';
@@ -466,6 +481,7 @@
                 // 跟統計數字一樣：讀不到就背景重試，連線恢復後自動補上。
                 // 不要停在「獲取訂單數據失敗」讓管理員以為要自己重新整理
                 console.warn(`獲取最近訂單失敗（第 ${attempt} 次嘗試）:`, error);
+                await tryResetConnection();
                 const listEl = document.getElementById('recent-orders-list');
                 if (listEl) {
                     listEl.innerHTML = `
