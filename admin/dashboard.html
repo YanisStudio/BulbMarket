@@ -320,8 +320,18 @@
         };
 
         // 獲取統計數據
-        const fetchStatistics = async function() {
+        const STAT_IDS = ['pending-orders', 'completed-orders', 'total-users', 'total-products'];
+
+        const fetchStatistics = async function(attempt = 1) {
             try {
+                // 讀取可能要好幾秒（而且連線不穩時會等滿 10 秒的逾時），
+                // 先把欄位改成「讀取中」，不然畫面上一直是預設值，
+                // 管理員會以為頁面壞了或資料真的是那樣
+                STAT_IDS.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el && el.textContent !== '連線中…') el.textContent = '…';
+                });
+
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
                 const query = window.firebaseServices.query;
@@ -357,17 +367,29 @@
                 document.getElementById('total-products').textContent = productsSnap.size;
 
             } catch (error) {
-                console.error("獲取統計數據失敗:", error);
-                document.getElementById('pending-orders').textContent = "--";
-                document.getElementById('completed-orders').textContent = "--";
-                document.getElementById('total-users').textContent = "--";
-                document.getElementById('total-products').textContent = "--";
+                // 讀不到就重試，不要讓管理員盯著 "--" 以為資料真的不見了。
+                // Firestore 連線偶爾會卡住十幾秒（公司網路、VPN 常見），
+                // 連線恢復後這裡會自動補上正確數字，不用重新整理
+                console.warn(`獲取統計數據失敗（第 ${attempt} 次嘗試）:`, error);
+                STAT_IDS.forEach((id) => {
+                    const el = document.getElementById(id);
+                    if (el) el.textContent = attempt >= 2 ? '連線中…' : '--';
+                });
+                // 間隔漸增、封頂 8 秒，跟前台商品列表的重試節奏一致
+                setTimeout(() => fetchStatistics(attempt + 1), Math.min(attempt * 1000, 8000));
             }
         };
 
         // 獲取最近訂單
-        const fetchRecentOrders = async function() {
+        const fetchRecentOrders = async function(attempt = 1) {
             try {
+                // 同樣先顯示讀取中：連線不穩時這裡會等滿 10 秒的逾時，
+                // 中間一片空白會讓人以為真的沒有訂單
+                const listEl = document.getElementById('recent-orders-list');
+                if (listEl && attempt === 1) {
+                    listEl.innerHTML = '<tr><td colspan="6">載入訂單中…</td></tr>';
+                }
+
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
                 const query = window.firebaseServices.query;
@@ -441,12 +463,18 @@
                 
                 document.getElementById('recent-orders-list').innerHTML = ordersHTML;
             } catch (error) {
-                console.error("獲取最近訂單失敗:", error);
-                document.getElementById('recent-orders-list').innerHTML = `
-                    <tr>
-                        <td colspan="6">獲取訂單數據失敗，請重試</td>
-                    </tr>
-                `;
+                // 跟統計數字一樣：讀不到就背景重試，連線恢復後自動補上。
+                // 不要停在「獲取訂單數據失敗」讓管理員以為要自己重新整理
+                console.warn(`獲取最近訂單失敗（第 ${attempt} 次嘗試）:`, error);
+                const listEl = document.getElementById('recent-orders-list');
+                if (listEl) {
+                    listEl.innerHTML = `
+                        <tr>
+                            <td colspan="6">網路連線不穩定，正在自動重新連線中…</td>
+                        </tr>
+                    `;
+                }
+                setTimeout(() => fetchRecentOrders(attempt + 1), Math.min(attempt * 1000, 8000));
             }
         };
         // 開始初始化流程
