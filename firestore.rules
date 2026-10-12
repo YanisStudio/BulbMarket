@@ -112,7 +112,12 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
-    // 其他集合一律拒絕
+    // 其他集合一律拒絕。
+    //
+    // 這條也涵蓋了 rateLimits（createOrder 的下單頻率計數，見
+    // functions/create-order.js）。那個集合只有 Cloud Function 會用，
+    // 而 Admin SDK 不受規則限制，所以這裡不需要、也不應該為它開任何權限——
+    // 開了的話攻擊者就能自己把計數歸零，頻率限制等於沒有。
     match /{document=**} {
       allow read, write: if false;
     }

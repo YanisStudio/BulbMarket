@@ -19,6 +19,17 @@ const MAX_ITEMS = 50;
 const MAX_QUANTITY = 999;
 const ORDER_NUMBER_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 
+// 下單頻率限制：同一個身分在時間窗內最多能成立幾筆訂單。
+//
+// 這支函式可以被匿名呼叫（訪客結帳本來就不需要登入），所以不加限制的話，
+// 寫個腳本重複呼叫就能把庫存全部扣光——金額改不了（伺服器重算），但真正想買的人
+// 看到的全是「無庫存」。這不是假設，用 curl 不帶任何登入就打得到。
+//
+// 數字放寬一點：真實顧客很少在 10 分鐘內成立超過 5 筆訂單，而攻擊者要刷光庫存
+// 需要的次數遠高於此。寧可寬鬆也不要擋到真的要買的人。
+const RATE_LIMIT_MAX_ORDERS = 5;
+const RATE_LIMIT_WINDOW_MS = 10 * 60 * 1000;
+
 // 字串欄位：去頭尾空白並限制長度；required 時空字串直接擋下
 function textField(value, label, maxLength, required) {
     const text = typeof value === "string" ? value.trim() : "";
@@ -37,6 +48,41 @@ function generateOrderNumber() {
     let random = "";
     crypto.randomBytes(4).forEach((b) => { random += ORDER_NUMBER_CHARS[b % ORDER_NUMBER_CHARS.length]; });
     return `BG${taipeiDateStamp()}-${random}`;
+}
+
+// 頻率限制的識別鍵：登入的人用 uid，訪客用來源 IP。
+//
+// 不存原始 IP：只存雜湊值，比對得出「是不是同一個來源」就夠了，不需要知道是誰。
+// Cloud Functions 前面有 Google 的負載平衡器，真實來源在 x-forwarded-for 的第一段。
+function rateLimitKey(request) {
+    if (request.auth?.uid) return "uid_" + request.auth.uid;
+    const raw = request.rawRequest || {};
+    const forwarded = raw.headers?.["x-forwarded-for"] || "";
+    const ip = String(forwarded).split(",")[0].trim() || raw.ip || "unknown";
+    return "ip_" + crypto.createHash("sha256").update(ip).digest("hex").slice(0, 32);
+}
+
+// 檢查並累加計數。回傳要寫回去的新狀態，由呼叫端在 transaction 裡一起寫，
+// 確保同時湧入的請求不會各自讀到舊的計數而一起放行
+function checkRateLimit(snapshot, now) {
+    const data = snapshot.exists ? snapshot.data() : null;
+    const windowStart = data && typeof data.windowStart === "number" ? data.windowStart : 0;
+    const withinWindow = now - windowStart < RATE_LIMIT_WINDOW_MS;
+    const count = withinWindow && typeof data.count === "number" ? data.count : 0;
+
+    if (count >= RATE_LIMIT_MAX_ORDERS) {
+        const waitMinutes = Math.max(1, Math.ceil((RATE_LIMIT_WINDOW_MS - (now - windowStart)) / 60000));
+        throw new HttpsError(
+            "resource-exhausted",
+            `短時間內下單次數過多，請於 ${waitMinutes} 分鐘後再試。如果這是誤判，請透過聯絡我們告知。`
+        );
+    }
+
+    return {
+        windowStart: withinWindow ? windowStart : now,
+        count: count + 1,
+        updatedAt: now
+    };
 }
 
 // 同一個商品在購物車出現多次時合併數量；數量必須是正整數
@@ -209,9 +255,16 @@ exports.createOrder = onCall({ region: "asia-east1" }, async (request) => {
     const orderRef = db.collection("orders").doc();
     const orderNumber = generateOrderNumber();
     const userId = request.auth?.uid || null;
+    const limitRef = db.collection("rateLimits").doc(rateLimitKey(request));
 
-    // 讀商品、算金額、建訂單、扣庫存放在同一個 transaction，避免同時下單超賣
+    // 讀商品、算金額、建訂單、扣庫存、累加下單次數都放在同一個 transaction：
+    // 避免同時下單超賣，也避免同時湧入的請求各自讀到舊的下單次數而一起被放行
     const total = await db.runTransaction(async (transaction) => {
+        // transaction 要求所有讀取都在寫入之前。頻率限制另外用 get() 讀，
+        // 不併進下面的 getAll()，否則 snaps 的索引會跟 requestedItems 對不上
+        const limitSnap = await transaction.get(limitRef);
+        const nextLimitState = checkRateLimit(limitSnap, Date.now());
+
         const productRefs = requestedItems.map((item) => db.collection("products").doc(item.id));
         const snaps = await transaction.getAll(...productRefs);
 
@@ -270,6 +323,9 @@ exports.createOrder = onCall({ region: "asia-east1" }, async (request) => {
                 lastUpdated: FieldValue.serverTimestamp()
             });
         });
+        // 訂單真的建立了才累加次數：驗證失敗（商品下架、價格變動）的請求不算，
+        // 不然顧客修正購物車重試幾次就會被自己擋住
+        transaction.set(limitRef, nextLimitState);
         return orderData.total;
     });
 
@@ -278,4 +334,4 @@ exports.createOrder = onCall({ region: "asia-east1" }, async (request) => {
 });
 
 // 給測試用：運費計算純函式
-exports._internal = { calculateShipping, calculateTieredShipping, mergeRequestedItems };
+exports._internal = { calculateShipping, calculateTieredShipping, mergeRequestedItems, checkRateLimit, rateLimitKey, RATE_LIMIT_MAX_ORDERS, RATE_LIMIT_WINDOW_MS };
