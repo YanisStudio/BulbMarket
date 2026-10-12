@@ -74,6 +74,7 @@ async function initializeFirebase() {
         } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
         const {
             getFirestore,
+            initializeFirestore,
             terminate,
             collection,
             addDoc,
@@ -117,6 +118,7 @@ async function initializeFirebase() {
             storage: storage,
             // 重建 Firestore 連線時要用（見 resetFirestoreConnection）
             getFirestore,
+            initializeFirestore,
             terminate,
             // Auth 方法
             getAuth,
@@ -178,7 +180,12 @@ async function resetFirestoreConnection() {
     }
     try {
         await services.terminate(services.db);
-        services.db = services.getFirestore(services.app);
+        // 一定要用 initializeFirestore 並帶回原本的設定，不能用 getFirestore()。
+        // getFirestore() 會建出「預設設定」的新實例，等於把各後台頁面原本指定的
+        // experimentalForceLongPolling 悄悄弄丟，重建出來的是另一種連線
+        services.db = services.initializeFirestore(services.app, {
+            experimentalForceLongPolling: true
+        });
         console.log('Firestore 連線已重建');
         return true;
     } catch (error) {
