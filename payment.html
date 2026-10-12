@@ -361,6 +361,7 @@
         setDoc,
         getDoc,
         getDocs,
+        getDocsFromServer,
         addDoc,        // 添加缺失的 addDoc
         updateDoc,     // 添加缺失的 updateDoc
         increment,     // 添加缺失的 increment
@@ -398,6 +399,7 @@
             getDoc,
             collection,
             getDocs,
+            getDocsFromServer,
             addDoc,        // 暴露 addDoc
             updateDoc,     // 暴露 updateDoc
             increment,     // 暴露 increment
@@ -930,7 +932,7 @@
                     const doc = window.firebaseServices.doc;
                     const getDoc = window.firebaseServices.getDoc;
                     const collection = window.firebaseServices.collection;
-                    const getDocs = window.firebaseServices.getDocs;
+                    const getDocsFromServer = window.firebaseServices.getDocsFromServer;
 
                     // 這 4 筆讀取互相獨立，原本一個一個 await 會把 4 趟網路來回時間疊加起來；
                     // 改用 Promise.all 平行送出，結帳頁載入時間大約只要最慢那一筆的時間
@@ -938,7 +940,7 @@
                         getDoc(doc(db, 'shippingSettings', 'freeShipping')),
                         getDoc(doc(db, 'shippingSettings', 'calculationMode')),
                         getDoc(doc(db, 'shippingRates', 'fixedRates')),
-                        getDocs(collection(db, 'tieredRates'))
+                        getDocsFromServer(collection(db, 'tieredRates'))
                     ]);
 
                     // 載入免運設定
@@ -973,7 +975,12 @@
                     tieredRates = allRates.sort((a, b) => a.minQuantity - b.minQuantity);
                     
                 } catch (error) {
+                    // 不能吞掉：吞掉之後運費會停在預設值（階梯運費是空陣列）算成 0，
+                    // 顧客看到的金額比實際少，送出訂單後伺服器重算才會對不上。
+                    // 往上拋給 initializeCheckout() 的 catch，它會停用「提交訂單」
+                    // 並顯示「載入失敗，請重新整理頁面」
                     console.error('載入運費設定失敗:', error);
+                    throw error;
                 }
             }
             

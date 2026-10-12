@@ -11,7 +11,7 @@ cd tests
 npm install            # 只需要 jsdom 與 puppeteer
 ```
 
-`append-order-note.test.js` 另外需要 `functions/` 的相依套件：
+`append-order-note.test.cjs` 另外需要 `functions/` 的相依套件：
 
 ```bash
 cd functions && npm install
@@ -27,12 +27,12 @@ node tests/check-shared-globals.mjs      # 每頁用到的共用全域是否有�
 ## 單元／行為測試（不需要網路）
 
 ```bash
-cd functions && node ../tests/append-order-note.test.js   # 訂單備註追加（19 項）
+cd functions && node ../tests/append-order-note.test.cjs   # 訂單備註追加（19 項）
 node tests/product-detail-keyboard.test.mjs               # 商品彈窗鍵盤操作（14 項）
 node tests/category-retry.test.mjs                        # 分類讀取失敗後的背景重試
 ```
 
-`append-order-note.test.js` 用假的 Firestore 驅動真實的 Cloud Function 程式碼，
+`append-order-note.test.cjs` 用假的 Firestore 驅動真實的 Cloud Function 程式碼，
 重點在驗證「只往後接、永遠不覆蓋既有備註」這條安全性質，以及會員訂單的權限判斷。
 
 ## Firestore 規則權限矩陣（需要網路 + gcloud）
