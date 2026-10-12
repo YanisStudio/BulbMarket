@@ -27,6 +27,7 @@
           initializeFirestore,
           collection,
           getDocs,
+          getDocsFromServer,
           doc,
           setDoc,
           getDoc,
@@ -52,6 +53,7 @@
           onAuthStateChanged,
           collection,
           getDocs,
+          getDocsFromServer,
           doc,
           setDoc,
           getDoc,
@@ -370,14 +372,14 @@
                 
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 
                 // 獲取所有訂單以計算消費會員數
                 console.log('正在獲取訂單資料...');
                 let userOrdersMap = new Map();
                 
                 try {
-                    const ordersSnapshot = await getDocs(collection(db, 'orders'));
+                    const ordersSnapshot = await getDocsFromServer(collection(db, 'orders'));
                     ordersSnapshot.forEach(doc => {
                         const order = doc.data();
                         if (order.userId) {
@@ -394,7 +396,7 @@
                 
                 // 從 Firestore 獲取用戶數據
                 console.log('正在獲取用戶資料...');
-                const usersSnapshot = await getDocs(collection(db, 'users'));
+                const usersSnapshot = await getDocsFromServer(collection(db, 'users'));
                 console.log('用戶查詢完成，找到', usersSnapshot.size, '個用戶');
                 
                 if (usersSnapshot.empty) {

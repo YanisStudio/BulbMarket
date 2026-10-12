@@ -33,6 +33,7 @@
             collection,
             doc,
             getDocs,
+            getDocsFromServer,
             getDoc,
             updateDoc,
             deleteDoc,
@@ -62,6 +63,7 @@
             collection,
             doc,
             getDocs,
+            getDocsFromServer,
             getDoc,
             updateDoc,
             deleteDoc,
@@ -1064,8 +1066,8 @@
 
                         // 訂單裡的商品沒有存運費類別，要對照目前的商品資料（已刪除的商品算「其他」）
                         const [querySnapshot, productsSnapshot] = await Promise.all([
-                            services.getDocs(q),
-                            services.getDocs(services.collection(services.db, 'products'))
+                            services.getDocsFromServer(q),
+                            services.getDocsFromServer(services.collection(services.db, 'products'))
                         ]);
                         const productCategory = {};
                         productsSnapshot.forEach(docSnap => {
@@ -1234,7 +1236,7 @@
                                 window.firebaseServices.where('status', '==', statusValue));
                         }
                         
-                        window.firebaseServices.getDocs(q)
+                        window.firebaseServices.getDocsFromServer(q)
                             .then((querySnapshot) => {
                                 if (querySnapshot.empty) {
                                     orderList.innerHTML = '<p class="no-orders">沒有找到訂單</p>';

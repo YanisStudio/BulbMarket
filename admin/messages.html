@@ -30,6 +30,7 @@
           doc,
           getDoc,
           getDocs,
+          getDocsFromServer,
           deleteDoc,
           updateDoc,
           query,
@@ -57,6 +58,7 @@
           getDoc,
           collection,
           getDocs,
+          getDocsFromServer,
           deleteDoc,
           updateDoc,
           query,
@@ -509,14 +511,14 @@
                 const collection = window.firebaseServices.collection;
                 const query = window.firebaseServices.query;
                 const orderBy = window.firebaseServices.orderBy;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 
                 // 獲取 messages 集合的引用，按時間排序（最新在前）
                 const messagesCollectionRef = collection(db, 'messages');
                 const q = query(messagesCollectionRef, orderBy('createdAt', 'desc'));
                 
                 // 獲取文檔
-                const querySnapshot = await getDocs(q);
+                const querySnapshot = await getDocsFromServer(q);
                 
                 if (querySnapshot.empty) {
                     messageList.innerHTML = '<p class="placeholder-message">目前沒有訊息</p>';
@@ -730,11 +732,11 @@
             try {
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 const deleteDoc = window.firebaseServices.deleteDoc;
                 
                 const messagesCollectionRef = collection(db, 'messages');
-                const querySnapshot = await getDocs(messagesCollectionRef);
+                const querySnapshot = await getDocsFromServer(messagesCollectionRef);
                 
                 const deletePromises = [];
                 querySnapshot.forEach((doc) => {

@@ -30,6 +30,7 @@
           addDoc,
           getDoc,
           getDocs,
+          getDocsFromServer,
           doc,
           updateDoc,
           deleteDoc,
@@ -58,6 +59,7 @@
           addDoc,
           getDoc,
           getDocs,
+          getDocsFromServer,
           doc,
           updateDoc,
           deleteDoc,
@@ -635,12 +637,12 @@
                 const doc = window.firebaseServices.doc;
                 const getDoc = window.firebaseServices.getDoc;
                 const collection = window.firebaseServices.collection;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 
                 const fixedRef = doc(db, 'shippingRates', 'fixedRates');
                 const [fixedSnap, tieredSnap] = await Promise.all([
                     getDoc(fixedRef),
-                    getDocs(collection(db, 'tieredRates'))
+                    getDocsFromServer(collection(db, 'tieredRates'))
                 ]);
 
                 if (fixedSnap.exists()) {

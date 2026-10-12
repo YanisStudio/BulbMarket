@@ -28,6 +28,7 @@
           doc,
           getDoc,
           getDocs,
+          getDocsFromServer,
           setDoc,
           writeBatch,
           serverTimestamp
@@ -59,6 +60,7 @@
           doc,
           getDoc,
           getDocs,
+          getDocsFromServer,
           setDoc,
           writeBatch,
           serverTimestamp,
@@ -577,7 +579,7 @@
 
         const loadProducts = async function() {
             const services = window.firebaseServices;
-            const snapshot = await services.getDocs(services.collection(services.db, 'products'));
+            const snapshot = await services.getDocsFromServer(services.collection(services.db, 'products'));
             products = [];
             snapshot.forEach(function(docSnap) {
                 const data = docSnap.data();
