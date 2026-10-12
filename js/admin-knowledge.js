@@ -7,7 +7,14 @@
  * 需要：js/knowledge.js、js/image-upload.js、js/admin-common.js（escapeHtml、AdminCommon）
  */
 (function() {
-    const DEFAULT_CATEGORIES = ['球根知識', '種植指南', '種植筆記'];
+    // 後台「分類」欄位的建議清單（輸入框旁的下拉選項）。
+    // 前台 knowledge.html 的分頁標籤是依「實際有文章使用的分類」動態產生的
+    //（見 js/knowledge.js 的 categoriesOf），所以這裡先列出名稱不會讓前台冒出
+    // 一個點進去是空的分頁——要等真的寫了第一篇，那個標籤才會出現。
+    //
+    // 「加入會員」「購物須知」不是栽培內容，是給新客人看的站務說明，
+    // 放在這裡是為了讓它們跟栽培文章共用同一套編輯與排版。
+    const DEFAULT_CATEGORIES = ['球根知識', '種植指南', '種植筆記', '加入會員', '購物須知'];
 
     // 「新增文章」的簡易範本：先放好常見的段落小標題，內文欄用提示文字說明該寫什麼
     // （hint 只顯示在編輯器，不會存進資料庫）。用不到的段落可以直接刪掉、小標題也能改
