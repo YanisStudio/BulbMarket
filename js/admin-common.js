@@ -74,6 +74,7 @@ async function initializeFirebase() {
         } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js");
         const {
             getFirestore,
+            terminate,
             collection,
             addDoc,
             getDoc,
@@ -114,6 +115,9 @@ async function initializeFirebase() {
             auth: auth,
             db: db,
             storage: storage,
+            // 重建 Firestore 連線時要用（見 resetFirestoreConnection）
+            getFirestore,
+            terminate,
             // Auth 方法
             getAuth,
             onAuthStateChanged,
@@ -146,6 +150,39 @@ async function initializeFirebase() {
         return true;
     } catch (error) {
         console.error('Firebase 初始化失敗:', error);
+        return false;
+    }
+}
+
+/**
+ * 重建 Firestore 連線：把卡在異常狀態的舊連線關掉，換一個全新的連線物件。
+ *
+ * 後台原本完全沒有這個機制。Firestore 的連線偶爾會卡住，一旦卡住就會進入
+ * 「離線模式」，之後所有讀取都立刻失敗——重試再多次也沒用，因為用的還是
+ * 同一個壞掉的連線。實際觀察到的現象是：第一次等滿 10 秒逾時，接下來第 2、3、4 次
+ * 全部瞬間失敗，然後永遠停在那裡，管理員只能自己重新整理。
+ *
+ * 換成全新的連線物件通常能更快恢復（效果類似整頁重新整理，但不用真的重整）。
+ * 只替換 window.firebaseServices.db 這個「屬性」，不是整個換掉 firebaseServices
+ * 物件，這樣所有「每次要用才即時讀取 window.firebaseServices.db」的地方，
+ * 下一次呼叫就會自動用到新連線。
+ *
+ * 注意：terminate() 之後 SDK 會把該實例從快取移除，所以再呼叫一次
+ * getFirestore(app) 會拿到全新的實例，不是原本那個已經終止的。
+ */
+async function resetFirestoreConnection() {
+    const services = window.firebaseServices;
+    if (!services || !services.app || !services.getFirestore || !services.terminate) {
+        console.warn('無法重建 Firestore 連線：缺少 app/getFirestore/terminate');
+        return false;
+    }
+    try {
+        await services.terminate(services.db);
+        services.db = services.getFirestore(services.app);
+        console.log('Firestore 連線已重建');
+        return true;
+    } catch (error) {
+        console.error('重建 Firestore 連線失敗:', error);
         return false;
     }
 }
@@ -612,6 +649,7 @@ async function initializeAdminCommon() {
             debounce,
             handleError,
             isAdmin,
+            resetFirestoreConnection,
             getCurrentUser: () => currentUser
         };
         
@@ -642,6 +680,7 @@ if (typeof window !== 'undefined') {
         debounce,
         handleError,
         isAdmin,
+        resetFirestoreConnection,
         getCurrentUser: () => currentUser
     };
 }
