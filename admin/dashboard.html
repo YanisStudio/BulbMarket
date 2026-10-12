@@ -27,6 +27,7 @@
           initializeFirestore,
           collection,
           getDocs,
+          getDocsFromServer,
           query,
           orderBy,
           where,
@@ -49,6 +50,7 @@
           onAuthStateChanged,
           collection,
           getDocs,
+          getDocsFromServer,
           query,
           orderBy,
           where,
@@ -323,24 +325,30 @@
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
                 const query = window.firebaseServices.query;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 const where = window.firebaseServices.where;
 
-                // 用 getDocs() 抓文件再用 .size 算數量，四個一起平行查。
+                // 用 getDocsFromServer() 抓文件再用 .size 算數量，四個一起平行查。
                 // 原本改用過 getCountFromServer 做純計數查詢想省流量，但聚合查詢在
                 // Firestore 安全規則以 resource.data 判斷讀取權限時會被直接拒絕
                 // （聚合查詢不會真的抓文件內容，規則沒東西可以判斷），導致這四個
-                // 數字全部卡在 "--"。改回 getDocs() 保證不受這個限制影響。
+                // 數字全部卡在 "--"。抓文件再算 .size 就不受這個限制。
+                //
+                // 也不能退回用 getDocs()：連不上後端時它會悄悄改讀本地快取，回傳
+                // 「技術上成功但內容是空」的結果，於是這四個數字會顯示成 0——
+                // 管理員會以為訂單和商品全都不見了，而不是看出這其實是連線問題。
+                // getDocsFromServer() 強制要真的連到伺服器，連不上就直接 throw，
+                // 交給下面的 catch 顯示 "--"，才看得出是讀取失敗而不是真的沒資料。
                 const [
                     pendingOrdersSnap,
                     completedOrdersSnap,
                     usersSnap,
                     productsSnap
                 ] = await Promise.all([
-                    getDocs(query(collection(db, "orders"), where("status", "==", "pending"))),
-                    getDocs(query(collection(db, "orders"), where("status", "==", "completed"))),
-                    getDocs(collection(db, "users")),
-                    getDocs(collection(db, "products"))
+                    getDocsFromServer(query(collection(db, "orders"), where("status", "==", "pending"))),
+                    getDocsFromServer(query(collection(db, "orders"), where("status", "==", "completed"))),
+                    getDocsFromServer(collection(db, "users")),
+                    getDocsFromServer(collection(db, "products"))
                 ]);
 
                 document.getElementById('pending-orders').textContent = pendingOrdersSnap.size;
@@ -363,7 +371,7 @@
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
                 const query = window.firebaseServices.query;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 const orderBy = window.firebaseServices.orderBy;
                 const limit = window.firebaseServices.limit;
 
@@ -372,7 +380,7 @@
                     orderBy("orderDate", "desc"),
                     limit(5)
                 );
-                const ordersSnapshot = await getDocs(recentOrdersQuery);
+                const ordersSnapshot = await getDocsFromServer(recentOrdersQuery);
                 
                 if (ordersSnapshot.empty) {
                     document.getElementById('recent-orders-list').innerHTML = `

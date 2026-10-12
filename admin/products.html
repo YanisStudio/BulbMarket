@@ -30,6 +30,7 @@
             addDoc,
             getDoc,
             getDocs,
+            getDocsFromServer,
             doc,
             updateDoc,
             deleteDoc,
@@ -70,6 +71,7 @@
             addDoc,
             getDoc,
             getDocs,
+            getDocsFromServer,
             doc,
             updateDoc,
             deleteDoc,
@@ -1051,7 +1053,7 @@ const waitForAdminCommon = function() {
             try {
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 const query = window.firebaseServices.query;
                 const where = window.firebaseServices.where;
                 
@@ -1062,7 +1064,7 @@ const waitForAdminCommon = function() {
                     where("isFeaturedOffer", "==", true)
                 );
                 
-                const featuredSnapshot = await getDocs(featuredQuery);
+                const featuredSnapshot = await getDocsFromServer(featuredQuery);
                 
                 currentFeaturedProductIds = [];
                 featuredSnapshot.forEach(doc => {
@@ -1148,7 +1150,7 @@ const waitForAdminCommon = function() {
             try {
                 const db = window.firebaseServices.db;
                 const collection = window.firebaseServices.collection;
-                const getDocs = window.firebaseServices.getDocs;
+                const getDocsFromServer = window.firebaseServices.getDocsFromServer;
                 const query = window.firebaseServices.query;
                 const orderBy = window.firebaseServices.orderBy;
                 
@@ -1166,7 +1168,7 @@ const waitForAdminCommon = function() {
                     );
                     
                     console.log('執行查詢...');
-                    const productsSnapshot = await getDocs(productsQuery);
+                    const productsSnapshot = await getDocsFromServer(productsQuery);
                     console.log('查詢完成，找到商品數量:', productsSnapshot.size);
                     
                     const productListElement = document.getElementById('product-list');
