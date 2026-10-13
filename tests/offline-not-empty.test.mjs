@@ -90,7 +90,9 @@ function runCart({ failShipping }) {
     // 執行頁面自己的 inline script
     const inline = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/);
     window.eval(inline[1]);
-    window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
+    // jsdom 會在建構後自己觸發一次 DOMContentLoaded（readyState 還是 loading 時），
+    // 這時再手動 dispatch 一次，頁面就會初始化兩次（事件綁兩次、按一下寫兩筆）
+    if (window.document.readyState !== 'loading') window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
     return { window, document };
 }
 

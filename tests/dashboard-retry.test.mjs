@@ -20,7 +20,7 @@ const STAT_IDS = ['pending-orders', 'completed-orders', 'total-users', 'total-pr
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // rebuildFixesIt: 重建連線之後讀取是否會恢復
-function launch(rebuildFixesIt) {
+async function launch(rebuildFixesIt) {
     const dom = new JSDOM('<!DOCTYPE html><html><head><meta charset="utf-8"></head>' + html.slice(html.indexOf('<body>')),
         { runScripts: 'outside-only', url: 'https://flowerbulb.tw/admin/dashboard.html' });
     const { window } = dom;
@@ -70,7 +70,14 @@ function launch(rebuildFixesIt) {
     const patched = inline.replace(/\n\s*\}\);\s*$/, EXPORT);
     assert.notStrictEqual(patched, inline, '沒有成功插入匯出，請檢查 script 結尾格式');
     window.eval(patched);
-    window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
+    // jsdom 會在建構後自己觸發一次 DOMContentLoaded（readyState 還是 loading 時），
+    // 這時再手動 dispatch 一次，頁面就會初始化兩次（事件綁兩次、按一下寫兩筆）
+    if (window.document.readyState !== 'loading') window.document.dispatchEvent(new window.Event('DOMContentLoaded'));
+    // 等 jsdom 自己觸發的 DOMContentLoaded 跑完，上面插入的匯出才會掛到 window 上
+    await new Promise((resolve) => {
+        if (window.__fetchStatistics) return resolve();
+        window.document.addEventListener('DOMContentLoaded', () => setTimeout(resolve, 0));
+    });
 
     return {
         state,
@@ -88,7 +95,7 @@ const t = (n, f) => {
 
 console.log('情境 A：重建連線之後可以恢復');
 {
-    const a = launch(true);
+    const a = await launch(true);
     a.start();
 
     // 「讀取中」是在第一個 await 之前同步設定的，所以要在這裡立刻檢查。
@@ -112,7 +119,7 @@ console.log('情境 A：重建連線之後可以恢復');
 
 console.log('\n情境 B：連線一直壞著（最糟情況）');
 {
-    const b = launch(false);
+    const b = await launch(false);
     b.start();
     await wait(4000);
 

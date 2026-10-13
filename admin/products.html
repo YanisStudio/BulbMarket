@@ -1052,8 +1052,6 @@ const waitForAdminCommon = function() {
                 });
             }
 
-            // 測試 Firestore 寫入權限
-            testFirestoreAccess();
         };
         
         // 加載當前精選商品
@@ -1128,30 +1126,11 @@ const waitForAdminCommon = function() {
             }
         };
         
-        // 測試 Firestore 寫入權限
-        const testFirestoreAccess = function() {
-            console.log('開始測試 Firestore 寫入...');
-            const db = window.firebaseServices.db;
-            const testData = {
-                name: '測試商品',
-                timestamp: new Date(),
-                test: true
-            };
-            
-            window.firebaseServices.addDoc(window.firebaseServices.collection(db, "test_writes"), testData)
-                .then((docRef) => {
-                    console.log('Firestore 寫入測試成功，文檔 ID:', docRef.id);
-                    // 測試成功後刪除該測試文檔
-                    window.firebaseServices.deleteDoc(window.firebaseServices.doc(db, "test_writes", docRef.id))
-                        .then(() => console.log('測試文檔已刪除'));
-                })
-                .catch((error) => {
-                    console.error('Firestore 寫入測試失敗:', error);
-                    console.error('錯誤詳情:', error.code, error.message);
-                    alert('Firestore 寫入測試失敗，請檢查 Firestore 權限設置。錯誤: ' + error.message);
-                });
-        };
-        
+        // 以前這裡有一個 testFirestoreAccess()：每次打開商品管理就往 test_writes 寫一筆
+        // 再刪掉，用來「測試寫入權限」。沒有實際用途，刪除沒跑完就會留下垃圾資料，
+        // 網路一不穩還會跳出「請檢查 Firestore 權限設置」這種誤導的提示，所以拿掉了。
+        // 權限有沒有問題，實際儲存商品時就會知道（saveProduct 會顯示錯誤）
+
         // 加載商品列表 - 修改版本，包含精選商品按鈕
         const loadProducts = async function() {
             showLoading();
@@ -1236,7 +1215,7 @@ const waitForAdminCommon = function() {
                                             <span class="product-id-hint">ID: ${productId.substring(0, 6)}...</span>
                                         </td>
                                         <td>${categoryText}</td>
-                                        <td>${product.price} / ${product.unit}</td>
+                                        <td>${product.price} / ${escapeHtml(product.unit)}</td>
                                         <td>${product.stock}</td>
                                         <td>
                                             <span class="status-dot ${statusDotClass}"></span>

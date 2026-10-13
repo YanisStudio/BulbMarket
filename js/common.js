@@ -580,6 +580,9 @@ function addToCart(productId, name, price, quantity = 1, stock = 0) {
         
         cart[existingItemIndex].quantity = newQuantity;
         cart[existingItemIndex].stock = stock;
+        // 同時更新成目前的價格與名稱：購物車裡可能是後台改價之前加入的舊價格
+        cart[existingItemIndex].price = price;
+        cart[existingItemIndex].name = name;
     } else {
         cart.push({
             id: productId,

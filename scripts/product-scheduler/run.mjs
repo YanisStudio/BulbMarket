@@ -9,6 +9,7 @@
 
 import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore, Timestamp, FieldValue } from 'firebase-admin/firestore';
+import { planTransition } from './plan.mjs';
 
 function loadServiceAccount() {
     const raw = process.env.FIREBASE_SERVICE_ACCOUNT;
@@ -22,35 +23,50 @@ function loadServiceAccount() {
     }
 }
 
-async function processBatchTransition(db, field, newStatus) {
+// 上架、下架兩種到期的排程一起處理：同一個商品兩個都到期時，以時間比較晚的為準
+//（規則見 plan.mjs）。以前是先把所有到期的上架做完、再做下架，
+// 「先下架、之後重新上架」的設定會被留在下架狀態
+async function processScheduledTransitions(db) {
     const now = Timestamp.now();
-    const snapshot = await db.collection('products').where(field, '<=', now).get();
+    const [publishSnap, unpublishSnap] = await Promise.all([
+        db.collection('products').where('scheduledPublishAt', '<=', now).get(),
+        db.collection('products').where('scheduledUnpublishAt', '<=', now).get(),
+    ]);
 
-    if (snapshot.empty) {
-        console.log(`[${field}] 沒有需要處理的商品`);
-        return 0;
+    // 兩個查詢可能撈到同一個商品，用 id 去重
+    const docsById = new Map();
+    [...publishSnap.docs, ...unpublishSnap.docs].forEach((doc) => docsById.set(doc.id, doc));
+
+    const updates = [];
+    docsById.forEach((doc) => {
+        const plan = planTransition(doc.data(), now.toMillis());
+        if (plan) updates.push({ doc, plan });
+    });
+
+    if (updates.length === 0) {
+        console.log('沒有需要處理的商品');
+        return { published: 0, unpublished: 0 };
     }
 
     // Firestore 單一 batch 最多 500 筆寫入，超過要分批送出
     const BATCH_LIMIT = 500;
-    const docs = snapshot.docs;
-    const names = [];
-    for (let start = 0; start < docs.length; start += BATCH_LIMIT) {
+    for (let start = 0; start < updates.length; start += BATCH_LIMIT) {
         const batch = db.batch();
-        docs.slice(start, start + BATCH_LIMIT).forEach((doc) => {
-            const data = doc.data();
-            names.push(`${doc.id}（${data.name || '未命名商品'}）`);
-            batch.update(doc.ref, {
-                status: newStatus,
-                [field]: FieldValue.delete(),
-            });
+        updates.slice(start, start + BATCH_LIMIT).forEach(({ doc, plan }) => {
+            const fields = { status: plan.status };
+            plan.clearFields.forEach((field) => { fields[field] = FieldValue.delete(); });
+            batch.update(doc.ref, fields);
         });
         await batch.commit();
     }
 
-    console.log(`[${field}] 已將 ${snapshot.size} 項商品的 status 改成 "${newStatus}"：`);
-    names.forEach((n) => console.log(`  - ${n}`));
-    return snapshot.size;
+    let published = 0;
+    let unpublished = 0;
+    updates.forEach(({ doc, plan }) => {
+        if (plan.status === 'active') published++; else unpublished++;
+        console.log(`  - ${doc.id}（${doc.data().name || '未命名商品'}）→ ${plan.status === 'active' ? '上架' : '下架'}`);
+    });
+    return { published, unpublished };
 }
 
 async function main() {
@@ -58,10 +74,9 @@ async function main() {
     initializeApp({ credential: cert(serviceAccount) });
     const db = getFirestore();
 
-    const publishedCount = await processBatchTransition(db, 'scheduledPublishAt', 'active');
-    const unpublishedCount = await processBatchTransition(db, 'scheduledUnpublishAt', 'inactive');
+    const { published, unpublished } = await processScheduledTransitions(db);
 
-    console.log(`完成。上架 ${publishedCount} 項，下架 ${unpublishedCount} 項。`);
+    console.log(`完成。上架 ${published} 項，下架 ${unpublished} 項。`);
 }
 
 main().catch((error) => {

@@ -1793,6 +1793,8 @@
                                     notes: updatedNotes
                                 });
                             }
+                            // 訂單已經被刪除（例如另一個分頁刪掉了）：不能繼續往下顯示「備註已新增」
+                            throw new Error('找不到這筆訂單，可能已經被刪除');
                         })
                         .then(() => {
                             document.getElementById('admin-order-notes').value = '';

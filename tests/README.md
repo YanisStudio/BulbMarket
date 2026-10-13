@@ -46,7 +46,20 @@ node tests/dashboard-retry.test.mjs                       # 後台儀表板連�
 node tests/offline-not-empty.test.mjs                     # 連線失敗不能顯示成「沒有資料」（8 項）
 node tests/cache-skew.test.mjs                            # 新 HTML 配舊快取 JS 時不會整頁壞掉（4 項）
 cd functions && node ../tests/rate-limit.test.cjs         # 下單頻率限制（15 項）
+node tests/cart-price-refresh.test.mjs                    # 購物車／結帳頁改用最新價格、移除失敗、階梯運費不當機（6 項）
+node tests/admin-shipping-save.test.mjs                   # 後台運費：空白運費不存 NaN、存一種不覆蓋另一種（3 項）
+node tests/scheduler-plan.test.mjs                        # 排程上下架：兩個時間都到期時以較晚的為準（6 項）
 ```
+
+`cart-price-refresh.test.mjs` 的背景：購物車存的是「加入當下」的價格，後台改價之後，
+結帳頁和伺服器會擋下價格對不上的訂單、請顧客回購物車確認——購物車以前不更新價格，
+顧客就卡在兩頁之間。
+
+**jsdom 測試的注意事項**：`new JSDOM(html)` 建構完 `readyState` 還是 `loading`，
+jsdom 會自己觸發一次 `DOMContentLoaded`。這時再手動 `dispatchEvent` 一次，頁面就會
+初始化兩次（事件綁兩次、按一下寫兩筆），測試結果跟真實瀏覽器不一樣。
+只有 `readyState !== 'loading'` 時才手動觸發；需要同步拿到初始化結果的測試要
+`await` 那次自然觸發的事件（見 `dashboard-retry.test.mjs`）。
 
 `reset-policy.test.mjs` 鎖住重建連線的兩個門檻：這一頁**從沒連上過**就一失敗立刻重建
 （冷開卡住時 SDK 自己恢復常要 40～60 秒以上）；**連上過之後**才失敗則持續失敗 30 秒才重建，

@@ -451,11 +451,13 @@
                 for (let i = sortedRates.length - 1; i >= 0; i--) {
                     const rate = sortedRates[i];
                     
-                    if (remainingQuantity >= rate.minQuantity) {
+                    // 跟伺服器 functions/create-order.js 同一套容錯：最大數量沒填（或是 0）視為不限，
+                    // 運費不是數字時當成 0
+                    if (remainingQuantity >= (rate.minQuantity || 0)) {
                         // 能使用這個階梯，盡可能使用其最大容量
-                        const useQuantity = Math.min(remainingQuantity, rate.maxQuantity);
-                        
-                        totalFee += rate.fee;
+                        const useQuantity = Math.min(remainingQuantity, Number(rate.maxQuantity) || remainingQuantity);
+
+                        totalFee += Number(rate.fee) || 0;
                         descriptions.push(`${rate.minQuantity}-${rate.maxQuantity}個區間：NT$ ${rate.fee}`);
                         remainingQuantity -= useQuantity;
                         handled = true;
@@ -851,16 +853,19 @@
             
             try {
                 const fee = parseInt(document.getElementById(`${method}-fixed-fee`).value) || 0;
-                
-                fixedRates[method] = fee;
-                
+
                 const db = window.firebaseServices.db;
                 const { doc, setDoc, serverTimestamp } = window.firebaseServices;
-                
+
+                // 只寫入這一種配送方式（merge），不要把記憶體裡的另一種一起寫回去。
+                // 原本是整份覆蓋：頁面載入運費設定失敗時，記憶體裡另一種還是預設的 0，
+                // 這時儲存超商運費，宅配運費就會被改成 0 元（免運）
                 await setDoc(doc(db, 'shippingRates', 'fixedRates'), {
-                    ...fixedRates,
+                    [method]: fee,
                     updatedAt: serverTimestamp()
-                });
+                }, { merge: true });
+
+                fixedRates[method] = fee;
                 
                 const methodName = method === 'home' ? '宅配' : '超商';
                 window.AdminCommon.showToast(`${methodName}固定運費已儲存`, 'success');
@@ -884,8 +889,16 @@
             const maxQuantity = parseInt(document.getElementById(`${method}-tier-max`).value);
             const fee = parseInt(document.getElementById(`${method}-tier-fee`).value);
             
-            if (!category || !minQuantity || !maxQuantity || fee === undefined) {
+            // 運費欄位空白時 parseInt 回傳 NaN。原本這裡寫的是 fee === undefined，
+            // 永遠不會成立，NaN 會被存進資料庫，購物車和結帳頁的運費就顯示成「NT$ NaN」
+            //（伺服器把它當 0 算，兩邊金額對不上）。運費 0 元是合法的，所以要用 isFinite 判斷
+            if (!category || !minQuantity || !maxQuantity || !Number.isFinite(fee)) {
                 window.AdminCommon.showToast('請填寫完整的階梯資料', 'warning');
+                return;
+            }
+
+            if (minQuantity < 1 || fee < 0) {
+                window.AdminCommon.showToast('最小數量至少是 1，運費不能是負數', 'error');
                 return;
             }
             

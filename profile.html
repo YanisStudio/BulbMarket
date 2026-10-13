@@ -883,8 +883,16 @@
                 })
                 .catch((error) => {
                     console.error('獲取用戶資料時出錯:', error);
-                    showMessage(profileMessage, '獲取用戶資料時出錯: ' + error.message, 'error');
-                    
+                    showMessage(profileMessage, '讀取個人資料失敗，請重新整理頁面後再試', 'error');
+
+                    // 讀不到資料時表單幾乎是空的，這時按「儲存」會用空白把資料庫裡的
+                    // 姓名、電話、地址整個蓋掉。先停用儲存按鈕，重新整理讀到資料後再改
+                    const saveBtn = profileForm && profileForm.querySelector('button[type="submit"]');
+                    if (saveBtn) {
+                        saveBtn.disabled = true;
+                        saveBtn.textContent = '資料讀取失敗，請重新整理頁面';
+                    }
+                                        
                     // 即使出錯也要設定基本權限
                     setFieldPermissions(userProvider);
                 });

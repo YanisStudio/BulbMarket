@@ -648,7 +648,7 @@ function buildProductCardHTML(product) {
                     <h3>${escapeHtml(product.name)}</h3>
                     <p class="product-desc">${escapeHtml(product.description)}</p>
                     <button type="button" class="product-detail-hint" aria-label="查看 ${escapeHtml(product.name)} 的詳細介紹"><i class="fas fa-search" aria-hidden="true"></i> 查看詳細介紹</button>
-                    <p class="product-price">$${product.price}/${product.unit}</p>
+                    <p class="product-price">$${product.price}/${escapeHtml(product.unit)}</p>
                     <p class="stock-info ${stockClass}">${stockText}</p>
                 </div>
                 <div class="product-actions">
