@@ -265,8 +265,8 @@
 // 栽培小知識：文章存在 Firestore 的 settings/knowledge（{ articles: [...] }），
 // 由後台「內容管理 → 栽培小知識」編輯。網址 ?category=分類名稱 篩選列表、?id=文章ID 顯示單篇
 const PAGE_SIZE = 9;
-let lastConnectionResetAt = 0;
-const CONNECTION_RESET_COOLDOWN_MS = 20000;
+// 什麼時候該重建 Firestore 連線，統一由 js/common.js 的
+// maybeResetFirestoreConnection() 決定
 
 document.addEventListener('DOMContentLoaded', function() {
     initCommonFeatures();
@@ -290,9 +290,10 @@ async function loadKnowledge(attempt = 1) {
     } catch (error) {
         console.error(`載入栽培小知識失敗（第 ${attempt} 次嘗試）:`, error);
         // 跟商品頁一樣：連續失敗才重建 Firestore 連線，60 秒內不重複重建
-        if (Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
-            lastConnectionResetAt = Date.now();
-            if (window.resetFirestoreConnection) await window.resetFirestoreConnection();
+        // 只有持續失敗夠久才真的重建，否則會把「只是慢、正要成功」的連線
+        // 砍掉重練，新連線又得從頭握手，反而更久
+        if (window.maybeResetFirestoreConnection) {
+            await window.maybeResetFirestoreConnection();
         }
         setTimeout(() => loadKnowledge(attempt + 1), Math.min(attempt * 1000, 8000));
     }

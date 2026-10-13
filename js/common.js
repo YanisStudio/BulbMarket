@@ -487,6 +487,45 @@ async function resetFirestoreConnection() {
 }
 window.resetFirestoreConnection = resetFirestoreConnection;
 
+// ---- 什麼時候才該重建連線 ----
+//
+// terminate() 會中止所有進行中的作業。如果連線其實只是慢、正要成功，
+// 一失敗就重建等於把它砍掉重練，新連線又得從頭握手一次——實測看到的就是
+// 「重建完的新連線一樣等滿 10 秒」，反而更久。
+//
+// Firestore SDK 本身就有重連與退避機制，大多數情況讓它自己恢復比較快。
+// 重建是最後手段，只有「持續失敗夠久、看起來是真的卡死」才動用。
+const RESET_AFTER_MS = 30000;      // 從第一次失敗算起，持續失敗超過這麼久才重建
+const RESET_COOLDOWN_MS = 60000;   // 兩次重建至少間隔這麼久
+let firstFailureAt = 0;
+let lastResetAt = 0;
+
+// 讀取成功時呼叫，把「連續失敗」的計時歸零
+function noteFirestoreSuccess() {
+    firstFailureAt = 0;
+}
+
+/**
+ * 失敗時呼叫。只有在「持續失敗超過 RESET_AFTER_MS」且距離上次重建夠久時，
+ * 才真的重建連線；其餘情況什麼都不做，讓 SDK 自己重連。
+ * @returns {Promise<boolean>} 這次有沒有真的重建
+ */
+async function maybeResetFirestoreConnection() {
+    const now = Date.now();
+    if (!firstFailureAt) {
+        firstFailureAt = now;
+        return false;
+    }
+    if (now - firstFailureAt < RESET_AFTER_MS) return false;
+    if (now - lastResetAt < RESET_COOLDOWN_MS) return false;
+    lastResetAt = now;
+    return resetFirestoreConnection();
+}
+
+window.maybeResetFirestoreConnection = maybeResetFirestoreConnection;
+window.noteFirestoreSuccess = noteFirestoreSuccess;
+
+
 /**
  * 顯示提示消息
  */
