@@ -1578,7 +1578,9 @@ if (newUserCreationTime && (now - parseInt(newUserCreationTime)) < 300000) {
                             // 只是這次剛好沒抓到最新資料；如果畫面上已經有正確的名字顯示著
                             // （localStorage 裡有快取值），就不要被這種不可靠的讀取結果蓋掉，
                             // 不然會變成「有時候顯示名字、有時候顯示信箱」
-                            if (!firestoreName && docSnap.metadata.fromCache && localStorage.getItem('userName')) {
+                            // 換成 Firestore Lite 之後讀取一律來自伺服器，快照沒有 metadata，
+                            // 所以要先確認 metadata 存在（舊的完整版 SDK 頁面仍可能用到這段）
+                            if (!firestoreName && docSnap.metadata && docSnap.metadata.fromCache && localStorage.getItem('userName')) {
                                 console.log('這次讀取來自本地快取且名字是空的，保留原本顯示的名字');
                                 return;
                             }
@@ -1599,7 +1601,7 @@ if (newUserCreationTime && (now - parseInt(newUserCreationTime)) < 300000) {
                             // docSnap.exists() 是 false 也有可能是連線不穩、退回本地空快取
                             // 造成的假訊號（本地快取根本沒存過這筆資料，不代表 Firestore 上
                             // 真的沒有），同樣不要因此蓋掉畫面上已經顯示的正確名字
-                            if (docSnap.metadata.fromCache && localStorage.getItem('userName')) {
+                            if (docSnap.metadata && docSnap.metadata.fromCache && localStorage.getItem('userName')) {
                                 console.log('這次讀取來自本地快取且查無資料，保留原本顯示的名字');
                                 return;
                             }

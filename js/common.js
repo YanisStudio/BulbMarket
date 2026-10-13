@@ -474,10 +474,8 @@ async function resetFirestoreConnection() {
     }
     try {
         await services.terminate(services.db);
-        // 跟各頁面初始化時的設定一致：固定使用長輪詢
-        services.db = services.initializeFirestore(services.app, {
-            experimentalForceLongPolling: true
-        });
+        // 跟各頁面初始化時用同一份設定（js/firebase-config.js）
+        services.db = services.initializeFirestore(services.app, window.FIRESTORE_SETTINGS);
         console.log('Firestore 連線已重建');
         return true;
     } catch (error) {
@@ -489,29 +487,47 @@ window.resetFirestoreConnection = resetFirestoreConnection;
 
 // ---- 什麼時候才該重建連線 ----
 //
-// terminate() 會中止所有進行中的作業。如果連線其實只是慢、正要成功，
-// 一失敗就重建等於把它砍掉重練，新連線又得從頭握手一次——實測看到的就是
-// 「重建完的新連線一樣等滿 10 秒」，反而更久。
+// 註：全站已改用 Firestore Lite（見 js/firebase-config.js），沒有長連線，
+// 下面情況 1 描述的「冷開卡住」已經不會發生。這套政策保留當安全網：
+// Lite 的實例重建很便宜，讀取失敗時換一個新的實例沒有壞處。
 //
-// Firestore SDK 本身就有重連與退避機制，大多數情況讓它自己恢復比較快。
-// 重建是最後手段，只有「持續失敗夠久、看起來是真的卡死」才動用。
-const RESET_AFTER_MS = 30000;      // 從第一次失敗算起，持續失敗超過這麼久才重建
-const RESET_COOLDOWN_MS = 60000;   // 兩次重建至少間隔這麼久
+// 分兩種情況：
+//
+// 1. 這一頁「從來沒有成功讀到過資料」（重開瀏覽器第一次進站最常見）：
+//    SDK 的 10 秒逾時到了才會回報第一次失敗，而實測這 10 秒內伺服器一筆資料都沒送到
+//   （WebChannel 的 AID 一直是 0），不是「快好了」的連線。這種連線靠 SDK 自己恢復
+//    實測常常要 40～60 秒以上，所以一失敗就重建，之後每次失敗間隔夠久就再重建。
+//    實測卡住後的恢復時間：等 30 秒才重建 約 40～60+ 秒 → 立刻重建 約 13～14 秒（中位數）。
+//
+// 2. 這一頁已經成功讀過資料，之後才失敗（網路中途斷掉等）：
+//    terminate() 會中止所有進行中的作業，如果連線其實只是慢、正要成功，
+//    一失敗就重建等於把它砍掉重練。SDK 本身有重連機制，先讓它自己恢復，
+//    只有持續失敗夠久、看起來真的卡死才重建。
+const NEVER_CONNECTED_RESET_GAP_MS = 9000; // 情況 1：兩次重建至少間隔（新連線也要給它 SDK 的 10 秒）
+const RESET_AFTER_MS = 30000;      // 情況 2：從第一次失敗算起，持續失敗超過這麼久才重建
+const RESET_COOLDOWN_MS = 60000;   // 情況 2：兩次重建至少間隔這麼久
+let everSucceeded = false;
 let firstFailureAt = 0;
 let lastResetAt = 0;
 
-// 讀取成功時呼叫，把「連續失敗」的計時歸零
+// 讀取成功時呼叫：標記「這一頁連上過」，並把「連續失敗」的計時歸零
 function noteFirestoreSuccess() {
+    everSucceeded = true;
     firstFailureAt = 0;
 }
 
 /**
- * 失敗時呼叫。只有在「持續失敗超過 RESET_AFTER_MS」且距離上次重建夠久時，
- * 才真的重建連線；其餘情況什麼都不做，讓 SDK 自己重連。
+ * 讀取失敗時呼叫，依上面兩種情況決定要不要真的重建連線；
+ * 不重建時什麼都不做，讓 SDK 自己重連。
  * @returns {Promise<boolean>} 這次有沒有真的重建
  */
 async function maybeResetFirestoreConnection() {
     const now = Date.now();
+    if (!everSucceeded) {
+        if (now - lastResetAt < NEVER_CONNECTED_RESET_GAP_MS) return false;
+        lastResetAt = now;
+        return resetFirestoreConnection();
+    }
     if (!firstFailureAt) {
         firstFailureAt = now;
         return false;
@@ -847,7 +863,7 @@ const FirebaseUtils = {
         const where = CommonModule.firebase.where;
 
         if (!getDocsFromServer) {
-            throw new Error('Firebase 服務缺少 getDocsFromServer，請確認此頁面的 <script type="module"> 有從 firebase-firestore.js import getDocsFromServer 並加進 window.firebaseServices');
+            throw new Error('Firebase 服務缺少 getDocsFromServer，請確認此頁面的 <script type="module"> 有從 firebase-firestore-lite.js import「getDocs as getDocsFromServer」並加進 window.firebaseServices');
         }
 
         const includeInactive = options.includeInactive === true;
@@ -860,7 +876,22 @@ const FirebaseUtils = {
         // 問題被誤判成「真的沒有商品」。getDocsFromServer 強制要求真的連到
         // 伺服器，連不上就直接 throw，讓外層 catch 走「連線不穩定，自動
         // 重試」的邏輯，不會顯示沒有商品
-        const productsSnapshot = await getDocsFromServer(productsQuery);
+        //
+        // 換成 Firestore Lite 之後，讀取是一般的 fetch，沒有完整版 SDK 那個
+        // 「10 秒連不上就回報離線」的機制。萬一網路卡住、請求一直沒有回應，
+        // 頁面會永遠停在載入中，所以自己加一個逾時，逾時就丟例外交給外層重試
+        const PRODUCTS_READ_TIMEOUT_MS = 20000;
+        let timeoutId;
+        const productsSnapshot = await Promise.race([
+            getDocsFromServer(productsQuery),
+            new Promise((resolve, reject) => {
+                timeoutId = setTimeout(() => {
+                    const error = new Error('讀取商品逾時（' + PRODUCTS_READ_TIMEOUT_MS / 1000 + ' 秒沒有回應）');
+                    error.code = 'deadline-exceeded';
+                    reject(error);
+                }, PRODUCTS_READ_TIMEOUT_MS);
+            })
+        ]).finally(() => clearTimeout(timeoutId));
 
         if (productsSnapshot.empty) {
             return [];

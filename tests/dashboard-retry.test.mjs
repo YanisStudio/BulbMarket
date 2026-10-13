@@ -14,6 +14,7 @@ import { JSDOM } from 'jsdom';
 
 const ROOT = path.join(path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, '$1')), '..');
 const html = fs.readFileSync(path.join(ROOT, 'admin/dashboard.html'), 'utf8').split('\r\n').join('\n');
+const adminCommon = fs.readFileSync(path.join(ROOT, 'js/admin-common.js'), 'utf8').split('\r\n').join('\n');
 
 const STAT_IDS = ['pending-orders', 'completed-orders', 'total-users', 'total-products'];
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -39,14 +40,27 @@ function launch(rebuildFixesIt) {
         getDoc: async () => offline(),
         auth: {}, onAuthStateChanged: () => {}
     };
+    // 「什麼時候重建」用 admin-common.js 裡真正的政策程式碼，不要自己另寫一份假的——
+    // 以前這裡只假造了 resetFirestoreConnection，儀表板改呼叫 maybeResetFirestoreConnection
+    // 之後，這支測試就悄悄變成「從來不重建」，情境 A 跟著壞掉
+    window.__fakeReset = async () => {
+        state.resets++;
+        if (rebuildFixesIt) state.alive = true;
+        return rebuildFixesIt;
+    };
+    const policyStart = adminCommon.indexOf('// ---- 什麼時候才該重建連線 ----');
+    const policyFnStart = adminCommon.indexOf('async function maybeResetFirestoreConnection()', policyStart);
+    const policyEnd = adminCommon.indexOf('\n}\n', policyFnStart) + 2;
+    assert.ok(policyStart > 0 && policyFnStart > 0 && policyEnd > policyFnStart, '在 admin-common.js 找不到重建政策');
+    window.eval('const resetFirestoreConnection = window.__fakeReset;\n' + adminCommon.slice(policyStart, policyEnd) +
+        '\nwindow.__policy = { maybeResetFirestoreConnection, noteFirestoreSuccess };');
+
     window.AdminCommon = {
         showToast() {}, showLoading() {}, hideLoading() {}, handleError() {},
         formatDate: () => '', isAdmin: async () => true, checkAdminAccess() {}, getCurrentUser: () => null,
-        resetFirestoreConnection: async () => {
-            state.resets++;
-            if (rebuildFixesIt) state.alive = true;
-            return rebuildFixesIt;
-        }
+        resetFirestoreConnection: window.__fakeReset,
+        maybeResetFirestoreConnection: window.__policy.maybeResetFirestoreConnection,
+        noteFirestoreSuccess: window.__policy.noteFirestoreSuccess
     };
 
     // 兩個載入函式宣告在 DOMContentLoaded 的 callback 裡，外面取不到，

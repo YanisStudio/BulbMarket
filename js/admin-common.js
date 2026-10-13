@@ -80,7 +80,7 @@ async function initializeFirebase() {
             addDoc,
             getDoc,
             getDocs,
-            getDocsFromServer,
+            getDocs: getDocsFromServer, // Lite 的 getDocs 一律向伺服器讀取，語意同 getDocsFromServer
             doc,
             updateDoc,
             deleteDoc,
@@ -93,7 +93,7 @@ async function initializeFirebase() {
             writeBatch,
             deleteField,
             increment
-        } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js");
+        } = await import("https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js");
         const {
             getStorage,
             ref,
@@ -174,18 +174,16 @@ async function initializeFirebase() {
  */
 async function resetFirestoreConnection() {
     const services = window.firebaseServices;
-    if (!services || !services.app || !services.getFirestore || !services.terminate) {
-        console.warn('無法重建 Firestore 連線：缺少 app/getFirestore/terminate');
+    if (!services || !services.app || !services.initializeFirestore || !services.terminate) {
+        console.warn('無法重建 Firestore 連線：缺少 app/initializeFirestore/terminate');
         return false;
     }
     try {
         await services.terminate(services.db);
         // 一定要用 initializeFirestore 並帶回原本的設定，不能用 getFirestore()。
-        // getFirestore() 會建出「預設設定」的新實例，等於把各後台頁面原本指定的
-        // experimentalForceLongPolling 悄悄弄丟，重建出來的是另一種連線
-        services.db = services.initializeFirestore(services.app, {
-            experimentalForceLongPolling: true
-        });
+        // 設定統一放在 js/firebase-config.js 的 FIRESTORE_SETTINGS，跟頁面初始化時同一份，
+        // 重建出來的才會是同一種連線
+        services.db = services.initializeFirestore(services.app, window.FIRESTORE_SETTINGS);
         console.log('Firestore 連線已重建');
         return true;
     } catch (error) {
@@ -196,28 +194,47 @@ async function resetFirestoreConnection() {
 
 // ---- 什麼時候才該重建連線 ----
 //
-// terminate() 會中止所有進行中的作業。如果連線其實只是慢、正要成功，
-// 一失敗就重建等於把它砍掉重練，新連線又得從頭握手一次——實測看到的就是
-// 「重建完的新連線一樣等滿 10 秒」，反而更久。
+// 註：全站已改用 Firestore Lite（見 js/firebase-config.js），沒有長連線，
+// 下面情況 1 描述的「冷開卡住」已經不會發生。這套政策保留當安全網：
+// Lite 的實例重建很便宜，讀取失敗時換一個新的實例沒有壞處。
 //
-// Firestore SDK 本身就有重連與退避機制，大多數情況讓它自己恢復比較快。
-// 重建是最後手段，只有「持續失敗夠久、看起來是真的卡死」才動用。
-const RESET_AFTER_MS = 30000;      // 從第一次失敗算起，持續失敗超過這麼久才重建
-const RESET_COOLDOWN_MS = 60000;   // 兩次重建至少間隔這麼久
+// 分兩種情況：
+//
+// 1. 這一頁「從來沒有成功讀到過資料」（重開瀏覽器第一次進站最常見）：
+//    SDK 的 10 秒逾時到了才會回報第一次失敗，而實測這 10 秒內伺服器一筆資料都沒送到
+//   （WebChannel 的 AID 一直是 0），不是「快好了」的連線。這種連線靠 SDK 自己恢復
+//    實測常常要 40～60 秒以上，所以一失敗就重建，之後每次失敗間隔夠久就再重建。
+//    實測卡住後的恢復時間：等 30 秒才重建 約 40～60+ 秒 → 立刻重建 約 13～14 秒（中位數）。
+//
+// 2. 這一頁已經成功讀過資料，之後才失敗（網路中途斷掉等）：
+//    terminate() 會中止所有進行中的作業，如果連線其實只是慢、正要成功，
+//    一失敗就重建等於把它砍掉重練。SDK 本身有重連機制，先讓它自己恢復，
+//    只有持續失敗夠久、看起來真的卡死才重建。
+const NEVER_CONNECTED_RESET_GAP_MS = 9000; // 情況 1：兩次重建至少間隔（新連線也要給它 SDK 的 10 秒）
+const RESET_AFTER_MS = 30000;      // 情況 2：從第一次失敗算起，持續失敗超過這麼久才重建
+const RESET_COOLDOWN_MS = 60000;   // 情況 2：兩次重建至少間隔這麼久
+let everSucceeded = false;
 let firstFailureAt = 0;
 let lastResetAt = 0;
 
-// 讀取成功時呼叫，把「連續失敗」的計時歸零
+// 讀取成功時呼叫：標記「這一頁連上過」，並把「連續失敗」的計時歸零
 function noteFirestoreSuccess() {
+    everSucceeded = true;
     firstFailureAt = 0;
 }
 
 /**
- * 失敗時呼叫。只有在「持續失敗超過 RESET_AFTER_MS」且距離上次重建夠久時，
- * 才真的重建連線；其餘情況什麼都不做，讓 SDK 自己重連。
+ * 讀取失敗時呼叫，依上面兩種情況決定要不要真的重建連線；
+ * 不重建時什麼都不做，讓 SDK 自己重連。
+ * @returns {Promise<boolean>} 這次有沒有真的重建
  */
 async function maybeResetFirestoreConnection() {
     const now = Date.now();
+    if (!everSucceeded) {
+        if (now - lastResetAt < NEVER_CONNECTED_RESET_GAP_MS) return false;
+        lastResetAt = now;
+        return resetFirestoreConnection();
+    }
     if (!firstFailureAt) {
         firstFailureAt = now;
         return false;

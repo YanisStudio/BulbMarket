@@ -3,6 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- firebase-warmup：讓瀏覽器一開始解析頁面就先跟 Firebase 握手、下載 SDK，
+         不用等到下面載入 Firebase 的 module 腳本才開始。重開瀏覽器第一次進站最有感
+         （連線、登入憑證都要重新建立）。版本號要跟下面 import 的一致。 -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js">
     <title>球根花卉團購 - 優質球根花卉專賣店</title>
     <meta name="description" content="球根花卉團購提供各式球根花卉、繡球花苗、進口球根、花卉種子及園藝資材。香水百合、孤挺花、鳶尾、睡蓮、鬱金香等，品質保證。">
     <meta name="keywords" content="花卉,球根,球根花卉,球根專賣,進口球根,花卉盆栽,種子,香水百合,孤挺花,鳶尾,睡蓮,鬱金香,繡球花苗,園藝資材,球根花卉團購,團購">
@@ -74,12 +83,12 @@
             setDoc,
             getDoc,
             getDocs,
-            getDocsFromServer,
+            getDocs as getDocsFromServer,
             query,
             orderBy,
             where,
             serverTimestamp
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js";
 
         // Firebase配置
         const firebaseConfig = window.FIREBASE_CONFIG;
@@ -87,10 +96,8 @@
         // 初始化Firebase
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        // 固定使用長輪詢（experimentalForceLongPolling），不先嘗試串流連線。
-        // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
-        // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
-        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+        // 連線設定統一放在 js/firebase-config.js 的 FIRESTORE_SETTINGS（原因寫在那裡）
+        const db = initializeFirestore(app, window.FIRESTORE_SETTINGS);
 
         // 將Firebase服務暴露給全局使用
         window.firebaseServices = {
@@ -683,8 +690,8 @@ function updateFeaturedSliderArrows() {
 // Auth 狀態確定（見 common.js 的 waitForAuthReady）才送出查詢，所以查詢成功
 // 但陣列是空的，就直接代表真的沒設定精選商品，不需要再額外重試確認。
 // 什麼時候該重建 Firestore 連線，統一由 js/common.js 的
-// maybeResetFirestoreConnection() 決定（只有持續失敗夠久才真的重建，
-// 否則會把「只是慢、正要成功」的連線砍掉重練，反而更久）
+// maybeResetFirestoreConnection() 決定（這一頁從沒連上過就立刻重建；
+// 連上過之後才失敗則先讓 SDK 自己重連，持續失敗 30 秒才重建）
 
 async function loadFeaturedProducts(attempt = 1) {
     try {
@@ -692,6 +699,7 @@ async function loadFeaturedProducts(attempt = 1) {
         const featuredProducts = await FirebaseUtils.loadFeaturedProducts();
 
         if (featuredProducts.length === 0) {
+            if (window.noteFirestoreSuccess) window.noteFirestoreSuccess();
             showNoProducts();
             return;
         }
@@ -708,9 +716,9 @@ async function loadFeaturedProducts(attempt = 1) {
     } catch (error) {
         console.error(`加載精選商品失敗（第 ${attempt} 次嘗試）:`, error);
 
-        // 第 1 次失敗先不出手，連第 2 次也失敗才換一個全新的 Firestore
-        // 連線物件再繼續重試，原因見 products.html 的同一段註解。
-        // 60 秒節流避免無限重建
+        // 要不要重建 Firestore 連線統一由 js/common.js 的 maybeResetFirestoreConnection()
+        // 決定：這一頁從沒連上過就立刻重建（冷開卡住時 SDK 自己恢復常要 40 秒以上），
+        // 連上過之後才失敗則先讓 SDK 自己重連，持續失敗 30 秒才重建
         if (window.maybeResetFirestoreConnection) {
             await window.maybeResetFirestoreConnection();
         }
