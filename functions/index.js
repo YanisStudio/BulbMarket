@@ -12,6 +12,9 @@ exports.createOrder = require("./create-order").createOrder;
 // 顧客追加訂單備註／回報匯款：只能往後接、不能覆蓋既有內容，見 append-order-note.js
 exports.appendOrderNote = require("./append-order-note").appendOrderNote;
 
+// 有新訂單時寄通知信給管理員，收件人寫在 notify-admin.js 的 ADMIN_ORDER_NOTIFY_EMAILS
+exports.notifyAdminNewOrder = require("./notify-admin").notifyAdminNewOrder;
+
 const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
 
 function formatCurrency(amount) {
