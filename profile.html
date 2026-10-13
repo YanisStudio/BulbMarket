@@ -3,6 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- firebase-warmup：讓瀏覽器一開始解析頁面就先跟 Firebase 握手、下載 SDK，
+         不用等到下面載入 Firebase 的 module 腳本才開始。重開瀏覽器第一次進站最有感
+         （連線、登入憑證都要重新建立）。版本號要跟下面 import 的一致。 -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js">
     <title>會員資料 - 球根花卉團購 | 優質球根花卉專賣店</title>
     <meta name="robots" content="noindex, follow">
     <meta name="description" content="球根花卉團購提供各式球根花卉、繡球花苗、進口球根、花卉種子及園藝資材。香水百合、孤挺花、鳶尾、睡蓮、鬱金香等，品質保證。">
@@ -370,17 +379,15 @@
             orderBy,
             where,
             serverTimestamp
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js";
 
         // Firebase配置 - 統一使用與其他頁面相同的配置
         const firebaseConfig = window.FIREBASE_CONFIG;
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        // 固定使用長輪詢（experimentalForceLongPolling），不先嘗試串流連線。
-        // 公司網路、VPN、防毒軟體常會擋住或緩衝串流連線，自動偵測要等 10 秒逾時才會改用長輪詢，
-        // 期間所有讀取都會失敗（顯示 client is offline）。本站都是一次性讀寫，長輪詢不影響功能
-        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+        // 連線設定統一放在 js/firebase-config.js 的 FIRESTORE_SETTINGS（原因寫在那裡）
+        const db = initializeFirestore(app, window.FIRESTORE_SETTINGS);
         
         window.firebaseServices = {
             auth: auth,

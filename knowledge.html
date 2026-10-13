@@ -3,6 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- firebase-warmup：讓瀏覽器一開始解析頁面就先跟 Firebase 握手、下載 SDK，
+         不用等到下面載入 Firebase 的 module 腳本才開始。重開瀏覽器第一次進站最有感
+         （連線、登入憑證都要重新建立）。版本號要跟下面 import 的一致。 -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js">
     <title>栽培小知識 - 球根花卉團購 | 優質球根花卉專賣店</title>
     <meta name="description" content="球根花卉栽培小知識：種植時機、土壤介質、澆水施肥、球根保存與休眠照顧，帶你輕鬆種出漂亮的百合、鬱金香、孤挺花等球根花卉。">
     <meta name="keywords" content="球根,球根花卉,種植,栽培,球根保存,鬱金香,百合,孤挺花,風信子,園藝知識,球根花卉團購">
@@ -51,18 +60,18 @@
             setDoc,
             getDoc,
             getDocs,
-            getDocsFromServer,
+            getDocs as getDocsFromServer,
             query,
             orderBy,
             where,
             serverTimestamp
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js";
 
         const firebaseConfig = window.FIREBASE_CONFIG;
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
-        // 跟其他頁面一致：固定使用長輪詢，避免公司網路擋串流連線時讀取卡住
-        const db = initializeFirestore(app, { experimentalForceLongPolling: true });
+        // 連線設定統一放在 js/firebase-config.js 的 FIRESTORE_SETTINGS（原因寫在那裡）
+        const db = initializeFirestore(app, window.FIRESTORE_SETTINGS);
 
         window.firebaseServices = {
             app,
@@ -280,6 +289,7 @@ async function loadKnowledge(attempt = 1) {
             grid.innerHTML = '<div class="error-message">網路連線不穩定，正在自動重新連線中，請稍候⋯⋯</div>';
         }
         const articles = await KnowledgeArticles.load({ publishedOnly: true });
+        if (window.noteFirestoreSuccess) window.noteFirestoreSuccess();
         const params = new URLSearchParams(window.location.search);
         const articleId = params.get('id');
         if (articleId) {
@@ -289,9 +299,9 @@ async function loadKnowledge(attempt = 1) {
         }
     } catch (error) {
         console.error(`載入栽培小知識失敗（第 ${attempt} 次嘗試）:`, error);
-        // 跟商品頁一樣：連續失敗才重建 Firestore 連線，60 秒內不重複重建
-        // 只有持續失敗夠久才真的重建，否則會把「只是慢、正要成功」的連線
-        // 砍掉重練，新連線又得從頭握手，反而更久
+        // 要不要重建 Firestore 連線統一由 js/common.js 的 maybeResetFirestoreConnection()
+        // 決定：這一頁從沒連上過就立刻重建（冷開卡住時 SDK 自己恢復常要 40 秒以上），
+        // 連上過之後才失敗則先讓 SDK 自己重連，持續失敗 30 秒才重建
         if (window.maybeResetFirestoreConnection) {
             await window.maybeResetFirestoreConnection();
         }

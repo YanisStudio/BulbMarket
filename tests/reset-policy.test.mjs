@@ -4,8 +4,13 @@
 // 一失敗就重建等於把它砍掉重練，新連線又得從頭握手——實測看到的就是
 // 「重建完的新連線一樣等滿 10 秒」，反而更久。
 //
-// 所以政策是：讓 SDK 自己先重連，只有「持續失敗夠久」才動用重建。
-// 這支測試鎖住那個門檻，避免日後有人又改回「一失敗就重建」。
+// 但「這一頁從來沒連上過」是另一回事：冷開卡住時 SDK 的 10 秒逾時內伺服器
+// 一筆資料都沒送到，不是快好了的連線，讓 SDK 自己恢復實測常要 40～60 秒以上。
+//
+// 所以政策分兩種：
+//   - 從沒連上過：一失敗就重建，之後每次失敗只要距上次重建 9 秒以上就再重建
+//   - 連上過之後才失敗：讓 SDK 自己先重連，持續失敗 30 秒才重建，重建後冷卻 60 秒
+// 這支測試鎖住這兩個門檻，避免日後有人改回「一律一失敗就重建」或「一律等 30 秒」。
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert';
@@ -54,15 +59,43 @@ function load(file) {
 for (const file of ['js/common.js', 'js/admin-common.js']) {
     console.log(`\n【${file}】`);
 
+    // ---- 從沒連上過（冷開卡住）----
     {
         const m = load(file);
-        await t('第一次失敗不重建（SDK 自己會重連，砍掉反而更久）', async () => {
-            await m.fail();
+        await m.fail();
+        t('從沒連上過：第一次失敗就重建', () => {
+            assert.strictEqual(m.rebuilds.length, 1, '應該立刻重建，實際 ' + m.rebuilds.length + ' 次');
+        });
+        m.advance(2000);
+        await m.fail();
+        t('從沒連上過：9 秒內的連續失敗不會重複重建', () => {
+            assert.strictEqual(m.rebuilds.length, 1, '重建太頻繁（' + m.rebuilds.length + ' 次）');
+        });
+        m.advance(9000);
+        await m.fail();
+        t('從沒連上過：新連線也卡住（再等滿 SDK 的逾時）就再重建', () => {
+            assert.strictEqual(m.rebuilds.length, 2, '應該重建第 2 次，實際 ' + m.rebuilds.length + ' 次');
+        });
+        m.success();
+        m.advance(10000);
+        await m.fail();
+        t('連上一次之後，就改用保守的規則（第一次失敗不重建）', () => {
+            assert.strictEqual(m.rebuilds.length, 2, '連上過之後仍然一失敗就重建');
+        });
+    }
+
+    // ---- 連上過之後才失敗 ----
+    {
+        const m = load(file);
+        m.success();
+        await m.fail();
+        t('第一次失敗不重建（SDK 自己會重連，砍掉反而更久）', () => {
             assert.strictEqual(m.rebuilds.length, 0, '第一次失敗就重建了');
         });
     }
     {
         const m = load(file);
+        m.success();
         await m.fail();
         m.advance(10000);
         await m.fail();
@@ -74,6 +107,7 @@ for (const file of ['js/common.js', 'js/admin-common.js']) {
     }
     {
         const m = load(file);
+        m.success();
         await m.fail();
         m.advance(31000);
         await m.fail();
@@ -83,6 +117,7 @@ for (const file of ['js/common.js', 'js/admin-common.js']) {
     }
     {
         const m = load(file);
+        m.success();
         await m.fail();
         m.advance(31000);
         await m.fail();          // 第 1 次重建
@@ -101,6 +136,7 @@ for (const file of ['js/common.js', 'js/admin-common.js']) {
     }
     {
         const m = load(file);
+        m.success();
         await m.fail();
         m.advance(25000);
         m.success();             // 中間成功一次
