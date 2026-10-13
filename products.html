@@ -418,9 +418,9 @@ let productsLoaded = false;
 let paginatedPages = [];
 let currentPageNum = 1;
 
-// 記錄上次自動重建 Firestore 連線的時間，避免網路真的斷線很久時無限重建
-let lastConnectionResetAt = 0;
-const CONNECTION_RESET_COOLDOWN_MS = 20000;
+// 什麼時候該重建 Firestore 連線，統一由 js/common.js 的
+// maybeResetFirestoreConnection() 決定（只有持續失敗夠久才真的重建，
+// 否則會把「只是慢、正要成功」的連線砍掉重練，反而更久）
 
 // DOM 載入完成後初始化
 document.addEventListener('DOMContentLoaded', function() {
@@ -512,6 +512,7 @@ async function loadProducts(attempt = 1) {
             return;
         }
 
+        if (window.noteFirestoreSuccess) window.noteFirestoreSuccess();
         currentProducts = products;
         console.log(`成功載入 ${products.length} 個商品`);
 
@@ -541,11 +542,8 @@ async function loadProducts(attempt = 1) {
         // 是同一個原因）。用 resetFirestoreConnection() 換一個全新的連線
         // 物件，不用真的重新整理整頁。60 秒節流，避免網路真的斷線很久時
         // 一直重建連線
-        if (Date.now() - lastConnectionResetAt > CONNECTION_RESET_COOLDOWN_MS) {
-            lastConnectionResetAt = Date.now();
-            if (window.resetFirestoreConnection) {
-                await window.resetFirestoreConnection();
-            }
+        if (window.maybeResetFirestoreConnection) {
+            await window.maybeResetFirestoreConnection();
         }
 
         // 不設重試上限，只把間隔漸增封頂在 8 秒——網路恢復的當下就能自動抓到

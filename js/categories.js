@@ -136,6 +136,7 @@
             renderFooterLinks(list);
             // 第一次就成功的話，呼叫端自己的 .then() 會處理；這裡只在重試成功時通知
             if (tryCount > 1) {
+                if (window.noteFirestoreSuccess) window.noteFirestoreSuccess();
                 console.log('商品分類已在第 ' + tryCount + ' 次嘗試載入成功');
                 notifyUpdate(list);
             }
