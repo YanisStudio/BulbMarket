@@ -1009,9 +1009,11 @@
                     for (let i = sortedRates.length - 1; i >= 0; i--) {
                         const rate = sortedRates[i];
                         
-                        if (remainingQuantity >= rate.minQuantity) {
-                            const useQuantity = Math.min(remainingQuantity, rate.maxQuantity);
-                            totalFee += rate.fee;
+                        // 跟伺服器 functions/create-order.js 同一套容錯：最大數量沒填（或是 0）
+                        // 視為不限（否則迴圈跑不完、頁面當掉），運費不是數字時當成 0
+                        if (remainingQuantity >= (rate.minQuantity || 0)) {
+                            const useQuantity = Math.min(remainingQuantity, Number(rate.maxQuantity) || remainingQuantity);
+                            totalFee += Number(rate.fee) || 0;
                             remainingQuantity -= useQuantity;
                             handled = true;
                             break;
@@ -1288,7 +1290,9 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                             productDetails[uniqueIds[index]] = {
                                 imageUrl: data.imageUrl || '/images/placeholder.jpg',
                                 stock: data.stock || 0,
-                                category: data.category || 'other'
+                                category: data.category || 'other',
+                                price: Number(data.price) || 0,
+                                name: data.name || ''
                             };
                         });
 
@@ -1304,11 +1308,26 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                 // 獲取產品圖片、庫存和類別
                 const productDetails = await getProductDetails();
                 
-                // 為購物車項目補充類別資訊
-                cart = cart.map(item => ({
-                    ...item,
-                    category: productDetails[item.id]?.category || 'other'
-                }));
+                // 為購物車項目補充類別資訊，價格一律以資料庫目前的價格為準。
+                // 購物車存的是「加入當下」的價格，後台改價後如果直接拿來顯示，
+                // 這頁算出來的金額會跟伺服器不一樣，送出時才被擋下來
+                const priceChanges = [];
+                cart = cart.map(item => {
+                    const info = productDetails[item.id];
+                    if (info && info.price !== item.price) {
+                        priceChanges.push(`${info.name || item.name}：NT$ ${item.price} → NT$ ${info.price}`);
+                    }
+                    return {
+                        ...item,
+                        name: info?.name || item.name,
+                        price: info ? info.price : item.price,
+                        category: info?.category || 'other'
+                    };
+                });
+                if (priceChanges.length > 0) {
+                    localStorage.setItem('cart', JSON.stringify(cart));
+                    showToast('部分商品價格已更新，金額已改用最新價格：' + priceChanges.join('、'));
+                }
                 
                 // 合併相同商品
                 const mergedCart = [];

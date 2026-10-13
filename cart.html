@@ -755,6 +755,23 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 顯示已移除商品的通知
     function showRemovedItemsNotification(removedNames, count) {
+        showCartNotice('商品已下架', `
+            以下商品已下架並從購物車中移除：<br>
+            <strong>${escapeHtml(removedNames)}</strong>
+            ${count > 1 ? ` (共 ${count} 項商品)` : ''}
+        `);
+    }
+
+    // 顯示價格已更新的通知（changes: [{ name, oldPrice, newPrice }]）
+    function showPriceChangedNotification(changes) {
+        const lines = changes.map(change =>
+            `<strong>${escapeHtml(change.name)}</strong>：NT$ ${change.oldPrice} → NT$ ${change.newPrice}`
+        ).join('<br>');
+        showCartNotice('商品價格已更新', `購物車已改用最新價格：<br>${lines}`);
+    }
+
+    // 購物車右上角的提示卡片；messageHTML 由呼叫端負責跳脫
+    function showCartNotice(title, messageHTML) {
         // 創建通知元素
         const notification = document.createElement('div');
         notification.className = 'removed-items-notification';
@@ -764,11 +781,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     <i class="fas fa-exclamation-triangle"></i>
                 </div>
                 <div class="notification-text">
-                    <div class="notification-title">商品已下架</div>
+                    <div class="notification-title">${escapeHtml(title)}</div>
                     <div class="notification-message">
-                        以下商品已下架並從購物車中移除：<br>
-                        <strong>${escapeHtml(removedNames)}</strong>
-                        ${count > 1 ? ` (共 ${count} 項商品)` : ''}
+                        ${messageHTML}
                     </div>
                 </div>
                 <button class="notification-close" onclick="this.parentElement.parentElement.remove()">
@@ -1057,9 +1072,12 @@ document.addEventListener('DOMContentLoaded', function() {
             for (let i = sortedRates.length - 1; i >= 0; i--) {
                 const rate = sortedRates[i];
                 
-                if (remainingQuantity >= rate.minQuantity) {
-                    const useQuantity = Math.min(remainingQuantity, rate.maxQuantity);
-                    totalFee += rate.fee;
+                // 跟伺服器 functions/create-order.js 同一套容錯：最大數量沒填（或是 0）
+                // 視為不限，否則 useQuantity 會是 0，remainingQuantity 永遠不會變小，
+                // 迴圈跑不完、整個頁面當掉；運費不是數字時當成 0，不要顯示成 NaN
+                if (remainingQuantity >= (rate.minQuantity || 0)) {
+                    const useQuantity = Math.min(remainingQuantity, Number(rate.maxQuantity) || remainingQuantity);
+                    totalFee += Number(rate.fee) || 0;
                     remainingQuantity -= useQuantity;
                     handled = true;
                     break;
@@ -1149,7 +1167,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     imageUrl: data.imageUrl || '/images/placeholder.jpg',
                     stock: data.stock || 0,
                     category: data.category || 'other',
-                    status: data.status || 'inactive' // 新增：獲取商品狀態
+                    status: data.status || 'inactive', // 新增：獲取商品狀態
+                    // 目前的價格與名稱：購物車存的是「加入當下」的價格，後台改價之後要跟著更新，
+                    // 見 renderCart() 的說明
+                    price: Number(data.price) || 0,
+                    name: data.name || ''
                 };
             });
 
@@ -1174,15 +1196,29 @@ document.addEventListener('DOMContentLoaded', function() {
             // 檢查並過濾已下架的商品
             const validCart = [];
             const removedItems = [];
+            const priceChanges = [];
 
             cart.forEach(item => {
                 const productInfo = productDetails[item.id];
 
                 // 檢查商品是否存在且狀態為 active
                 if (productInfo && productInfo.status === 'active') {
+                    // 價格一律以資料庫目前的價格為準。購物車存的是「加入當下」的價格，
+                    // 後台改價之後如果不在這裡更新，結帳頁（以及伺服器）會因為價格對不上
+                    // 擋下訂單、請顧客「回購物車確認最新金額」，回到這裡看到的卻還是舊價格，
+                    // 顧客就卡在購物車和結帳頁之間，只能刪掉商品重新加入
+                    if (productInfo.price !== item.price) {
+                        priceChanges.push({
+                            name: productInfo.name || item.name,
+                            oldPrice: item.price,
+                            newPrice: productInfo.price
+                        });
+                    }
                     // 商品仍然有效，加入有效購物車
                     validCart.push({
                         ...item,
+                        name: productInfo.name || item.name,
+                        price: productInfo.price,
                         category: productInfo.category || 'other'
                     });
                 } else {
@@ -1197,9 +1233,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // calculateShipping() 會把每一樣商品都算成「其他」類別，運費算錯
             cart = validCart;
 
-            // 如果有商品被移除，更新購物車並通知用戶
-            if (removedItems.length > 0) {
+            // 有商品被移除或價格更新，都要寫回 localStorage，結帳頁才會用到最新資料
+            if (removedItems.length > 0 || priceChanges.length > 0) {
                 localStorage.setItem('cart', JSON.stringify(cart));
+            }
+
+            if (priceChanges.length > 0) {
+                showPriceChangedNotification(priceChanges);
+            }
+
+            // 如果有商品被移除，通知用戶
+            if (removedItems.length > 0) {
 
                 // 顯示被移除商品的通知
                 const removedNames = removedItems.map(item => item.name).join('、');
@@ -1512,10 +1556,13 @@ document.addEventListener('DOMContentLoaded', function() {
                         enableCartActions();
 
                     } catch (error) {
+                        // 商品其實已經從購物車移除了（上面的 splice + localStorage），
+                        // 失敗的是之後重新讀取商品資訊。畫面上還是舊的列表，每一列的
+                        // data-index 已經跟購物車對不上，再按刪除會刪到別的商品，
+                        // 所以改顯示連線錯誤畫面，讓使用者重新載入
                         console.error('移除商品時出錯:', error);
                         hideRemoveItemLoading();
-                        enableCartActions();
-                        showToast('移除商品時發生錯誤，請重試');
+                        showCartConnectionError();
                     }
                 }
             });
@@ -1577,11 +1624,16 @@ document.addEventListener('DOMContentLoaded', function() {
             // 獲取產品詳情
             const productDetails = await getProductDetails();
             
-            // 為購物車項目補充類別資訊
-            cart = cart.map(item => ({
-                ...item,
-                category: productDetails[item.id]?.category || 'other'
-            }));
+            // 為購物車項目補充類別資訊，價格同樣以資料庫為準（見 renderCart()）
+            cart = cart.map(item => {
+                const info = productDetails[item.id];
+                return {
+                    ...item,
+                    price: info ? info.price : item.price,
+                    category: info?.category || 'other'
+                };
+            });
+            localStorage.setItem('cart', JSON.stringify(cart));
             
             if (loadingText) loadingText.textContent = '正在更新商品列表';
             
