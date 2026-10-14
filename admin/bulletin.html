@@ -797,8 +797,7 @@
                     showBulletinSection();
                     loadBulletin();
                     window.AdminKnowledge.init();
-                    // admin-knowledge.js 跟這一頁分開快取，剛上線時可能還是舊版、沒有 AdminMembership
-                    if (window.AdminMembership) window.AdminMembership.init();
+                    initMembershipAdmin();
                 },
                 function(error) {
                     if (error === '未登入') {
@@ -808,6 +807,31 @@
                     }
                 }
             );
+        };
+
+        // 「加入會員」分頁的編輯器。js/knowledge.js、js/admin-knowledge.js 跟這一頁分開快取，
+        // 瀏覽器可能還是舊版（沒有 AdminMembership），這時加上時間參數強制下載最新版
+        const loadFreshScript = function(src) {
+            return new Promise(function(resolve, reject) {
+                const script = document.createElement('script');
+                script.src = src + '?v=' + Date.now();
+                script.onload = resolve;
+                script.onerror = function() { reject(new Error('無法下載 ' + src)); };
+                document.head.appendChild(script);
+            });
+        };
+        const initMembershipAdmin = async function() {
+            try {
+                if (!window.AdminMembership) {
+                    if (!window.MembershipArticles) await loadFreshScript('/js/knowledge.js');
+                    await loadFreshScript('/js/admin-knowledge.js');
+                }
+                window.AdminMembership.init();
+            } catch (error) {
+                console.error('載入加入會員編輯器失敗:', error);
+                document.getElementById('membership-admin-list').innerHTML =
+                    '<p class="knowledge-empty">載入失敗，請重新整理頁面再試一次。</p>';
+            }
         };
 
         const showBulletinSection = function() {
