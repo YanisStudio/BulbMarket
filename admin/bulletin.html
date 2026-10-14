@@ -123,7 +123,7 @@
         <div class="admin-container">
             <h1 class="admin-title">內容管理</h1>
 
-            <!-- 管理員才看得到：分成「布告欄」、「栽培小知識」兩個區域 -->
+            <!-- 管理員才看得到：分成「布告欄」、「栽培小知識」、「加入會員」三個區域 -->
             <div id="bulletin-section" style="display: none;">
                 <div class="content-tabs" role="tablist">
                     <button type="button" class="content-tab active" role="tab" data-panel="bulletin-panel" aria-selected="true">
@@ -131,6 +131,9 @@
                     </button>
                     <button type="button" class="content-tab" role="tab" data-panel="knowledge-panel" aria-selected="false">
                         <i class="fas fa-seedling"></i> 栽培小知識
+                    </button>
+                    <button type="button" class="content-tab" role="tab" data-panel="membership-panel" aria-selected="false">
+                        <i class="fas fa-user-plus"></i> 加入會員
                     </button>
                 </div>
 
@@ -165,6 +168,25 @@
                     </div>
 
                     <div id="knowledge-editor" hidden></div>
+                </div>
+
+                <!-- 加入會員：跟栽培小知識共用同一套編輯器（js/admin-knowledge.js），資料存在 settings/membership -->
+                <div class="content-panel" id="membership-panel" hidden>
+                    <p class="bulletin-intro">前台「加入會員」頁面的文章，例如註冊方式、購物須知、運送與退換貨說明。只有一篇文章時，前台會直接顯示那一篇；有多篇時會列出文章卡片。</p>
+
+                    <div id="membership-list-wrap">
+                        <div class="knowledge-toolbar">
+                            <button type="button" class="btn btn-primary" id="membership-new-btn">
+                                <i class="fas fa-plus"></i> 新增文章
+                            </button>
+                            <a href="/membership.html" target="_blank" rel="noopener" class="btn btn-outline">
+                                <i class="fas fa-external-link-alt"></i> 查看前台頁面
+                            </a>
+                        </div>
+                        <div id="membership-admin-list"></div>
+                    </div>
+
+                    <div id="membership-editor" hidden></div>
                 </div>
             </div>
 
@@ -241,7 +263,9 @@
 
         .content-panel[hidden],
         #knowledge-list-wrap[hidden],
-        #knowledge-editor[hidden] {
+        #knowledge-editor[hidden],
+        #membership-list-wrap[hidden],
+        #membership-editor[hidden] {
             display: none;
         }
 
@@ -773,6 +797,8 @@
                     showBulletinSection();
                     loadBulletin();
                     window.AdminKnowledge.init();
+                    // admin-knowledge.js 跟這一頁分開快取，剛上線時可能還是舊版、沒有 AdminMembership
+                    if (window.AdminMembership) window.AdminMembership.init();
                 },
                 function(error) {
                     if (error === '未登入') {
@@ -808,7 +834,8 @@
             document.getElementById('not-logged-in-section').style.display = 'block';
         };
 
-        // 「布告欄」、「栽培小知識」兩個分頁；網址帶 #knowledge 直接打開栽培小知識
+        // 「布告欄」、「栽培小知識」、「加入會員」三個分頁；網址帶 #knowledge／#membership 直接打開該分頁
+        const PANEL_HASH = { 'knowledge-panel': '#knowledge', 'membership-panel': '#membership' };
         const switchPanel = function(panelId) {
             document.querySelectorAll('.content-tab').forEach(function(tab) {
                 const active = tab.dataset.panel === panelId;
@@ -818,12 +845,14 @@
             document.querySelectorAll('.content-panel').forEach(function(panel) {
                 panel.hidden = panel.id !== panelId;
             });
-            history.replaceState(null, '', panelId === 'knowledge-panel' ? '#knowledge' : location.pathname);
+            history.replaceState(null, '', PANEL_HASH[panelId] || location.pathname);
         };
         document.querySelectorAll('.content-tab').forEach(function(tab) {
             tab.addEventListener('click', function() { switchPanel(tab.dataset.panel); });
         });
-        if (location.hash === '#knowledge') switchPanel('knowledge-panel');
+        Object.keys(PANEL_HASH).forEach(function(panelId) {
+            if (location.hash === PANEL_HASH[panelId]) switchPanel(panelId);
+        });
 
         const setSlotEnabled = function(slot, enabled) {
             document.getElementById(`slot-${slot}-body`).classList.toggle('enabled', enabled);

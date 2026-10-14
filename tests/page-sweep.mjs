@@ -31,6 +31,8 @@ const BASE = 'http://localhost:8097/';
 const CHECKS = {
     'index.html': () => document.querySelectorAll('#featured-products-grid .product-card').length > 0,
     'products.html': () => document.querySelectorAll('#products-grid .product-card').length > 0,
+    // 只有一篇文章時直接顯示那一篇
+    'membership.html': () => document.querySelectorAll('#knowledge-article-view:not([hidden]) .knowledge-section').length > 0,
     'knowledge.html': () => document.querySelectorAll('#knowledge-grid a, #knowledge-grid .knowledge-card, #knowledge-grid article').length > 0,
     'cart.html': () => /NT\$|\$\s*\d|元/.test((document.querySelector('.cart-summary, #cart-summary, .summary') || document.body).textContent)
         && !/載入中|讀取中/.test((document.querySelector('#shipping-fee, .shipping-fee') || { textContent: '' }).textContent),
