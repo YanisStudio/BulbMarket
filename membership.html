@@ -276,8 +276,31 @@
 // 加入會員：文章存在 Firestore 的 settings/membership（{ articles: [...] }），
 // 由後台「內容管理 → 加入會員」編輯，資料格式跟栽培小知識一樣（見 js/knowledge.js）。
 // 網址 ?id=文章ID 顯示單篇；只有一篇已發布的文章時，直接顯示那一篇
-const Articles = window.MembershipArticles;
+let Articles = window.MembershipArticles;
 const PAGE_URL = '/membership.html';
+
+// 每個檔案在瀏覽器各自快取 10 分鐘。剛上線、或剛看過栽培小知識的瀏覽器，
+// 可能還快取著舊版的 js/knowledge.js（沒有 MembershipArticles），這時重試幾次都沒用
+//（重試不會重新下載檔案），畫面會一直停在「網路連線不穩定」。
+// 遇到這種情況就加上時間參數，強制重新下載最新的 js/knowledge.js
+function loadFreshScript(src) {
+    return new Promise((resolve, reject) => {
+        const script = document.createElement('script');
+        script.src = src + (src.includes('?') ? '&' : '?') + 'v=' + Date.now();
+        script.onload = resolve;
+        script.onerror = () => reject(new Error('無法下載 ' + src));
+        document.head.appendChild(script);
+    });
+}
+
+async function ensureArticles() {
+    if (!Articles) {
+        await loadFreshScript('/js/knowledge.js');
+        Articles = window.MembershipArticles;
+    }
+    if (!Articles) throw new Error('js/knowledge.js 沒有 MembershipArticles');
+    return Articles;
+}
 const PAGE_SIZE = 9;
 // 什麼時候該重建 Firestore 連線，統一由 js/common.js 的
 // maybeResetFirestoreConnection() 決定
@@ -293,10 +316,7 @@ async function loadKnowledge(attempt = 1) {
         if (attempt > 2) {
             grid.innerHTML = '<div class="error-message">網路連線不穩定，正在自動重新連線中，請稍候⋯⋯</div>';
         }
-        // js/knowledge.js 跟這一頁分開快取，剛上線時可能還是舊版、沒有 MembershipArticles，
-        // 丟例外交給下面的重試
-        if (!Articles) throw new Error('js/knowledge.js 尚未更新');
-        const articles = await Articles.load({ publishedOnly: true });
+        const articles = await (await ensureArticles()).load({ publishedOnly: true });
         if (window.noteFirestoreSuccess) window.noteFirestoreSuccess();
         const params = new URLSearchParams(window.location.search);
         const articleId = params.get('id');
