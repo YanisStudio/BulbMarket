@@ -59,7 +59,8 @@ t('網站的匯款帳號（js/bank-info.js）跟信裡的一致', () => {
         assert.ok(src.includes(`${key}: '${BANK_TRANSFER_INFO[key]}'`), `${key} 不一致`);
     }
     const success = require('fs').readFileSync(path.join(__dirname, '..', 'order-success.html'), 'utf8');
-    assert.ok(success.includes(BANK_TRANSFER_INFO.account), 'order-success.html 的帳號不一致');
+    assert.ok(success.includes('/js/bank-info.js') && !/\d{4}-\d{3}-\d{6}/.test(success),
+        'order-success.html 應該用 js/bank-info.js，不要自己寫死帳號');
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);

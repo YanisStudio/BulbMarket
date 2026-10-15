@@ -210,14 +210,9 @@
         .pay-root { max-width: 640px; margin: 2rem auto 3rem; }
         .pay-card { background: #fff; border: 1px solid #e3e8e4; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
         .pay-card h3 { margin: 0 0 .75rem; color: #2e7d4f; font-size: 1.15rem; }
-        .pay-meta { display: grid; grid-template-columns: auto 1fr; gap: .35rem 1rem; margin: 0; }
-        .pay-meta dt { color: #6b776e; }
-        .pay-meta dd { margin: 0; }
         .pay-items { list-style: none; padding: 0; margin: .75rem 0 0; border-top: 1px dashed #dfe5e0; }
         .pay-items li { display: flex; justify-content: space-between; gap: 1rem; padding: .4rem 0; border-bottom: 1px dashed #dfe5e0; }
         .pay-items li span:last-child { white-space: nowrap; }
-        .pay-total { text-align: right; margin: .75rem 0 0; font-size: 1.1rem; }
-        .pay-total strong { color: #c0392b; font-size: 1.25em; }
         .pay-steps { margin: .5rem 0 0; padding-left: 1.25rem; line-height: 1.8; }
         .pay-status { border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; line-height: 1.7; }
         .pay-status.ok { background: #e8f5e9; color: #1b5e20; }
@@ -228,6 +223,16 @@
         .pay-form input, .pay-form textarea { width: 100%; padding: .6rem .75rem; border: 1px solid #cfd8d2; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         .pay-form .form-hint { color: #7a857d; font-size: .85rem; margin-top: .25rem; }
         .pay-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+        .pay-note { color: #6b776e; font-size: .9rem; margin: .25rem 0 .75rem; }
+        .pay-order { padding: .75rem 0; border-top: 1px solid #edf1ee; }
+        .pay-order:first-of-type { border-top: 0; padding-top: 0; }
+        .pay-order-head { display: flex; justify-content: space-between; align-items: center; gap: .5rem; }
+        .pay-order-date { color: #8a958d; font-size: .85rem; }
+        .pay-order-total { text-align: right; margin: .5rem 0 0; }
+        .pay-badge { font-size: .8rem; padding: .15rem .6rem; border-radius: 999px; white-space: nowrap; }
+        .pay-badge.due { background: #fdecea; color: #c0392b; }
+        .pay-badge.ok { background: #e8f5e9; color: #2e7d32; }
+        .pay-badge.muted { background: #eee; color: #666; }
     </style>
 
     <footer class="site-footer">
@@ -285,33 +290,28 @@
     <script src="/js/bank-info.js"></script>
 
     <script>
-// 訂單付款頁：pay.html?id=訂單ID
+// 訂單付款頁：所有付款都集中在這一頁
+//   pay.html?id=訂單ID            一筆（訂單成立通知信、訂單完成頁、訂單記錄的單筆詳情）
+//   pay.html?ids=ID1,ID2,...      多筆一起付（訂單記錄勾選的訂單、未付款提醒）
 //
-// 訂單成立通知信裡的「前往付款」按鈕會連到這裡，顧客不用登入、也不用記得要去哪裡付款，
-// 打開就看得到應付金額、匯款帳號，匯款後直接在這裡回報。
-//
-// 用訂單 ID 讀單筆訂單，跟訂單完成頁同一套假設：Firestore 規則 orders 允許 get（訂單 ID 是
-// 20 碼隨機字串），回報匯款走 Cloud Function appendOrderNote（會員訂單要本人登入才能回報）。
-// 這一頁只顯示訂單編號、商品與金額，不顯示收件人姓名、電話、地址。
-const orderId = new URLSearchParams(window.location.search).get('id') || '';
-let currentOrder = null;
-let authResolved = false;
+// 打開就看得到應付金額、匯款帳號，匯款後直接在這裡回報。不需要登入：
+// 用訂單 ID 讀單筆訂單（Firestore 規則 orders 允許 get，訂單 ID 是 20 碼隨機字串），
+// 回報匯款走 Cloud Function appendOrderNote（知道訂單 ID 就能回報，只會往後接，
+// 不會改成已付款，最後由管理員核對）。這一頁只顯示訂單編號、商品與金額，
+// 不顯示收件人姓名、電話、地址。
+const MAX_ORDERS = 20; // 跟 functions/append-order-note.js 的 MAX_ORDERS_PER_CALL 一致
+const params = new URLSearchParams(window.location.search);
+const orderIds = [...new Set((params.get('ids') || params.get('id') || '')
+    .split(',').map(id => id.trim()).filter(id => id && !id.includes('/')))].slice(0, MAX_ORDERS);
+let orders = []; // [{ id, data }]，找不到的訂單不放進來
 
 document.addEventListener('DOMContentLoaded', function() {
     initCommonFeatures();
-    if (!orderId) {
+    if (orderIds.length === 0) {
         showMessage('找不到訂單', '網址裡沒有訂單編號。請從訂單成立通知信裡的「前往付款」按鈕進來，或到<a href="/orders.html">訂單記錄</a>查看。');
         return;
     }
-    loadOrder();
-    // 會員訂單要知道目前登入的是誰，才能決定顯示回報表單還是請對方先登入
-    const services = window.firebaseServices;
-    if (services && services.onAuthStateChanged) {
-        services.onAuthStateChanged(services.auth, function() {
-            authResolved = true;
-            if (currentOrder) render();
-        });
-    }
+    loadOrders();
 });
 
 function showMessage(title, html) {
@@ -319,16 +319,16 @@ function showMessage(title, html) {
         <div class="pay-card"><h3>${escapeHtml(title)}</h3><p>${html}</p></div>`;
 }
 
-async function loadOrder(attempt = 1) {
+async function loadOrders(attempt = 1) {
     try {
         const services = window.firebaseServices;
-        const snap = await services.getDoc(services.doc(services.db, 'orders', orderId));
+        const snaps = await Promise.all(orderIds.map(id => services.getDoc(services.doc(services.db, 'orders', id))));
         if (window.noteFirestoreSuccess) window.noteFirestoreSuccess();
-        if (!snap.exists()) {
+        orders = snaps.map((snap, i) => snap.exists() ? { id: orderIds[i], data: snap.data() } : null).filter(Boolean);
+        if (orders.length === 0) {
             showMessage('找不到訂單', '這個付款連結對應的訂單不存在，可能已經被取消。如有疑問請<a href="/contact.html">聯絡我們</a>。');
             return;
         }
-        currentOrder = snap.data();
         render();
     } catch (error) {
         console.error(`讀取訂單失敗（第 ${attempt} 次嘗試）:`, error);
@@ -336,89 +336,97 @@ async function loadOrder(attempt = 1) {
             document.getElementById('pay-root').innerHTML = '<div class="loading-indicator">網路連線不穩定，正在自動重新連線中，請稍候⋯⋯</div>';
         }
         if (window.maybeResetFirestoreConnection) await window.maybeResetFirestoreConnection();
-        setTimeout(() => loadOrder(attempt + 1), Math.min(attempt * 1000, 8000));
+        setTimeout(() => loadOrders(attempt + 1), Math.min(attempt * 1000, 8000));
     }
 }
 
-function paymentText(payment) {
-    return payment === 'transfer_later' ? '稍後轉帳' : payment === 'transfer' ? '銀行轉帳' : (payment || '');
+function isPaid(order) {
+    return order.paymentConfirmed === true || ['confirmed', 'shipped', 'completed'].includes(order.status);
+}
+
+function money(n) {
+    return 'NT$ ' + (Number(n) || 0).toLocaleString('zh-TW');
+}
+
+function orderCard(entry) {
+    const order = entry.data;
+    const date = order.orderDate && order.orderDate.toDate ? order.orderDate.toDate().toLocaleDateString('zh-TW') : '';
+    const items = (order.items || []).map(item => `
+        <li><span>${escapeHtml(item.name)} × ${escapeHtml(item.quantity)}</span>
+            <span>${money(Number(item.price) * Number(item.quantity))}</span></li>`).join('');
+    let badge = '';
+    if (order.status === 'cancelled') badge = '<span class="pay-badge muted">已取消</span>';
+    else if (isPaid(order)) badge = '<span class="pay-badge ok">已付款</span>';
+    else if (typeof isPaymentReported === 'function' && isPaymentReported(order)) badge = '<span class="pay-badge ok">已回報・待確認</span>';
+    else badge = '<span class="pay-badge due">未付款</span>';
+    return `
+        <div class="pay-order">
+            <div class="pay-order-head"><strong>${escapeHtml(order.orderNumber || entry.id)}</strong>${badge}</div>
+            ${date ? `<div class="pay-order-date">${escapeHtml(date)}</div>` : ''}
+            <ul class="pay-items">${items}</ul>
+            <p class="pay-order-total">運費 ${money(order.shippingFee)}　訂單金額 <strong>${money(order.total)}</strong></p>
+        </div>`;
 }
 
 function render() {
-    const order = currentOrder;
     const root = document.getElementById('pay-root');
-    const total = Number(order.total) || 0;
-    const date = order.orderDate && order.orderDate.toDate
-        ? order.orderDate.toDate().toLocaleDateString('zh-TW') : '';
-    const items = (order.items || []).map(item => `
-        <li><span>${escapeHtml(item.name)} × ${escapeHtml(item.quantity)}</span>
-            <span>NT$ ${(Number(item.price) * Number(item.quantity)).toLocaleString('zh-TW')}</span></li>`).join('');
+    // 還要付款的：沒取消、還沒確認付款（已回報但還沒確認的也算，讓顧客可以補充或更正）
+    const payable = orders.filter(o => o.data.status !== 'cancelled' && !isPaid(o.data));
+    const total = payable.reduce((sum, o) => sum + (Number(o.data.total) || 0), 0);
+    const allReported = payable.length > 0 && payable.every(o => typeof isPaymentReported === 'function' && isPaymentReported(o.data));
+    const missing = orderIds.length - orders.length;
 
-    const summary = `
+    const ordersHTML = `
         <div class="pay-card">
-            <h3>訂單資訊</h3>
-            <dl class="pay-meta">
-                <dt>訂單編號</dt><dd>${escapeHtml(order.orderNumber || orderId)}</dd>
-                ${date ? `<dt>訂單日期</dt><dd>${escapeHtml(date)}</dd>` : ''}
-                <dt>付款方式</dt><dd>${escapeHtml(paymentText(order.payment))}</dd>
-            </dl>
-            <ul class="pay-items">${items}</ul>
-            <p class="pay-total">運費 NT$ ${(Number(order.shippingFee) || 0).toLocaleString('zh-TW')}　應付金額 <strong>NT$ ${total.toLocaleString('zh-TW')}</strong></p>
+            <h3>${orders.length > 1 ? `訂單資訊（${orders.length} 筆）` : '訂單資訊'}</h3>
+            ${orders.map(orderCard).join('')}
+            ${missing > 0 ? `<p class="pay-note">有 ${missing} 筆訂單找不到，可能已經被取消。</p>` : ''}
         </div>`;
 
-    const paid = order.paymentConfirmed === true || ['confirmed', 'shipped', 'completed'].includes(order.status);
-    if (order.status === 'cancelled') {
-        root.innerHTML = `<div class="pay-status muted">這筆訂單已取消，不需要付款。如有疑問請<a href="/contact.html">聯絡我們</a>。</div>${summary}`;
-        return;
-    }
-    if (paid) {
-        root.innerHTML = `<div class="pay-status ok"><strong>這筆訂單已確認付款，謝謝您！</strong><br>出貨時會再寄信通知您。</div>${summary}`;
+    if (payable.length === 0) {
+        const allCancelled = orders.every(o => o.data.status === 'cancelled');
+        root.innerHTML = `
+            <div class="pay-status ${allCancelled ? 'muted' : 'ok'}">
+                ${allCancelled ? '訂單已取消，不需要付款。如有疑問請<a href="/contact.html">聯絡我們</a>。'
+                               : '<strong>這些訂單都已確認付款，謝謝您！</strong><br>出貨時會再寄信通知您。'}
+            </div>
+            ${ordersHTML}`;
         return;
     }
 
-    const reported = typeof isPaymentReported === 'function' && isPaymentReported(order);
-    const status = reported
+    const status = allReported
         ? `<div class="pay-status ok"><strong>已收到您的匯款回報</strong>，我們核對款項後會改成「已付款」並寄信通知您。<br>如果需要補充或更正，可以再填一次下面的表單。</div>`
-        : `<div class="pay-status info"><strong>這筆訂單尚未付款</strong>，請依下面的步驟完成轉帳。</div>`;
+        : `<div class="pay-status info"><strong>${payable.length > 1 ? `共 ${payable.length} 筆訂單尚未付款` : '這筆訂單尚未付款'}</strong>，合計 ${money(total)}，請依下面的步驟完成轉帳。</div>`;
 
     root.innerHTML = `
         ${status}
-        ${summary}
         <div class="pay-card">
             <h3>匯款帳戶</h3>
             ${window.BankTransferInfo ? BankTransferInfo.html(total) : ''}
             <ol class="pay-steps">
-                <li>轉帳到上面的帳戶，金額 NT$ ${total.toLocaleString('zh-TW')}</li>
+                <li>轉帳到上面的帳戶，金額 ${money(total)}${payable.length > 1 ? `（${payable.length} 筆訂單合併一次轉帳）` : ''}</li>
                 <li>轉帳後，在下面填寫匯款資訊（帳號後五碼方便我們對帳）</li>
                 <li>我們核對款項後會寄出「付款已確認」通知信</li>
             </ol>
         </div>
-        <div class="pay-card" id="pay-report">${reportFormHTML(order, reported)}</div>
+        <div class="pay-card" id="pay-report">${reportFormHTML(payable, total, allReported)}</div>
+        ${ordersHTML}
     `;
-    bindForm();
+    bindForm(payable);
 }
 
-function reportFormHTML(order, reported) {
-    // 會員訂單：伺服器只接受下單的會員本人回報，沒登入（或登入別的帳號）就先請對方登入
-    const services = window.firebaseServices;
-    const user = services && services.auth && services.auth.currentUser;
-    if (order.userId && !user) {
-        if (!authResolved) return '<h3>回報匯款</h3><p>確認登入狀態中...</p>';
-        return `
-            <h3>回報匯款</h3>
-            <p>這是會員訂單，請先登入下單時使用的會員帳號，再回報匯款資訊。</p>
-            <div class="pay-actions"><button type="button" class="btn btn-primary" id="pay-login-btn">登入會員</button></div>`;
-    }
+function reportFormHTML(payable, total, allReported) {
     const today = localDateString();
     return `
-        <h3>${reported ? '補充／更正匯款資訊' : '回報匯款'}</h3>
+        <h3>${allReported ? '補充／更正匯款資訊' : '回報匯款'}</h3>
+        ${payable.length > 1 ? `<p class="pay-note">這次會為 ${payable.length} 筆訂單一起登記同一筆匯款。</p>` : ''}
         <form class="pay-form" id="pay-form">
             <div class="form-group"><label for="pay-remitter">匯款人姓名</label>
                 <input type="text" id="pay-remitter" required maxlength="50" placeholder="請輸入匯款人姓名"></div>
             <div class="form-group"><label for="pay-bank">匯款銀行</label>
                 <input type="text" id="pay-bank" required maxlength="50" placeholder="例：玉山銀行"></div>
             <div class="form-group"><label for="pay-amount">匯款金額</label>
-                <input type="number" id="pay-amount" required min="1" value="${Number(order.total) || ''}">
+                <input type="number" id="pay-amount" required min="1" value="${total || ''}">
                 <div class="form-hint">已帶入應付金額，實際匯款金額不同請自行修改</div></div>
             <div class="form-group"><label for="pay-last5">匯款帳號後五碼</label>
                 <input type="text" id="pay-last5" required maxlength="5" pattern="[0-9]{5}" inputmode="numeric" placeholder="例：12345"></div>
@@ -430,16 +438,7 @@ function reportFormHTML(order, reported) {
         </form>`;
 }
 
-function bindForm() {
-    const loginBtn = document.getElementById('pay-login-btn');
-    if (loginBtn) {
-        loginBtn.addEventListener('click', function() {
-            const desktop = document.getElementById('login-btn');
-            const mobile = document.getElementById('login-btn-mobile');
-            if (desktop && desktop.offsetParent !== null) desktop.click();
-            else if (mobile) mobile.click();
-        });
-    }
+function bindForm(payable) {
     const form = document.getElementById('pay-form');
     if (!form) return;
     form.addEventListener('submit', async function(event) {
@@ -449,8 +448,8 @@ function bindForm() {
         button.textContent = '送出中...';
         try {
             await window.firebaseServices.appendOrderNote({
-                orderIds: [orderId],
-                kind: 'payment',
+                orderIds: payable.map(o => o.id),
+                kind: payable.length > 1 ? 'mergePayment' : 'payment',
                 payment: {
                     remitterName: document.getElementById('pay-remitter').value,
                     bank: document.getElementById('pay-bank').value,

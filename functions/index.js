@@ -62,7 +62,7 @@ function buildItemsTable(items) {
     `;
 }
 
-// 收款帳戶。要換帳戶時，js/bank-info.js 跟 order-success.html 的「匯款資訊」也要一起改
+// 收款帳戶。要換帳戶時，js/bank-info.js 也要一起改（網站上的付款頁、訂單完成頁讀那一份）
 const BANK_TRANSFER_INFO = { accountName: "林瑞青", bankName: "玉山銀行", bankCode: "808", account: "1023-979-097466" };
 
 // 付款頁：打開就看得到應付金額、匯款帳號，並可直接回報匯款（不用登入；會員訂單回報時要登入）

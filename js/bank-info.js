@@ -1,8 +1,7 @@
 /**
- * 銀行轉帳的收款帳戶（付款頁 pay.html、訂單記錄 orders.html 共用）。
+ * 銀行轉帳的收款帳戶（付款頁 pay.html、訂單完成頁 order-success.html 共用）。
  *
- * 要換帳戶時，這裡跟 functions/index.js 的 BANK_TRANSFER_INFO（訂單成立通知信裡的帳戶）
- * 還有 order-success.html 的「匯款資訊」要一起改。
+ * 要換帳戶時，這裡跟 functions/index.js 的 BANK_TRANSFER_INFO（訂單成立通知信裡的帳戶）要一起改。
  */
 (function() {
     const info = {

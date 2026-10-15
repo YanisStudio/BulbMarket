@@ -125,17 +125,26 @@ await t('網頁端送 notes 之外的欄位也沒用（只有 notes 會被寫入
     assert.ok(o.notes.startsWith('【匯款確認】'), o.notes);
 });
 
-await t('會員訂單：別人的 uid 會被擋下來', async () => {
+await t('會員訂單的一般備註：別人的 uid 會被擋下來', async () => {
     store.set('o1', { orderNumber: 'BG1', notes: '', userId: 'owner-uid' });
     await expectCode('permission-denied', () =>
-        appendOrderNote({ data: { orderIds: ['o1'], kind: 'payment', payment: PAYMENT }, auth: { uid: 'attacker-uid' } }));
+        appendOrderNote({ data: { orderIds: ['o1'], kind: 'note', text: '改地址' }, auth: { uid: 'attacker-uid' } }));
     assert.strictEqual(writeLog.length, 0, '被擋下來卻還是寫入了');
 });
 
-await t('會員訂單：未登入也會被擋下來', async () => {
+await t('會員訂單的一般備註：未登入也會被擋下來', async () => {
     store.set('o1', { orderNumber: 'BG1', notes: '', userId: 'owner-uid' });
     await expectCode('permission-denied', () =>
-        appendOrderNote({ data: { orderIds: ['o1'], kind: 'payment', payment: PAYMENT }, auth: null }));
+        appendOrderNote({ data: { orderIds: ['o1'], kind: 'note', text: '改地址' }, auth: null }));
+});
+
+await t('會員訂單：沒登入也能憑付款連結（訂單 ID）回報匯款，只會往後接', async () => {
+    store.set('o1', { orderNumber: 'BG1', notes: '原本的備註', userId: 'owner-uid', paymentConfirmed: false });
+    const res = await appendOrderNote({ data: { orderIds: ['o1'], kind: 'payment', payment: PAYMENT }, auth: null });
+    assert.strictEqual(res.updated, 1);
+    const o = store.get('o1');
+    assert.ok(o.notes.startsWith('原本的備註\n\n【匯款確認】'), o.notes);
+    assert.strictEqual(o.paymentConfirmed, false, '回報匯款不能直接改成已付款');
 });
 
 await t('會員訂單：本人可以寫入', async () => {
@@ -160,11 +169,10 @@ await t('合併匯款：多筆訂單都寫入，且訂單編號由伺服器自�
     assert.ok(store.get('b').notes.startsWith('舊備註\n\n'), '舊備註沒被保留');
 });
 
-await t('合併匯款：其中一筆是別人的，整批都不寫入（全有或全無）', async () => {
+await t('合併匯款：其中一筆不存在，整批都不寫入（全有或全無）', async () => {
     store.set('a', { orderNumber: 'BG-AAA', notes: '', userId: 'u1' });
-    store.set('b', { orderNumber: 'BG-BBB', notes: '', userId: 'someone-else' });
-    await expectCode('permission-denied', () =>
-        appendOrderNote({ data: { orderIds: ['a', 'b'], kind: 'mergePayment', payment: PAYMENT }, auth: { uid: 'u1' } }));
+    await expectCode('not-found', () =>
+        appendOrderNote({ data: { orderIds: ['a', 'missing'], kind: 'mergePayment', payment: PAYMENT }, auth: { uid: 'u1' } }));
     assert.strictEqual(writeLog.length, 0, '有一筆不能改，卻還是寫了其他筆');
 });
 
