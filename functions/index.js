@@ -62,12 +62,55 @@ function buildItemsTable(items) {
     `;
 }
 
-// 跟 orders.html 的 paymentReminderHTML 用同一套文案，付款方式不同、提醒內容不同
-function paymentReminderText(payment) {
-    if (payment === "transfer_later") {
-        return "請回到「訂單記錄」列表勾選這筆訂單，完成匯款確認（可與其他未付款訂單合併一起匯款）。";
-    }
-    return "請於訂單成立後 24 小時內完成 ATM 轉帳，我們將在確認付款後盡快為您處理訂單。";
+// 收款帳戶。要換帳戶時，js/bank-info.js 跟 order-success.html 的「匯款資訊」也要一起改
+const BANK_TRANSFER_INFO = { accountName: "林瑞青", bankName: "玉山銀行", bankCode: "808", account: "1023-979-097466" };
+
+// 付款頁：打開就看得到應付金額、匯款帳號，並可直接回報匯款（不用登入；會員訂單回報時要登入）
+const PAY_URL = "https://flowerbulb.tw/pay.html?id=";
+
+const PAYMENT_TEXT = { transfer: "銀行轉帳", transfer_later: "稍後轉帳", credit: "信用卡" };
+
+// 訂單成立通知信的付款區塊：匯款帳號 + 「前往付款」按鈕。
+// 以前只有一句「請回到訂單記錄完成匯款確認」，選「稍後轉帳」的顧客反映不知道要匯到哪裡
+function paymentBlockHtml(order, orderId) {
+    const url = PAY_URL + encodeURIComponent(orderId);
+    const intro = order?.payment === "transfer_later"
+        ? "您選擇了「稍後轉帳」，方便時請轉帳到以下帳戶（也可以登入網站，在「訂單記錄」把多筆未付款訂單合併一起匯款）。"
+        : "請於訂單成立後 24 小時內轉帳到以下帳戶，我們確認付款後會盡快為您安排出貨。";
+    const row = (label, value) =>
+        `<tr><td style="padding:3px 12px 3px 0;color:#777;white-space:nowrap;">${label}</td><td style="padding:3px 0;font-weight:bold;">${value}</td></tr>`;
+    return `
+        <div style="background:#fff8e1;padding:14px 16px;border-radius:8px;margin:16px 0;">
+            <p style="margin:0 0 10px;"><b>尚未付款：</b>${intro}</p>
+            <table style="border-collapse:collapse;margin:0 0 10px;">
+                ${row("應付金額", `<span style="color:#c0392b;">${formatCurrency(order?.total)}</span>`)}
+                ${row("銀行", `${escapeHtml(BANK_TRANSFER_INFO.bankName)}（代碼 ${escapeHtml(BANK_TRANSFER_INFO.bankCode)}）`)}
+                ${row("帳號", escapeHtml(BANK_TRANSFER_INFO.account))}
+                ${row("戶名", escapeHtml(BANK_TRANSFER_INFO.accountName))}
+            </table>
+            <p style="margin:0 0 12px;">轉帳後請點下面的按鈕回報匯款資訊（帳號後五碼），我們核對後會寄出「付款已確認」通知信。</p>
+            <a href="${url}" style="display:inline-block;background:#2e7d4f;color:#ffffff;padding:11px 22px;border-radius:6px;text-decoration:none;font-weight:bold;">前往付款／回報匯款</a>
+            <p style="margin:12px 0 0;color:#888;font-size:0.85em;">按鈕無法點選時，請複製這個網址到瀏覽器開啟：<br><a href="${url}" style="color:#2e7d4f;word-break:break-all;">${url}</a></p>
+        </div>`;
+}
+
+function buildOrderConfirmationEmail(order, orderId) {
+    const bodyHtml = `
+            <h2 style="color:#2e7d4f;">感謝您的訂購，${escapeHtml(order?.customer?.name)}！</h2>
+            <p>我們已經收到您的訂單，以下是訂單明細：</p>
+            <p><b>訂單編號：</b>${escapeHtml(order?.orderNumber)}</p>
+            <p><b>付款方式：</b>${escapeHtml(PAYMENT_TEXT[order?.payment] || order?.payment || "")}</p>
+            ${buildItemsTable(order?.items)}
+            <p>商品小計：${formatCurrency(order?.subtotal)}</p>
+            <p>運費：${formatCurrency(order?.shippingFee)}</p>
+            <p style="font-size:1.1em;"><b>訂單總額：${formatCurrency(order?.total)}</b></p>
+            ${paymentBlockHtml(order, orderId)}
+            <p style="margin-top:24px;color:#777;font-size:0.9em;">如有任何問題，歡迎透過網站的聯絡我們與我們聯繫。</p>
+        `;
+    return {
+        subject: `【球根花卉團購】訂單成立，請留意付款 - ${order?.orderNumber}`,
+        bodyHtml
+    };
 }
 
 async function sendOrderEmail({ order, subject, bodyHtml, logLabel, orderId }) {
@@ -99,23 +142,11 @@ exports.sendOrderConfirmationEmail = onDocumentCreated(
         const order = event.data?.data();
         const orderId = event.params.orderId;
 
-        const bodyHtml = `
-            <h2 style="color:#2e7d4f;">感謝您的訂購，${escapeHtml(order?.customer?.name)}！</h2>
-            <p>我們已經收到您的訂單，以下是訂單明細：</p>
-            <p><b>訂單編號：</b>${escapeHtml(order?.orderNumber)}</p>
-            ${buildItemsTable(order?.items)}
-            <p>商品小計：${formatCurrency(order?.subtotal)}</p>
-            <p>運費：${formatCurrency(order?.shippingFee)}</p>
-            <p style="font-size:1.1em;"><b>訂單總額：${formatCurrency(order?.total)}</b></p>
-            <div style="background:#fff8e1;padding:12px;border-radius:6px;margin:16px 0;">
-                <p style="margin:0;"><b>尚未付款：</b>${paymentReminderText(order?.payment)}</p>
-            </div>
-            <p style="margin-top:24px;color:#777;font-size:0.9em;">如有任何問題，歡迎透過網站的聯絡我們與我們聯繫。</p>
-        `;
+        const { subject, bodyHtml } = buildOrderConfirmationEmail(order, orderId);
 
         await sendOrderEmail({
             order,
-            subject: `【球根花卉團購】訂單成立，請留意付款 - ${order?.orderNumber}`,
+            subject,
             bodyHtml,
             logLabel: "訂單成立通知信",
             orderId
@@ -238,3 +269,6 @@ exports.sendMessageReplyEmail = onDocumentUpdated(
         }
     }
 );
+
+// 給測試用：信件內容組字串
+exports._emailInternal = { buildOrderConfirmationEmail, BANK_TRANSFER_INFO };

@@ -45,7 +45,7 @@ function formatTaipeiTime(timestamp) {
 }
 
 const SHIPPING_TEXT = { store: "7-11 取貨", home: "宅配到府" };
-const PAYMENT_TEXT = { transfer: "ATM 轉帳", transfer_later: "稍後轉帳", credit: "信用卡" };
+const PAYMENT_TEXT = { transfer: "銀行轉帳", transfer_later: "稍後轉帳", credit: "信用卡" };
 
 function buildAdminOrderEmail(order, orderId) {
     const customer = order.customer || {};

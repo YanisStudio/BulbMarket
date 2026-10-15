@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- firebase-warmup：讓瀏覽器一開始解析頁面就先跟 Firebase 握手、下載 SDK，
+         不用等到下面載入 Firebase 的 module 腳本才開始。重開瀏覽器第一次進站最有感
+         （連線、登入憑證都要重新建立）。版本號要跟下面 import 的一致。 -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://securetoken.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin>
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js">
+    <link rel="modulepreload" href="https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js">
+    <title>訂單付款 - 球根花卉團購</title>
+    <meta name="robots" content="noindex, nofollow">
+    <meta name="author" content="球根花卉團購">
+    <!-- Open Graph 標籤 (用於社交媒體分享) -->
+<link rel="icon" type="image/png" sizes="32x32" href="/images/logo.png">
+<link rel="icon" type="image/png" sizes="16x16" href="/images/logo.png">
+<link rel="apple-touch-icon" sizes="180x180" href="/images/logo.png">
+<link rel="shortcut icon" href="/images/logo.png">
+
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/common.css">
+    <link rel="stylesheet" href="/css/cart.css">
+    <link rel="stylesheet" href="/css/auth-modals.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
+
+    <!-- Firebase SDK引入 - 使用模組方式 -->
+    <script src="/js/firebase-config.js"></script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import {
+            getAuth,
+            signOut,
+            onAuthStateChanged,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            FacebookAuthProvider,
+            RecaptchaVerifier,
+            signInWithPhoneNumber,
+            PhoneAuthProvider,
+            signInWithCredential
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import {
+            initializeFirestore,
+            terminate,
+            collection,
+            doc,
+            setDoc,
+            getDoc,
+            getDocs,
+            getDocs as getDocsFromServer,
+            query,
+            orderBy,
+            where,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-lite.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
+
+        const firebaseConfig = window.FIREBASE_CONFIG;
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        // 連線設定統一放在 js/firebase-config.js 的 FIRESTORE_SETTINGS（原因寫在那裡）
+        const db = initializeFirestore(app, window.FIRESTORE_SETTINGS);
+
+        // 回報匯款的 Cloud Function（functions/append-order-note.js）部署在台灣機房
+        const functions = getFunctions(app, 'asia-east1');
+
+        window.firebaseServices = {
+            appendOrderNote: httpsCallable(functions, 'appendOrderNote'),
+            app,
+            auth,
+            db,
+            initializeFirestore,
+            terminate,
+            getAuth,
+            signOut,
+            onAuthStateChanged,
+            doc,
+            setDoc,
+            getDoc,
+            collection,
+            getDocs,
+            getDocsFromServer,
+            query,
+            where,
+            orderBy,
+            serverTimestamp,
+            GoogleAuthProvider,
+            signInWithPopup,
+            signInWithRedirect,
+            getRedirectResult,
+            FacebookAuthProvider,
+            RecaptchaVerifier,
+            signInWithPhoneNumber,
+            PhoneAuthProvider,
+            signInWithCredential
+        };
+    </script>
+    <link rel="stylesheet" href="/css/storefront.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <!-- 漢堡選單按鈕 (手機版) -->
+            <button class="menu-toggle" id="menu-toggle">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            <a href="/index.html" class="logo-container">
+    <img src="/images/logo.jpg" alt="球根花卉團購 logo" class="logo-image" width="520" height="730">
+    <div class="logo">
+        <h1>球根花卉團購</h1>
+        <p>球根花卉・種子專賣</p>
+    </div>
+</a>
+
+            <!-- 手機版頂部購物車 -->
+            <div class="mobile-header-actions">
+                <div class="cart-icon-container">
+                    <a href="/cart.html" class="cart-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count" id="cart-count-fixed">0</span>
+                    </a>
+                </div>
+            </div>
+
+            <!-- 導航選單 -->
+            <nav id="main-nav">
+                <ul>
+                    <li><a href="/index.html">首頁</a></li>
+                    <li><a href="/products.html">商品</a></li>
+                    <li><a href="/knowledge.html">栽培小知識</a></li>
+                    <li><a href="/membership.html">加入會員</a></li>
+                    <li><a href="/about.html">關於我們</a></li>
+                    <li><a href="/contact.html">聯絡我們</a></li>
+
+                    <!-- 手機版選單中的操作選項 -->
+                    <div class="mobile-actions">
+                        <div class="user-actions" id="user-actions-mobile">
+                            <a href="#" class="btn-login" id="login-btn-mobile">登入</a>
+                        </div>
+
+                        <div class="user-profile-mobile" id="user-profile-mobile">
+                            <div class="user-info">
+                                <i class="fas fa-user-circle"></i>
+                                <span id="username-display-mobile">會員名稱</span>
+                            </div>
+                            <div class="user-links">
+                                <a href="/profile.html"><i class="fas fa-user"></i> 會員資料</a>
+                                <a href="/orders.html"><i class="fas fa-shopping-bag"></i> 訂單記錄</a>
+                                <a href="/messages.html"><i class="fas fa-envelope"></i> 我的訊息</a>
+                                <a href="/admin/dashboard.html" id="admin-btn-mobile" class="admin-link" style="display: none;"><i class="fas fa-cog"></i> 系統管理</a>
+                                <a href="#" id="logout-btn-mobile"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                            </div>
+                        </div>
+                    </div>
+                </ul>
+            </nav>
+
+            <!-- 桌面版右側元素 -->
+            <div class="header-right">
+                <div class="cart-icon-container">
+                    <a href="/cart.html" class="cart-icon">
+                        <i class="fas fa-shopping-cart"></i>
+                        <span class="cart-count" id="cart-count">0</span>
+                    </a>
+                </div>
+
+                <div class="user-actions" id="user-actions">
+                    <a href="#" class="btn-login" id="login-btn">登入</a>
+                </div>
+
+                <div class="user-profile" id="user-profile">
+                    <div class="user-name" id="user-dropdown-btn">
+                        <i class="fas fa-user-circle"></i>
+                        <span id="username-display">會員名稱</span>
+                        <i class="fas fa-chevron-down"></i>
+                    </div>
+                    <div class="user-menu" id="user-menu">
+                        <a href="/profile.html"><i class="fas fa-user"></i> 會員資料</a>
+                        <a href="/orders.html"><i class="fas fa-shopping-bag"></i> 訂單記錄</a>
+                        <a href="/messages.html"><i class="fas fa-envelope"></i> 我的訊息</a>
+                        <a href="/admin/dashboard.html" id="admin-btn" class="admin-link" style="display: none;"><i class="fas fa-cog"></i> 系統管理</a>
+                        <a href="#" id="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- 半透明背景覆蓋 (用於手機版選單) -->
+    <div class="menu-overlay" id="menu-overlay"></div>
+
+    <main class="pay-page">
+        <div class="section-band"><h2>訂單付款</h2></div>
+        <div class="container">
+            <div id="pay-root" class="pay-root">
+                <div class="loading-indicator">載入訂單中...</div>
+            </div>
+        </div>
+    </main>
+
+    <style>
+        .pay-root { max-width: 640px; margin: 2rem auto 3rem; }
+        .pay-card { background: #fff; border: 1px solid #e3e8e4; border-radius: 12px; padding: 1.25rem 1.5rem; margin-bottom: 1.25rem; box-shadow: 0 2px 8px rgba(0,0,0,.04); }
+        .pay-card h3 { margin: 0 0 .75rem; color: #2e7d4f; font-size: 1.15rem; }
+        .pay-meta { display: grid; grid-template-columns: auto 1fr; gap: .35rem 1rem; margin: 0; }
+        .pay-meta dt { color: #6b776e; }
+        .pay-meta dd { margin: 0; }
+        .pay-items { list-style: none; padding: 0; margin: .75rem 0 0; border-top: 1px dashed #dfe5e0; }
+        .pay-items li { display: flex; justify-content: space-between; gap: 1rem; padding: .4rem 0; border-bottom: 1px dashed #dfe5e0; }
+        .pay-items li span:last-child { white-space: nowrap; }
+        .pay-total { text-align: right; margin: .75rem 0 0; font-size: 1.1rem; }
+        .pay-total strong { color: #c0392b; font-size: 1.25em; }
+        .pay-steps { margin: .5rem 0 0; padding-left: 1.25rem; line-height: 1.8; }
+        .pay-status { border-radius: 12px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; line-height: 1.7; }
+        .pay-status.ok { background: #e8f5e9; color: #1b5e20; }
+        .pay-status.info { background: #fff8e1; color: #6d4c00; }
+        .pay-status.muted { background: #f2f2f2; color: #555; }
+        .pay-form .form-group { margin-bottom: .9rem; }
+        .pay-form label { display: block; margin-bottom: .3rem; font-weight: 600; }
+        .pay-form input, .pay-form textarea { width: 100%; padding: .6rem .75rem; border: 1px solid #cfd8d2; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+        .pay-form .form-hint { color: #7a857d; font-size: .85rem; margin-top: .25rem; }
+        .pay-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+    </style>
+
+    <footer class="site-footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3>球根花卉團購</h3>
+                    <p>為您提供最優質的球根花卉選擇</p>
+                    <div class="social-links">
+                        <a href="https://www.facebook.com/groups/g112332?locale=zh_TW" target="_blank" rel="noopener" title="Facebook 社團"><i class="fab fa-facebook"></i></a>
+                        <!-- 蝦皮賣場連結先暫時關閉，之後要重新開放時把 style="display:none;" 拿掉即可 --><a href="https://shopee.tw/vincentsayhello?categoryId=100636&entryPoint=ShopByPDP&itemId=27426426770" target="_blank" rel="noopener" title="蝦皮賣場" style="display:none;"><i class="fas fa-shopping-bag"></i></a>
+                    </div>
+                </div>
+
+                <div class="footer-section">
+                    <h3>商品分類</h3>
+                    <ul class="footer-links footer-category-links">
+                        <li><a href="/products.html">所有商品 &raquo;</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>顧客服務</h3>
+                    <ul class="footer-links">
+                        <li><a href="/knowledge.html">栽培小知識</a></li>
+                        <li><a href="/membership.html">加入會員</a></li>
+                        <li><a href="/about.html">關於我們</a></li>
+                        <li><a href="/contact.html">聯絡我們</a></li>
+                        <li><a href="/orders.html">訂單查詢</a></li>
+                        <li><a href="/cart.html">購物車</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>服務時間</h3>
+                    <p><i class="far fa-clock"></i> 週一至週五：9:00 - 18:00</p>
+                    <p><i class="fas fa-truck"></i> 超商取貨與宅急便配送</p>
+                    <p><i class="fas fa-users"></i> 團購優惠價格</p>
+                </div>
+            </div>
+
+            <div class="copyright">
+                <p class="footer-company">黃裕泰種子行｜統一編號：94806296</p>
+                <p>&copy; 2025 球根花卉團購。保留所有權利。</p>
+                <p class="disclaimer">※ 植物為活體，不適用七天鑑賞期 ※</p>
+            </div>
+        </div>
+    </footer>
+
+    <script src="/js/auth-modals.js"></script>
+    <script src="/js/categories.js"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/member.js"></script>
+    <script src="/js/unpaid-reminder.js"></script>
+    <script src="/js/bank-info.js"></script>
+
+    <script>
+// 訂單付款頁：pay.html?id=訂單ID
+//
+// 訂單成立通知信裡的「前往付款」按鈕會連到這裡，顧客不用登入、也不用記得要去哪裡付款，
+// 打開就看得到應付金額、匯款帳號，匯款後直接在這裡回報。
+//
+// 用訂單 ID 讀單筆訂單，跟訂單完成頁同一套假設：Firestore 規則 orders 允許 get（訂單 ID 是
+// 20 碼隨機字串），回報匯款走 Cloud Function appendOrderNote（會員訂單要本人登入才能回報）。
+// 這一頁只顯示訂單編號、商品與金額，不顯示收件人姓名、電話、地址。
+const orderId = new URLSearchParams(window.location.search).get('id') || '';
+let currentOrder = null;
+let authResolved = false;
+
+document.addEventListener('DOMContentLoaded', function() {
+    initCommonFeatures();
+    if (!orderId) {
+        showMessage('找不到訂單', '網址裡沒有訂單編號。請從訂單成立通知信裡的「前往付款」按鈕進來，或到<a href="/orders.html">訂單記錄</a>查看。');
+        return;
+    }
+    loadOrder();
+    // 會員訂單要知道目前登入的是誰，才能決定顯示回報表單還是請對方先登入
+    const services = window.firebaseServices;
+    if (services && services.onAuthStateChanged) {
+        services.onAuthStateChanged(services.auth, function() {
+            authResolved = true;
+            if (currentOrder) render();
+        });
+    }
+});
+
+function showMessage(title, html) {
+    document.getElementById('pay-root').innerHTML = `
+        <div class="pay-card"><h3>${escapeHtml(title)}</h3><p>${html}</p></div>`;
+}
+
+async function loadOrder(attempt = 1) {
+    try {
+        const services = window.firebaseServices;
+        const snap = await services.getDoc(services.doc(services.db, 'orders', orderId));
+        if (window.noteFirestoreSuccess) window.noteFirestoreSuccess();
+        if (!snap.exists()) {
+            showMessage('找不到訂單', '這個付款連結對應的訂單不存在，可能已經被取消。如有疑問請<a href="/contact.html">聯絡我們</a>。');
+            return;
+        }
+        currentOrder = snap.data();
+        render();
+    } catch (error) {
+        console.error(`讀取訂單失敗（第 ${attempt} 次嘗試）:`, error);
+        if (attempt >= 2) {
+            document.getElementById('pay-root').innerHTML = '<div class="loading-indicator">網路連線不穩定，正在自動重新連線中，請稍候⋯⋯</div>';
+        }
+        if (window.maybeResetFirestoreConnection) await window.maybeResetFirestoreConnection();
+        setTimeout(() => loadOrder(attempt + 1), Math.min(attempt * 1000, 8000));
+    }
+}
+
+function paymentText(payment) {
+    return payment === 'transfer_later' ? '稍後轉帳' : payment === 'transfer' ? '銀行轉帳' : (payment || '');
+}
+
+function render() {
+    const order = currentOrder;
+    const root = document.getElementById('pay-root');
+    const total = Number(order.total) || 0;
+    const date = order.orderDate && order.orderDate.toDate
+        ? order.orderDate.toDate().toLocaleDateString('zh-TW') : '';
+    const items = (order.items || []).map(item => `
+        <li><span>${escapeHtml(item.name)} × ${escapeHtml(item.quantity)}</span>
+            <span>NT$ ${(Number(item.price) * Number(item.quantity)).toLocaleString('zh-TW')}</span></li>`).join('');
+
+    const summary = `
+        <div class="pay-card">
+            <h3>訂單資訊</h3>
+            <dl class="pay-meta">
+                <dt>訂單編號</dt><dd>${escapeHtml(order.orderNumber || orderId)}</dd>
+                ${date ? `<dt>訂單日期</dt><dd>${escapeHtml(date)}</dd>` : ''}
+                <dt>付款方式</dt><dd>${escapeHtml(paymentText(order.payment))}</dd>
+            </dl>
+            <ul class="pay-items">${items}</ul>
+            <p class="pay-total">運費 NT$ ${(Number(order.shippingFee) || 0).toLocaleString('zh-TW')}　應付金額 <strong>NT$ ${total.toLocaleString('zh-TW')}</strong></p>
+        </div>`;
+
+    const paid = order.paymentConfirmed === true || ['confirmed', 'shipped', 'completed'].includes(order.status);
+    if (order.status === 'cancelled') {
+        root.innerHTML = `<div class="pay-status muted">這筆訂單已取消，不需要付款。如有疑問請<a href="/contact.html">聯絡我們</a>。</div>${summary}`;
+        return;
+    }
+    if (paid) {
+        root.innerHTML = `<div class="pay-status ok"><strong>這筆訂單已確認付款，謝謝您！</strong><br>出貨時會再寄信通知您。</div>${summary}`;
+        return;
+    }
+
+    const reported = typeof isPaymentReported === 'function' && isPaymentReported(order);
+    const status = reported
+        ? `<div class="pay-status ok"><strong>已收到您的匯款回報</strong>，我們核對款項後會改成「已付款」並寄信通知您。<br>如果需要補充或更正，可以再填一次下面的表單。</div>`
+        : `<div class="pay-status info"><strong>這筆訂單尚未付款</strong>，請依下面的步驟完成轉帳。</div>`;
+
+    root.innerHTML = `
+        ${status}
+        ${summary}
+        <div class="pay-card">
+            <h3>匯款帳戶</h3>
+            ${window.BankTransferInfo ? BankTransferInfo.html(total) : ''}
+            <ol class="pay-steps">
+                <li>轉帳到上面的帳戶，金額 NT$ ${total.toLocaleString('zh-TW')}</li>
+                <li>轉帳後，在下面填寫匯款資訊（帳號後五碼方便我們對帳）</li>
+                <li>我們核對款項後會寄出「付款已確認」通知信</li>
+            </ol>
+        </div>
+        <div class="pay-card" id="pay-report">${reportFormHTML(order, reported)}</div>
+    `;
+    bindForm();
+}
+
+function reportFormHTML(order, reported) {
+    // 會員訂單：伺服器只接受下單的會員本人回報，沒登入（或登入別的帳號）就先請對方登入
+    const services = window.firebaseServices;
+    const user = services && services.auth && services.auth.currentUser;
+    if (order.userId && !user) {
+        if (!authResolved) return '<h3>回報匯款</h3><p>確認登入狀態中...</p>';
+        return `
+            <h3>回報匯款</h3>
+            <p>這是會員訂單，請先登入下單時使用的會員帳號，再回報匯款資訊。</p>
+            <div class="pay-actions"><button type="button" class="btn btn-primary" id="pay-login-btn">登入會員</button></div>`;
+    }
+    const today = localDateString();
+    return `
+        <h3>${reported ? '補充／更正匯款資訊' : '回報匯款'}</h3>
+        <form class="pay-form" id="pay-form">
+            <div class="form-group"><label for="pay-remitter">匯款人姓名</label>
+                <input type="text" id="pay-remitter" required maxlength="50" placeholder="請輸入匯款人姓名"></div>
+            <div class="form-group"><label for="pay-bank">匯款銀行</label>
+                <input type="text" id="pay-bank" required maxlength="50" placeholder="例：玉山銀行"></div>
+            <div class="form-group"><label for="pay-amount">匯款金額</label>
+                <input type="number" id="pay-amount" required min="1" value="${Number(order.total) || ''}">
+                <div class="form-hint">已帶入應付金額，實際匯款金額不同請自行修改</div></div>
+            <div class="form-group"><label for="pay-last5">匯款帳號後五碼</label>
+                <input type="text" id="pay-last5" required maxlength="5" pattern="[0-9]{5}" inputmode="numeric" placeholder="例：12345"></div>
+            <div class="form-group"><label for="pay-date">匯款日期</label>
+                <input type="date" id="pay-date" required value="${today}" max="${today}"></div>
+            <div class="form-group"><label for="pay-note">備註（選填）</label>
+                <textarea id="pay-note" maxlength="200" rows="2"></textarea></div>
+            <div class="pay-actions"><button type="submit" class="btn btn-primary" id="pay-submit">送出匯款資訊</button></div>
+        </form>`;
+}
+
+function bindForm() {
+    const loginBtn = document.getElementById('pay-login-btn');
+    if (loginBtn) {
+        loginBtn.addEventListener('click', function() {
+            const desktop = document.getElementById('login-btn');
+            const mobile = document.getElementById('login-btn-mobile');
+            if (desktop && desktop.offsetParent !== null) desktop.click();
+            else if (mobile) mobile.click();
+        });
+    }
+    const form = document.getElementById('pay-form');
+    if (!form) return;
+    form.addEventListener('submit', async function(event) {
+        event.preventDefault();
+        const button = document.getElementById('pay-submit');
+        button.disabled = true;
+        button.textContent = '送出中...';
+        try {
+            await window.firebaseServices.appendOrderNote({
+                orderIds: [orderId],
+                kind: 'payment',
+                payment: {
+                    remitterName: document.getElementById('pay-remitter').value,
+                    bank: document.getElementById('pay-bank').value,
+                    amount: document.getElementById('pay-amount').value,
+                    lastFiveDigits: document.getElementById('pay-last5').value,
+                    date: document.getElementById('pay-date').value,
+                    note: document.getElementById('pay-note').value
+                }
+            });
+            document.getElementById('pay-report').innerHTML = `
+                <h3>已收到您的匯款資訊</h3>
+                <p>謝謝您！我們核對款項後會把訂單改成「已付款」，並寄信通知您。</p>
+                <div class="pay-actions"><a class="btn btn-outline" href="/orders.html">查看訂單記錄</a><a class="btn btn-outline" href="/products.html">繼續逛逛</a></div>`;
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        } catch (error) {
+            console.error('回報匯款失敗:', error);
+            const msg = typeof appendNoteErrorMessage === 'function' ? appendNoteErrorMessage(error) : '送出失敗，請檢查網路連線後再試';
+            if (typeof showToast === 'function') showToast(msg); else alert(msg);
+            button.disabled = false;
+            button.textContent = '送出匯款資訊';
+        }
+    });
+}
+    </script>
+</body>
+</html>

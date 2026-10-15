@@ -51,6 +51,8 @@ node tests/cart-price-refresh.test.mjs                    # 購物車／結帳�
 node tests/admin-shipping-save.test.mjs                   # 後台運費：空白運費不存 NaN、存一種不覆蓋另一種（3 項）
 node tests/scheduler-plan.test.mjs                        # 排程上下架：兩個時間都到期時以較晚的為準（6 項）
 node tests/admin-articles.test.mjs                        # 後台栽培小知識／加入會員兩個文章分頁互不干擾（5 項）
+node tests/pay-page.test.mjs                              # 付款頁、未付款提醒、訂單記錄預設勾選（12 項）
+cd functions && node ../tests/order-email-payment.test.cjs # 訂單成立通知信的匯款帳號與付款連結（8 項）
 ```
 
 `cart-price-refresh.test.mjs` 的背景：購物車存的是「加入當下」的價格，後台改價之後，

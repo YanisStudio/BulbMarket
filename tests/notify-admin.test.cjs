@@ -61,7 +61,7 @@ async function t(name, fn) {
 
     await t('內容有商品明細、運費、總額、備註、台灣時間，以及直接打開這筆訂單的後台連結', async () => {
         const { html } = _internal.buildAdminOrderEmail(ORDER, 'ORDER123');
-        ['百合', '鬱金香', 'NT$ 240', 'NT$ 60', 'NT$ 380', '0912345678', '台北車站門市', 'ATM 轉帳', '7-11 取貨', '包裝好一點']
+        ['百合', '鬱金香', 'NT$ 240', 'NT$ 60', 'NT$ 380', '0912345678', '台北車站門市', '銀行轉帳', '7-11 取貨', '包裝好一點']
             .forEach((s) => assert.ok(html.includes(s), '缺少 ' + s));
         assert.ok(html.includes('2026/10/14 10:30'), '時間不是台灣時區');
         assert.ok(html.includes('https://flowerbulb.tw/admin/orders.html?id=ORDER123'), '缺少後台連結');
