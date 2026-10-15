@@ -592,11 +592,13 @@
 
                         <!-- 稍後轉帳：訂單先成立，付款留到會員中心的訂單記錄再處理 -->
                         <div id="transfer-later-notice" style="display: none;">
-                            <p>訂單已經成立，<strong>還不用現在付款</strong>。請登入會員中心，到「訂單記錄」找到這筆訂單完成匯款確認（也可以跟其他未付款的訂單一起合併匯款）。</p>
+                            <p>訂單已經成立，<strong>還不用現在付款</strong>。方便時請轉帳到下面的帳戶，再回報匯款資訊（也可以到「訂單記錄」跟其他未付款的訂單一起合併匯款）。匯款帳號也已經寄到您的信箱。</p>
+                            <div id="transfer-later-bank"></div>
                             <div id="transfer-later-login-warning" class="important-note" style="display: none;">
                                 <p>您目前<strong>尚未登入</strong>，這筆訂單將無法在訂單記錄裡查到、也無法完成付款確認，請盡快登入或註冊會員（使用結帳時填寫的姓名或電話核對），避免無法對帳。</p>
                             </div>
-                            <a href="/orders.html" class="btn btn-primary">前往訂單記錄付款</a>
+                            <a href="#" class="btn btn-primary" id="transfer-later-pay-link" hidden>前往付款頁</a>
+                            <a href="/orders.html" class="btn btn-outline">前往訂單記錄</a>
                         </div>
                     </div>
 
@@ -676,6 +678,8 @@
     <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
+    <script src="/js/bank-info.js"></script>
+    <script src="/js/unpaid-reminder.js"></script>
 
     <!-- 訂單完成頁面功能 -->
     <script>
@@ -743,7 +747,7 @@
                             <i class="fas fa-exclamation-triangle"></i>
                         </div>
                         <h3>匯款確認提醒</h3>
-                        <p>您選擇了ATM轉帳付款，建議您先完成匯款確認再離開，以確保訂單能順利處理。</p>
+                        <p>您選擇了銀行轉帳付款，建議您先完成匯款確認再離開，以確保訂單能順利處理。</p>
                         <p><strong>未填寫匯款確認可能會導致訂單處理延遲。</strong></p>
                         <div class="member-modal-actions">
                             <button class="btn" id="stay-and-confirm" style="background: linear-gradient(135deg, #66bb6a, #4caf50); color: white; border: none; cursor: pointer;">留下填寫</button>
@@ -938,10 +942,10 @@
             // 更新付款方式信息
             const paymentMethodText = paymentMethod === 'credit' ? '信用卡'
                 : paymentMethod === 'transfer_later' ? '稍後轉帳'
-                : 'ATM轉帳';
+                : '銀行轉帳';
             document.getElementById('payment-method').textContent = paymentMethodText;
 
-            // 如果是ATM轉帳，顯示轉帳信息、金額跟現在就填的匯款確認表單
+            // 如果是銀行轉帳，顯示轉帳信息、金額跟現在就填的匯款確認表單
             if (paymentMethod === 'transfer') {
                 document.getElementById('transfer-notice').style.display = 'block';
 
@@ -962,6 +966,17 @@
             // 沒登入的話要特別提醒（訪客訂單沒有 userId，之後在訂單記錄裡找不到）
             if (paymentMethod === 'transfer_later') {
                 document.getElementById('transfer-later-notice').style.display = 'block';
+                // 稍後轉帳也要讓顧客知道要匯到哪裡：以前這裡只叫顧客去訂單記錄，
+                // 但訂單記錄沒有匯款帳號，顧客會不知道要去哪裡匯款
+                const laterBank = document.getElementById('transfer-later-bank');
+                if (laterBank && window.BankTransferInfo) {
+                    laterBank.innerHTML = BankTransferInfo.html(Number(lastOrder.total) || undefined);
+                }
+                const payLink = document.getElementById('transfer-later-pay-link');
+                if (payLink && lastOrder.id) {
+                    payLink.href = '/pay.html?id=' + encodeURIComponent(lastOrder.id);
+                    payLink.hidden = false;
+                }
             }
             
             // 顯示歡迎訊息

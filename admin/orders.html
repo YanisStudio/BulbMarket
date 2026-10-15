@@ -1121,7 +1121,7 @@
                             sheet['!cols'] = widths.map(width => ({ width }));
                             XLSX.utils.book_append_sheet(workbook, sheet, name);
                         };
-                        const paymentText = payment => payment === 'transfer' ? 'ATM轉帳'
+                        const paymentText = payment => payment === 'transfer' ? '銀行轉帳'
                             : payment === 'transfer_later' ? '稍後轉帳'
                             : payment === 'credit' ? '信用卡付款' : (payment || '');
 
@@ -1465,7 +1465,7 @@
                                 statusSelectHTML += '</select>';
                                 
                                 const shippingMethodText = order.shipping === 'home' ? '宅配到府' : '超商取貨';
-                                const paymentMethodText = order.payment === 'transfer' ? 'ATM轉帳'
+                                const paymentMethodText = order.payment === 'transfer' ? '銀行轉帳'
                                     : order.payment === 'transfer_later' ? '稍後轉帳'
                                     : order.payment === 'credit' ? '信用卡付款'
                                     : (order.payment || '未知');
@@ -1865,7 +1865,7 @@
                                     <div class="form-group">
                                         <label for="edit-payment-method">付款方式</label>
                                         <select id="edit-payment-method">
-                                            <option value="transfer" ${orderData.payment === 'transfer' ? 'selected' : ''}>ATM轉帳</option>
+                                            <option value="transfer" ${orderData.payment === 'transfer' ? 'selected' : ''}>銀行轉帳</option>
                                             <option value="transfer_later" ${orderData.payment === 'transfer_later' ? 'selected' : ''}>稍後轉帳</option>
                                             <option value="credit" ${orderData.payment === 'credit' ? 'selected' : ''}>信用卡付款</option>
                                         </select>

@@ -803,8 +803,13 @@
                     <div class="orders-main">
                         <!-- 合併匯款：勾選未付款的訂單後出現 -->
                         <div class="merge-payment-bar" id="merge-payment-bar" style="display: none;">
-                            <span>已選 <strong id="merge-selected-count">0</strong> 筆訂單，共 $<strong id="merge-selected-total">0</strong></span>
-                            <button type="button" class="btn btn-primary" id="open-merge-payment-btn">確認匯款</button>
+                            <span>已選 <strong id="merge-selected-count">0</strong> 筆未付款訂單，共 $<strong id="merge-selected-total">0</strong></span>
+                            <button type="button" class="btn btn-primary" id="open-merge-payment-btn">我已匯款，填寫匯款資訊</button>
+                        </div>
+                        <!-- 有勾選未付款訂單時顯示匯款帳號，顧客不用另外找要匯到哪裡 -->
+                        <div id="merge-bank-info" style="display: none;">
+                            <p class="form-hint">請將上面的合計金額轉帳到以下帳戶，轉帳後按「我已匯款，填寫匯款資訊」回報：</p>
+                            <div id="merge-bank-info-box"></div>
                         </div>
 
                         <div class="transfer-confirmation" id="merge-payment-form-wrap" style="display: none;">
@@ -924,6 +929,8 @@
     <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
+    <script src="/js/bank-info.js"></script>
+    <script src="/js/unpaid-reminder.js"></script>
 
     <script>
 // loadUserOrders() 找到的「屬於我的訂單」ID 清單，包含訪客訂單（沒有 userId，
@@ -1184,8 +1191,10 @@ async function loadUserOrders(user) {
                 : isReported
                     ? '<span class="order-status status-reported">已回報匯款・待確認</span>'
                     : `<span class="order-status ${statusClass}">${statusText}</span>`;
+            // 未付款的訂單預設全部勾選：很多顧客不知道要先勾選才能付款，
+            // 預設勾好、下方直接顯示合計金額與匯款帳號，不需要的再取消勾選
             const checkboxHTML = isUnpaid
-                ? `<input type="checkbox" class="order-select-checkbox" data-id="${order.id}" data-total="${order.total || 0}">`
+                ? `<input type="checkbox" class="order-select-checkbox" data-id="${order.id}" data-total="${order.total || 0}" checked aria-label="選取這筆訂單一起付款">`
                 : '';
 
             ordersHTML += `
@@ -1260,8 +1269,10 @@ function updateMergePaymentBar() {
     const bar = document.getElementById('merge-payment-bar');
     if (!bar) return;
 
+    const bankInfo = document.getElementById('merge-bank-info');
     if (checked.length === 0) {
         bar.style.display = 'none';
+        if (bankInfo) bankInfo.style.display = 'none';
         const formWrap = document.getElementById('merge-payment-form-wrap');
         if (formWrap) formWrap.style.display = 'none';
         return;
@@ -1273,6 +1284,10 @@ function updateMergePaymentBar() {
     document.getElementById('merge-selected-count').textContent = checked.length;
     document.getElementById('merge-selected-total').textContent = total;
     bar.style.display = 'flex';
+    if (bankInfo && window.BankTransferInfo) {
+        document.getElementById('merge-bank-info-box').innerHTML = BankTransferInfo.html();
+        bankInfo.style.display = 'block';
+    }
 }
 
 // 打開合併匯款表單：金額自動加總所選訂單，日期預設今天
@@ -1509,13 +1524,13 @@ async function showOrderDetail(orderId) {
         } else if (isOrderUnpaid && order.payment === 'transfer') {
             paymentReminderHTML = `
                 <div class="section-alert">
-                    <p><strong>等待付款：</strong> 請完成ATM轉帳，並回到<a href="/orders.html">訂單記錄</a>列表勾選這筆訂單填寫匯款資訊。我們將在確認付款後處理您的訂單。</p>
+                    <p><strong>等待付款：</strong> 請完成銀行轉帳，再到<a href="/pay.html?id=${encodeURIComponent(order.id)}">付款頁</a>查看匯款帳號並回報匯款資訊。我們將在確認付款後處理您的訂單。</p>
                 </div>
             `;
         } else if (isOrderUnpaid && order.payment === 'transfer_later') {
             paymentReminderHTML = `
                 <div class="section-alert">
-                    <p><strong>尚未付款：</strong> 請回到<a href="/orders.html">訂單記錄</a>列表勾選這筆訂單，完成匯款確認（可與其他未付款訂單合併一起匯款）。</p>
+                    <p><strong>尚未付款：</strong> 請到<a href="/pay.html?id=${encodeURIComponent(order.id)}">付款頁</a>查看匯款帳號並回報匯款；也可以在上方訂單列表勾選多筆未付款訂單，合併一次匯款。</p>
                 </div>
             `;
         }
@@ -1529,7 +1544,7 @@ async function showOrderDetail(orderId) {
         `;
 
         const shippingMethodText = order.shipping === 'home' ? '宅配到府' : '7-11取貨';
-        const paymentMethodText = order.payment === 'transfer' ? 'ATM轉帳'
+        const paymentMethodText = order.payment === 'transfer' ? '銀行轉帳'
             : order.payment === 'transfer_later' ? '稍後轉帳'
             : '信用卡付款';
 
