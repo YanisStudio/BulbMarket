@@ -16,10 +16,11 @@ const BASE_ORDER = {
     customer: { name: '王小明', phone: '0912345678', address: '台中市某某路 1 號' },
 };
 
-function openPay({ order, user = null, id = 'ORDER1' }) {
+function openPay({ order, user = null, id = 'ORDER1', orders = null, query = null }) {
+    const db = orders || (order ? { ORDER1: order } : {});
     const html = read('pay.html');
     const body = '<!DOCTYPE html><html><head><meta charset="utf-8"></head>' + html.slice(html.indexOf('<body>'));
-    const dom = new JSDOM(body, { runScripts: 'outside-only', url: 'https://flowerbulb.tw/pay.html' + (id ? '?id=' + id : '') });
+    const dom = new JSDOM(body, { runScripts: 'outside-only', url: 'https://flowerbulb.tw/pay.html' + (query !== null ? query : (id ? '?id=' + id : '')) });
     const { window } = dom;
     window.console.error = () => {};
     window.console.log = () => {};
@@ -28,7 +29,7 @@ function openPay({ order, user = null, id = 'ORDER1' }) {
     window.firebaseServices = {
         db: {}, auth: { currentUser: user },
         doc: (db, col, docId) => ({ col, id: docId }),
-        getDoc: async (ref) => ({ exists: () => !!order && ref.id === 'ORDER1', data: () => order }),
+        getDoc: async (ref) => ({ exists: () => !!db[ref.id], data: () => db[ref.id] }),
         onAuthStateChanged: (auth, cb) => { setTimeout(() => cb(user), 0); return () => {}; },
         appendOrderNote: async (payload) => { calls.push(payload); return { data: { updated: 1 } }; },
     };
@@ -52,7 +53,7 @@ await t('未付款的訪客訂單：顯示應付金額、匯款帳號與回報�
     const page = openPay({ order: { ...BASE_ORDER, payment: 'transfer' } });
     await wait(100);
     const text = page.root().textContent;
-    ['BG20261015-ABCD', '尚未付款', '1023-979-097466', '林瑞青', '玉山銀行', 'NT$ 380', '銀行轉帳']
+    ['BG20261015-ABCD', '尚未付款', '1023-979-097466', '林瑞青', '玉山銀行', 'NT$ 380']
         .forEach((s) => assert.ok(text.includes(s), '缺少 ' + s));
     assert.ok(!text.includes('0912345678') && !text.includes('台中市某某路'), '不應該顯示電話或地址');
     assert.ok(page.document.getElementById('pay-form'), '沒有回報表單');
@@ -76,18 +77,37 @@ await t('送出回報：呼叫 appendOrderNote（kind=payment，這一筆訂單�
     assert.ok(/已收到您的匯款資訊/.test($('pay-report').textContent));
 });
 
-await t('會員訂單、還沒登入：匯款帳號照樣顯示，回報處請對方先登入', async () => {
+await t('會員訂單、沒有登入（從信件連結進來）：一樣可以直接回報，不用先登入', async () => {
     const page = openPay({ order: { ...BASE_ORDER, userId: 'u1' } });
     await wait(100);
     assert.ok(page.root().textContent.includes('1023-979-097466'), '帳號沒顯示');
-    assert.ok(!page.document.getElementById('pay-form'), '沒登入不應該顯示表單');
-    assert.ok(page.document.getElementById('pay-login-btn'), '沒有登入按鈕');
+    assert.ok(page.document.getElementById('pay-form'), '應該直接顯示回報表單');
+    assert.ok(!/請先登入/.test(page.root().textContent), '不應該要求登入');
 });
 
-await t('會員訂單、已登入：顯示回報表單', async () => {
-    const page = openPay({ order: { ...BASE_ORDER, userId: 'u1' }, user: { uid: 'u1' } });
+await t('多筆一起付（?ids=）：合計金額、一張表單，送出時用 mergePayment 一次回報所有未付款訂單', async () => {
+    const page = openPay({
+        query: '?ids=A,B,C,MISSING',
+        orders: {
+            A: { ...BASE_ORDER, orderNumber: 'BG-A', total: 380 },
+            B: { ...BASE_ORDER, orderNumber: 'BG-B', total: 120 },
+            C: { ...BASE_ORDER, orderNumber: 'BG-C', total: 999, paymentConfirmed: true, status: 'confirmed' },
+        },
+    });
     await wait(100);
-    assert.ok(page.document.getElementById('pay-form'), '沒有表單');
+    const text = page.root().textContent;
+    assert.ok(text.includes('共 2 筆訂單尚未付款') && text.includes('NT$ 500'), '合計不對：' + text.slice(0, 80));
+    assert.ok(text.includes('BG-C') && text.includes('已付款'), '已付款的訂單應該列出來並標示已付款');
+    assert.ok(text.includes('1 筆訂單找不到'), '找不到的訂單沒有提示');
+    assert.strictEqual(page.document.getElementById('pay-amount').value, '500');
+    const $ = (id) => page.document.getElementById(id);
+    $('pay-remitter').value = '王小明';
+    $('pay-bank').value = '台灣銀行';
+    $('pay-last5').value = '12345';
+    $('pay-form').dispatchEvent(new page.window.Event('submit', { cancelable: true }));
+    await wait(50);
+    assert.strictEqual(page.calls[0].kind, 'mergePayment');
+    assert.deepStrictEqual([...page.calls[0].orderIds], ['A', 'B'], '只回報未付款的那兩筆');
 });
 
 await t('已回報匯款：顯示「已收到您的匯款回報」，仍可補充', async () => {
@@ -129,7 +149,7 @@ function openReminder({ pathname = '/index.html', orders, user = { uid: 'u1' }, 
     window.firebaseServices = {
         db: {}, auth: { currentUser: user },
         collection: (db, name) => ({ name }), where: (f, op, v) => ({ f, op, v }), query: (c, w) => ({ c, w }),
-        getDocs: async (q) => { queries.push(q); return { forEach: (fn) => orders.forEach((o) => fn({ data: () => o })) }; },
+        getDocs: async (q) => { queries.push(q); return { forEach: (fn) => orders.forEach((o, i) => fn({ id: 'o' + i, data: () => o })) }; },
         onAuthStateChanged: (auth, cb) => { setTimeout(() => cb(user), 0); return () => {}; },
     };
     window.eval(read('js/common.js'));
@@ -144,13 +164,13 @@ const UNPAID = [
     { status: 'confirmed', paymentConfirmed: true, total: 500 },
 ];
 
-await t('有未付款訂單：跳出提醒，筆數與金額不含已回報、已付款的訂單，連到訂單記錄', async () => {
+await t('有未付款訂單：跳出提醒，筆數與金額不含已回報、已付款的訂單，帶著這些訂單到付款頁', async () => {
     const page = openReminder({ orders: UNPAID });
     await wait(50);
     const box = page.document.querySelector('.unpaid-reminder');
     assert.ok(box, '沒有跳出提醒');
     assert.ok(box.textContent.includes('2 筆') && box.textContent.includes('NT$ 500'), box.textContent.trim().slice(0, 80));
-    assert.strictEqual(box.querySelector('a').getAttribute('href'), '/orders.html');
+    assert.strictEqual(box.querySelector('a').getAttribute('href'), '/pay.html?ids=o0,o1');
     assert.deepStrictEqual(page.queries[0].w, { f: 'userId', op: '==', v: 'u1' }, '只能查自己的訂單');
     box.querySelector('.unpaid-reminder-later').click();
     assert.strictEqual(page.document.querySelector('.unpaid-reminder'), null, '按「稍後再說」沒有關掉');
@@ -179,6 +199,27 @@ console.log('\n訂單記錄');
 await t('未付款訂單的勾選框預設勾選', async () => {
     const src = read('orders.html');
     assert.ok(/class="order-select-checkbox"[^`]*\bchecked\b/.test(src), '勾選框沒有預設 checked');
+});
+
+await t('訂單記錄不放付款表單，「前往付款」帶著勾選的訂單到付款頁', async () => {
+    const html = read('orders.html');
+    assert.ok(!html.includes('merge-payment-form'), '還有合併匯款表單');
+    const dom = new JSDOM('<!DOCTYPE html><body>' + html.slice(html.indexOf('<div class="merge-payment-bar"'), html.indexOf('</div>', html.indexOf('id="go-pay-btn"')) + 6)
+        + '<input type="checkbox" class="order-select-checkbox" data-id="A" data-total="380" checked>'
+        + '<input type="checkbox" class="order-select-checkbox" data-id="B" data-total="120" checked>'
+        + '<input type="checkbox" class="order-select-checkbox" data-id="C" data-total="999"></body>', { runScripts: 'outside-only' });
+    const fn = html.match(/function updateMergePaymentBar\(\) \{[\s\S]*?\n\}/)[0];
+    dom.window.eval(fn + '; updateMergePaymentBar();');
+    const d = dom.window.document;
+    assert.strictEqual(d.getElementById('go-pay-btn').getAttribute('href'), '/pay.html?ids=A,B');
+    assert.strictEqual(d.getElementById('merge-selected-total').textContent, '500');
+});
+
+await t('結帳完成頁不放回報表單、離開時不再跳提醒，改成「前往付款」', async () => {
+    const html = read('order-success.html');
+    assert.ok(!html.includes('payment-confirm-form'), '還有回報表單');
+    assert.ok(!html.includes('beforeunload'), '還有離開提醒');
+    assert.ok(html.includes("'/pay.html?id=' + encodeURIComponent(lastOrder.id)"), '沒有付款頁連結');
 });
 
 await t('所有前台頁面都載入了未付款提醒', async () => {

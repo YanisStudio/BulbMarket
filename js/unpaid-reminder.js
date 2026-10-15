@@ -1,5 +1,6 @@
 /**
- * 未付款訂單提醒：會員登入後，如果有還沒付款的訂單，彈出一次提醒，帶他到「訂單記錄」付款。
+ * 未付款訂單提醒：會員登入後，如果有還沒付款的訂單，彈出一次提醒，
+ * 「前往付款」直接帶著所有未付款訂單到付款頁 pay.html（匯款帳號、回報表單都在那裡）。
  *
  * - 同一個瀏覽器分頁工作階段只提醒一次（sessionStorage），不會每換一頁就跳
  * - 已經在付款相關頁面（訂單記錄、結帳、付款頁、訂單完成、購物車）就不跳
@@ -34,7 +35,7 @@
             const snap = await getDocs(s.query(s.collection(s.db, 'orders'), s.where('userId', '==', user.uid)));
             snap.forEach(function(doc) {
                 const order = doc.data();
-                if (isUnpaid(order)) unpaid.push(order);
+                if (isUnpaid(order)) unpaid.push(Object.assign({ id: doc.id }, order));
             });
         } catch (error) {
             // 讀不到就算了，不要因為提醒功能打擾使用者；下次換頁會再試
@@ -51,6 +52,8 @@
 
     function show(orders) {
         const total = orders.reduce(function(sum, order) { return sum + (Number(order.total) || 0); }, 0);
+        // 付款頁一次最多 20 筆（跟 Cloud Function 的上限一致）
+        const payUrl = '/pay.html?ids=' + orders.slice(0, 20).map(function(o) { return encodeURIComponent(o.id); }).join(',');
         const escape = typeof escapeHtml === 'function' ? escapeHtml : function(v) { return String(v); };
         const modal = document.createElement('div');
         modal.className = 'unpaid-reminder';
@@ -62,9 +65,9 @@
             <div class="unpaid-reminder-box">
                 <div class="unpaid-reminder-icon"><i class="fas fa-file-invoice-dollar" aria-hidden="true"></i></div>
                 <h3 id="unpaid-reminder-title">您有 ${orders.length} 筆訂單尚未付款</h3>
-                <p>合計 <strong>NT$ ${escape(total.toLocaleString('zh-TW'))}</strong>，請到「訂單記錄」查看匯款帳號並回報匯款，我們確認付款後就會安排出貨。</p>
+                <p>合計 <strong>NT$ ${escape(total.toLocaleString('zh-TW'))}</strong>，可以合併一次轉帳。按「前往付款」查看匯款帳號並回報匯款，我們確認付款後就會安排出貨。</p>
                 <div class="unpaid-reminder-actions">
-                    <a href="/orders.html" class="btn btn-primary unpaid-reminder-go">前往付款</a>
+                    <a href="${payUrl}" class="btn btn-primary unpaid-reminder-go">前往付款</a>
                     <button type="button" class="btn btn-outline unpaid-reminder-later">稍後再說</button>
                 </div>
             </div>

@@ -12,7 +12,8 @@
 //   1. 規則收緊成「只有管理員能改訂單」（見 firestore.rules）
 //   2. 這裡只會「往後接」，永遠不會覆蓋或刪除既有備註
 //   3. 備註格式（【匯款確認】等標記、時間戳）由伺服器產生，不是網頁端說了算
-//   4. 會員訂單（有 userId）額外要求呼叫者就是該會員本人，比以前更嚴
+//   4. 會員訂單（有 userId）的「一般備註」要求呼叫者就是該會員本人。
+//      「回報匯款」則跟訪客訂單一樣，知道訂單 ID 就能回報（見下面的說明）
 //   5. 讀取與寫入在同一個 transaction 裡，兩個人同時送出不會有人的備註被蓋掉
 //
 // 「知道訂單 ID」仍然是訪客能回報匯款的依據，這跟規則裡 `allow get: if true`
@@ -121,9 +122,14 @@ exports.appendOrderNote = onCall({ region: "asia-east1" }, async (request) => {
         snaps.forEach((snap) => {
             if (!snap.exists) throw new HttpsError("not-found", "找不到訂單資料");
             const order = snap.data();
-            // 會員訂單只有本人能加備註；訪客訂單（沒有 userId）靠「知道訂單 ID」為憑，
-            // 跟訂單完成頁讓訪客讀自己訂單的假設一致
-            if (order.userId && order.userId !== uid) {
+            // 一般備註：會員訂單只有本人能加。
+            //
+            // 回報匯款（payment / mergePayment）：不論會員或訪客訂單，知道訂單 ID 就能回報。
+            // 訂單成立通知信的「前往付款」連結就帶著訂單 ID，顧客常常是在手機上點信、
+            // 而手機沒有登入，以前會員訂單會卡在「請先登入」。放寬是安全的：
+            //   - 回報只會「往後接」一段匯款資訊，不會改成已付款，最後一定要管理員核對才算數
+            //   - 訂單 ID 是 20 碼隨機字串，跟訪客訂單一直以來的假設相同
+            if (kind === "note" && order.userId && order.userId !== uid) {
                 throw new HttpsError("permission-denied", "這筆訂單不屬於目前登入的帳號");
             }
             if ((order.notes || "").length >= MAX_TOTAL_NOTES_LENGTH) {
