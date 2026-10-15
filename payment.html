@@ -601,8 +601,9 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="email">電子郵件</label>
-                                    <input type="email" id="email" name="email">
+                                    <label for="email">電子郵件 <span class="required">*</span></label>
+                                    <input type="email" id="email" name="email" required placeholder="付款連結與出貨通知會寄到這裡">
+                                    <div class="form-hint" style="color: #777; font-size: 0.85rem; margin-top: 4px;">訂單成立後，我們會把匯款帳號與付款連結寄到這個信箱，之後出貨也會寄信通知您</div>
                                 </div>
                                 
                                 <div class="form-row">
@@ -1109,6 +1110,10 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                             // 填充收件人資料
                             document.getElementById('name').value = userData.name || '';
                             document.getElementById('phone').value = userData.phone || '';
+                            // 手機號碼登入的會員，登入帳號本身沒有 Email；會員資料裡填過的話就帶入
+                            //（Email 是必填，付款連結和出貨通知都寄到這裡）
+                            const emailInput = document.getElementById('email');
+                            if (!emailInput.value && userData.email) emailInput.value = userData.email;
                             if (twDistrictSelect) twDistrictSelect.setValue(userData.city, userData.district);
 
                             // address 欄位在「7-11取貨」模式下代表門市名稱，跟會員的住家
@@ -1674,7 +1679,8 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                         id: result.orderId,
                         orderNumber: result.orderNumber,
                         total: result.total,
-                        items: result.itemCount,
+                        // 總件數（例如 1 種商品買 3 顆就是 3 件）；伺服器回傳的 itemCount 是「幾種商品」
+                        items: cart.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
                         customerName: name.trim(),
                         customerPhone: phone.trim(),
                         orderDate: localDateString()

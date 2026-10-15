@@ -164,16 +164,24 @@ const UNPAID = [
     { status: 'confirmed', paymentConfirmed: true, total: 500 },
 ];
 
-await t('有未付款訂單：跳出提醒，筆數與金額不含已回報、已付款的訂單，帶著這些訂單到付款頁', async () => {
+await t('有 2 筆以上未付款：跳出提醒，筆數與金額不含已回報、已付款的訂單，帶到訂單記錄讓顧客自己勾選', async () => {
     const page = openReminder({ orders: UNPAID });
     await wait(50);
     const box = page.document.querySelector('.unpaid-reminder');
     assert.ok(box, '沒有跳出提醒');
     assert.ok(box.textContent.includes('2 筆') && box.textContent.includes('NT$ 500'), box.textContent.trim().slice(0, 80));
-    assert.strictEqual(box.querySelector('a').getAttribute('href'), '/pay.html?ids=o0,o1');
+    assert.strictEqual(box.querySelector('a').getAttribute('href'), '/orders.html');
     assert.deepStrictEqual(page.queries[0].w, { f: 'userId', op: '==', v: 'u1' }, '只能查自己的訂單');
     box.querySelector('.unpaid-reminder-later').click();
     assert.strictEqual(page.document.querySelector('.unpaid-reminder'), null, '按「稍後再說」沒有關掉');
+});
+
+await t('只有 1 筆未付款：直接帶到那筆的付款頁', async () => {
+    const page = openReminder({ orders: [UNPAID[0], UNPAID[3]] });
+    await wait(50);
+    const box = page.document.querySelector('.unpaid-reminder');
+    assert.ok(box && box.textContent.includes('1 筆') && box.textContent.includes('NT$ 380'));
+    assert.strictEqual(box.querySelector('a').getAttribute('href'), '/pay.html?id=o0');
 });
 
 await t('同一個工作階段只提醒一次', async () => {
@@ -226,6 +234,29 @@ await t('所有前台頁面都載入了未付款提醒', async () => {
     const missing = fs.readdirSync(ROOT).filter((f) => f.endsWith('.html'))
         .filter((f) => read(f).includes('/js/member.js') && !read(f).includes('/js/unpaid-reminder.js'));
     assert.deepStrictEqual(missing, []);
+});
+
+console.log('\n結帳與訂單資訊');
+
+await t('結帳時 Email 必填（付款連結與出貨通知都寄到這裡），手機登入的會員會帶入會員資料的 Email', async () => {
+    const html = read('payment.html');
+    assert.ok(/<input type="email" id="email" name="email" required/.test(html), 'Email 不是必填');
+    assert.ok(html.includes('if (!emailInput.value && userData.email) emailInput.value = userData.email;'), '沒有帶入會員資料的 Email');
+});
+
+await t('結帳完成頁的說明跟實際一致：寄 Email 通知，不是簡訊', async () => {
+    const html = read('order-success.html');
+    assert.ok(!html.includes('簡訊'), '還寫著簡訊通知');
+    assert.ok(html.includes('寄 Email 通知您'));
+});
+
+await t('商品數量顯示總件數（1 種買 3 顆是 3 件），不是商品種類數', async () => {
+    assert.ok(!read('orders.html').includes('order.items?.length || 0} 件'), '訂單記錄還在用商品種類數');
+    assert.ok(!read('payment.html').includes('items: result.itemCount'), '結帳完成頁還在用商品種類數');
+});
+
+await t('未付款訂單有說明不要的話怎麼辦（聯絡我們取消）', async () => {
+    assert.ok(read('orders.html').includes('不需要這筆訂單了嗎？'));
 });
 
 console.log(`\n${pass} passed, ${fail} failed`);
