@@ -601,9 +601,9 @@
                                 </div>
                                 
                                 <div class="form-group">
-                                    <label for="email">電子郵件 <span class="required">*</span></label>
-                                    <input type="email" id="email" name="email" required placeholder="付款連結與出貨通知會寄到這裡">
-                                    <div class="form-hint" style="color: #777; font-size: 0.85rem; margin-top: 4px;">訂單成立後，我們會把匯款帳號與付款連結寄到這個信箱，之後出貨也會寄信通知您</div>
+                                    <label for="email">電子郵件（選填）</label>
+                                    <input type="email" id="email" name="email" placeholder="填寫的話，付款連結與出貨通知會寄到這裡">
+                                    <div class="form-hint" style="color: #777; font-size: 0.85rem; margin-top: 4px;">有填寫的話，訂單成立後會把匯款帳號與付款連結寄到這個信箱，出貨時也會寄信通知您</div>
                                 </div>
                                 
                                 <div class="form-row">
@@ -1110,8 +1110,8 @@ function calculateShipping(cartItems, subtotal, method = 'store') {
                             // 填充收件人資料
                             document.getElementById('name').value = userData.name || '';
                             document.getElementById('phone').value = userData.phone || '';
-                            // 手機號碼登入的會員，登入帳號本身沒有 Email；會員資料裡填過的話就帶入
-                            //（Email 是必填，付款連結和出貨通知都寄到這裡）
+                            // 手機號碼登入的會員，登入帳號本身沒有 Email；會員資料裡填過的話就幫忙帶入
+                            //（Email 選填，有填才收得到付款連結和出貨通知）
                             const emailInput = document.getElementById('email');
                             if (!emailInput.value && userData.email) emailInput.value = userData.email;
                             if (twDistrictSelect) twDistrictSelect.setValue(userData.city, userData.district);
