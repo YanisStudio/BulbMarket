@@ -238,9 +238,10 @@ await t('所有前台頁面都載入了未付款提醒', async () => {
 
 console.log('\n結帳與訂單資訊');
 
-await t('結帳時 Email 必填（付款連結與出貨通知都寄到這裡），手機登入的會員會帶入會員資料的 Email', async () => {
+await t('結帳時 Email 是選填（不是每個顧客都有 Email），手機登入的會員會帶入會員資料的 Email', async () => {
     const html = read('payment.html');
-    assert.ok(/<input type="email" id="email" name="email" required/.test(html), 'Email 不是必填');
+    const input = html.match(/<input type="email" id="email"[^>]*>/)[0];
+    assert.ok(!/\brequired\b/.test(input), 'Email 不能是必填：' + input);
     assert.ok(html.includes('if (!emailInput.value && userData.email) emailInput.value = userData.email;'), '沒有帶入會員資料的 Email');
 });
 
