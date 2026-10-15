@@ -456,6 +456,12 @@
     margin-top: 8px;
 }
 
+.section-alert .cancel-hint {
+    margin-top: 10px;
+    font-size: 0.88em;
+    color: #8a6d3b;
+}
+
 .section-alert p {
     margin: 0;
     color: #5D4037;
@@ -1192,7 +1198,7 @@ async function loadUserOrders(user) {
                             </div>
                             <div class="order-info">
                                 <p>收件人: ${escapeHtml(order.customer?.name) || '未知'}</p>
-                                <p>商品數量: ${order.items?.length || 0} 件</p>
+                                <p>商品數量: ${(order.items || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0)} 件</p>
                                 <p class="order-total">總金額: ${order.total || 0}</p>
                                 <p class="order-date">${orderDate}</p>
                             </div>
@@ -1391,6 +1397,7 @@ async function showOrderDetail(orderId) {
                 <div class="section-alert">
                     <p><strong>尚未付款：</strong> 匯款帳號與回報表單都在付款頁。</p>
                     <a class="btn btn-primary" href="/pay.html?id=${encodeURIComponent(order.id)}">前往付款</a>
+                    <p class="cancel-hint">不需要這筆訂單了嗎？請<a href="/contact.html">聯絡我們</a>告知訂單編號，我們會幫您取消。</p>
                 </div>
             `;
         }
