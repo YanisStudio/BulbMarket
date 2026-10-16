@@ -451,10 +451,22 @@
     margin-left: 4px;
 }
 
+.status-badge.order_confirmed {
+    background-color: #fde9d9;
+    color: #9a4a12;
+    border: 1px solid #f8c9a5;
+}
+
 .status-badge.confirmed {
     background-color: #d1ecf1;
     color: #0c5460;
     border: 1px solid #bee5eb;
+}
+
+.status-badge.preparing {
+    background-color: #e8e1f5;
+    color: #4a2d7a;
+    border: 1px solid #d3c5ec;
 }
 
 .status-badge.shipped {

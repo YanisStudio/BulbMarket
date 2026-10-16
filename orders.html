@@ -188,9 +188,19 @@
     color: #1565C0;
 }
 
+.status-order_confirmed {
+    background-color: #FDE9D9;
+    color: #9A4A12;
+}
+
 .status-confirmed {
     background-color: #E3F2FD;
     color: #1565C0;
+}
+
+.status-preparing {
+    background-color: #EDE7F6;
+    color: #4A2D7A;
 }
 
 .status-shipped {
@@ -918,6 +928,7 @@
     <script src="/js/categories.js"></script>
     <script src="/js/common.js"></script>
     <script src="/js/member.js"></script>
+    <script src="/js/order-status.js"></script>
     <script src="/js/unpaid-reminder.js"></script>
 
     <script>
@@ -1172,8 +1183,9 @@ async function loadUserOrders(user) {
             // 還沒付款的訂單，對客戶來說重點是「要去付款」，用專屬的紅色徽章
             // 突顯、並顯示合併匯款用的勾選框，跟一般狀態徽章的樣式分開處理
             // 已經回報過匯款、等管理員對帳的訂單，不能再勾選合併匯款，改顯示「待確認」
-            const isReported = order.status === 'pending' && isPaymentReported(order);
-            const isUnpaid = order.status === 'pending' && order.paymentConfirmed !== true && !isReported;
+            // 「未付款」「訂單確認」都還在等付款（見 js/order-status.js）
+            const isReported = OrderStatus.isAwaitingPayment(order.status) && isPaymentReported(order);
+            const isUnpaid = OrderStatus.isAwaitingPayment(order.status) && order.paymentConfirmed !== true && !isReported;
             const badgeHTML = isUnpaid
                 ? '<span class="unpaid-badge">未付款</span>'
                 : isReported
@@ -1382,8 +1394,8 @@ async function showOrderDetail(orderId) {
         }
         
         // 未付款時提醒重點是「請去付款」，跟訂單處理狀態分開判斷
-        const isOrderReported = order.status === 'pending' && isPaymentReported(order);
-        const isOrderUnpaid = order.status === 'pending' && order.paymentConfirmed !== true && !isOrderReported;
+        const isOrderReported = OrderStatus.isAwaitingPayment(order.status) && isPaymentReported(order);
+        const isOrderUnpaid = OrderStatus.isAwaitingPayment(order.status) && order.paymentConfirmed !== true && !isOrderReported;
 
         let paymentReminderHTML = '';
         if (isOrderReported) {
@@ -1675,37 +1687,9 @@ function closeNotesSuccessModal() {
 // 將關閉函數暴露到全域
 window.closeNotesSuccessModal = closeNotesSuccessModal;
 
+// 狀態名稱與顏色統一在 js/order-status.js
 function getOrderStatusInfo(status) {
-   let statusText = '';
-   let statusClass = '';
-   
-   switch(status) {
-       case 'pending':
-           statusText = '未付款';
-           statusClass = 'status-pending';
-           break;
-       case 'confirmed':
-           statusText = '已付款';
-           statusClass = 'status-confirmed';
-           break;
-       case 'shipped':
-           statusText = '已出貨';
-           statusClass = 'status-shipped';
-           break;
-       case 'completed':
-           statusText = '已完成';
-           statusClass = 'status-completed';
-           break;
-       case 'cancelled':
-           statusText = '已取消';
-           statusClass = 'status-cancelled';
-           break;
-       default:
-           statusText = '未付款';
-           statusClass = 'status-pending';
-   }
-   
-   return { statusText, statusClass };
+    return { statusText: OrderStatus.label(status), statusClass: 'status-' + OrderStatus.cssKey(status) };
 }
 
     </script>

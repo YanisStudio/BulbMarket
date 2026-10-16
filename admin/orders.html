@@ -169,7 +169,9 @@
                             <select id="status-filter" style="width: 150px; height: 40px; font-size: 15px; padding: 5px;">
                                 <option value="all">全部訂單</option>
                                 <option value="pending">未付款</option>
+                                <option value="order_confirmed">訂單確認</option>
                                 <option value="confirmed">已付款</option>
+                                <option value="preparing">確認收款備貨中</option>
                                 <option value="shipped">已出貨</option>
                                 <option value="completed">已完成</option>
                                 <option value="cancelled">已取消</option>
@@ -207,6 +209,7 @@
                     <div class="radio-group">
                         <label><input type="radio" name="export-range" value="all" checked> 全部訂單</label>
                         <label><input type="radio" name="export-range" value="confirmed"> 僅已付款訂單</label>
+                        <label><input type="radio" name="export-range" value="preparing"> 僅確認收款備貨中訂單</label>
                         <label><input type="radio" name="export-range" value="shipped"> 僅已出貨訂單</label>
                         <label><input type="radio" name="export-range" value="completed"> 僅已完成訂單</label>
                     </div>
@@ -262,6 +265,7 @@
     </footer>
     
     <script src="/js/admin-common.js"></script>
+    <script src="/js/order-status.js"></script>
     
     <style>
         /* 訂單管理特定樣式 */
@@ -1214,15 +1218,9 @@
                     }
                 }
                 
+                // 狀態名稱統一在 js/order-status.js
                 function getStatusText(status) {
-                    const statusMap = {
-                        'pending': '未付款',
-                        'confirmed': '已付款',
-                        'shipped': '已出貨',
-                        'completed': '已完成',
-                        'cancelled': '已取消'
-                    };
-                    return statusMap[status] || '未知狀態';
+                    return OrderStatus.label(status);
                 }
                 
                 // 加載訂單
@@ -1293,41 +1291,15 @@
                                 filteredOrders.forEach(order => {
                                     const orderDate = window.AdminCommon.formatDate(order.orderDate, 'full');
                                     
-                                    let statusClass = '';
-                                    let statusText = '';
-                                    
-                                    switch(order.status) {
-                                        case 'pending':
-                                            statusClass = 'pending';
-                                            statusText = '未付款';
-                                            break;
-                                        case 'confirmed':
-                                            statusClass = 'confirmed';
-                                            statusText = '已付款';
-                                            break;
-                                        case 'shipped':
-                                            statusClass = 'shipped';
-                                            statusText = '已出貨';
-                                            break;
-                                        case 'completed':
-                                            statusClass = 'completed';
-                                            statusText = '已完成';
-                                            break;
-                                        case 'cancelled':
-                                            statusClass = 'cancelled';
-                                            statusText = '已取消';
-                                            break;
-                                        default:
-                                            statusClass = 'pending';
-                                            statusText = '未付款';
-                                    }
+                                    const statusClass = OrderStatus.cssKey(order.status);
+                                    const statusText = OrderStatus.label(order.status);
                                     
                                     ordersHTML += `
                                         <div class="order-item" data-id="${order.id}">
                                             <div class="order-item-header">
                                                 <span class="order-number">${escapeHtml(order.orderNumber) || '無訂單編號'}</span>
                                                 <span class="status-badge ${statusClass}">${statusText}</span>
-                                                ${order.status === 'pending' && isPaymentReported(order) ? '<span class="status-badge reported">已回報匯款</span>' : ''}
+                                                ${OrderStatus.isAwaitingPayment(order.status) && isPaymentReported(order) ? '<span class="status-badge reported">已回報匯款</span>' : ''}
                                             </div>
                                             <div class="order-item-body">
                                                 <p><strong>客戶:</strong> ${escapeHtml(order.customer?.name) || '未知'}</p>
@@ -1449,13 +1421,7 @@
                                     `;
                                 }
                                 
-                                const statusOptions = [
-                                    { value: 'pending', text: '未付款' },
-                                    { value: 'confirmed', text: '已付款' },
-                                    { value: 'shipped', text: '已出貨' },
-                                    { value: 'completed', text: '已完成' },
-                                    { value: 'cancelled', text: '已取消' }
-                                ];
+                                const statusOptions = OrderStatus.LIST.map(s => ({ value: s.value, text: s.label }));
                                 
                                 let statusSelectHTML = '<select id="status-update" style="width: 150px; height: 40px; font-size: 15px; padding: 5px;">';
                                 statusOptions.forEach(option => {
@@ -1470,7 +1436,7 @@
                                     : order.payment === 'credit' ? '信用卡付款'
                                     : (order.payment || '未知');
                                 // 顧客回報了匯款但還沒對帳：提醒管理員核對後把狀態改成「已付款」
-                                const reportedNoticeHTML = order.status === 'pending' && isPaymentReported(order)
+                                const reportedNoticeHTML = OrderStatus.isAwaitingPayment(order.status) && isPaymentReported(order)
                                     ? '<p class="reported-notice"><i class="fas fa-info-circle"></i> 顧客已回報匯款（見下方客戶備註），核對款項後請把狀態改成「已付款」，系統才會寄出付款確認信。</p>'
                                     : '';
                                 
@@ -1633,7 +1599,8 @@
                     return batch.commit();
                 }
 
-                const STOCK_RESTORABLE_STATUSES = ['pending', 'confirmed'];
+                // 商品還沒寄出的狀態（取消／刪除時可以把庫存加回去），見 js/order-status.js
+                const STOCK_RESTORABLE_STATUSES = OrderStatus.LIST.filter(s => s.restorable).map(s => s.value);
 
                 // 更新訂單狀態
                 async function updateOrderStatus(orderId, newStatus) {
@@ -1645,7 +1612,7 @@
                     // paymentConfirmed 還是 true 而不顯示紅色「未付款」徽章、也不給勾選框，
                     // 顧客就沒辦法回報匯款了（isPaymentReported 也會一直回傳 false）
                     const updateData = { status: newStatus };
-                    if (['confirmed', 'shipped', 'completed'].includes(newStatus)) {
+                    if (OrderStatus.isPaid(newStatus)) {
                         updateData.paymentConfirmed = true;
                     } else {
                         updateData.paymentConfirmed = false;
@@ -1680,25 +1647,12 @@
                             if (orderItem) {
                                 const statusElement = orderItem.querySelector('.status-badge');
                                 if (statusElement) {
-                                    statusElement.classList.remove(
-                                        'pending', 'confirmed', 'shipped', 'completed', 'cancelled'
-                                    );
-                                    
-                                    statusElement.classList.add(newStatus);
-                                    
-                                    let statusText = '';
-                                    switch(newStatus) {
-                                        case 'pending': statusText = '未付款'; break;
-                                        case 'confirmed': statusText = '已付款'; break;
-                                        case 'shipped': statusText = '已出貨'; break;
-                                        case 'completed': statusText = '已完成'; break;
-                                        case 'cancelled': statusText = '已取消'; break;
-                                        default: statusText = '未付款';
-                                    }
-                                    statusElement.textContent = statusText;
+                                    statusElement.classList.remove(...OrderStatus.LIST.map(s => s.value));
+                                    statusElement.classList.add(OrderStatus.cssKey(newStatus));
+                                    statusElement.textContent = OrderStatus.label(newStatus);
                                 }
                                 const reportedBadge = orderItem.querySelector('.status-badge.reported');
-                                if (reportedBadge && newStatus !== 'pending') reportedBadge.remove();
+                                if (reportedBadge && !OrderStatus.isAwaitingPayment(newStatus)) reportedBadge.remove();
                             }
                             
                             window.AdminCommon.showToast(

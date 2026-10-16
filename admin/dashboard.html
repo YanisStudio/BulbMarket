@@ -233,6 +233,7 @@
     </footer>
     
     <script src="/js/admin-common.js"></script>
+    <script src="/js/order-status.js"></script>
     
     <style>
         /* 改善操作按鈕的視覺效果 */
@@ -376,7 +377,8 @@
                     usersSnap,
                     productsSnap
                 ] = await Promise.all([
-                    getDocsFromServer(query(collection(db, "orders"), where("status", "==", "pending"))),
+                    // 「未付款」包含還在等付款的所有狀態（未付款、訂單確認），見 js/order-status.js
+                    getDocsFromServer(query(collection(db, "orders"), where("status", "in", window.OrderStatus ? OrderStatus.AWAITING_PAYMENT : ["pending"]))),
                     getDocsFromServer(query(collection(db, "orders"), where("status", "==", "completed"))),
                     getDocsFromServer(collection(db, "users")),
                     getDocsFromServer(collection(db, "products"))
@@ -452,27 +454,8 @@
                         orderDate = date.toLocaleDateString('zh-TW');
                     }
                     
-                    let statusClass = 'pending';
-                    let statusText = '未付款';
-
-                    switch(order.status) {
-                        case 'confirmed':
-                            statusClass = 'confirmed';
-                            statusText = '已付款';
-                            break;
-                        case 'shipped':
-                            statusClass = 'shipped';
-                            statusText = '已出貨';
-                            break;
-                        case 'completed':
-                            statusClass = 'completed';
-                            statusText = '已完成';
-                            break;
-                        case 'cancelled':
-                            statusClass = 'cancelled';
-                            statusText = '已取消';
-                            break;
-                    }
+                    const statusClass = OrderStatus.cssKey(order.status);
+                    const statusText = OrderStatus.label(order.status);
                     
                     ordersHTML += `
                         <tr>

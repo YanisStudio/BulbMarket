@@ -52,6 +52,7 @@ node tests/admin-shipping-save.test.mjs                   # 後台運費：空�
 node tests/scheduler-plan.test.mjs                        # 排程上下架：兩個時間都到期時以較晚的為準（6 項）
 node tests/admin-articles.test.mjs                        # 後台栽培小知識／加入會員兩個文章分頁互不干擾（5 項）
 node tests/pay-page.test.mjs                              # 付款頁、未付款提醒、訂單記錄預設勾選（12 項）
+node tests/order-status.test.mjs                          # 訂單狀態的順序、名稱、算不算已付款（9 項）
 cd functions && node ../tests/order-email-payment.test.cjs # 訂單成立通知信的匯款帳號與付款連結（8 項）
 ```
 

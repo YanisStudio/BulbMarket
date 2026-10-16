@@ -19,7 +19,9 @@
     const SESSION_KEY = 'unpaidReminderShown_';
 
     function isUnpaid(order) {
-        if (order.status !== 'pending' || order.paymentConfirmed === true) return false;
+        // 還在等付款的狀態（跟 js/order-status.js 的 awaitingPayment 一致；有載入就用那一份）
+        const awaiting = window.OrderStatus ? window.OrderStatus.AWAITING_PAYMENT : ['pending', 'order_confirmed'];
+        if (awaiting.indexOf(order.status || 'pending') === -1 || order.paymentConfirmed === true) return false;
         return !(typeof isPaymentReported === 'function' && isPaymentReported(order));
     }
 
