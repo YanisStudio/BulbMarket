@@ -288,6 +288,7 @@
     <script src="/js/member.js"></script>
     <script src="/js/unpaid-reminder.js"></script>
     <script src="/js/bank-info.js"></script>
+    <script src="/js/order-status.js"></script>
 
     <script>
 // 訂單付款頁：所有付款都集中在這一頁
@@ -341,7 +342,7 @@ async function loadOrders(attempt = 1) {
 }
 
 function isPaid(order) {
-    return order.paymentConfirmed === true || ['confirmed', 'shipped', 'completed'].includes(order.status);
+    return order.paymentConfirmed === true || OrderStatus.isPaid(order.status);
 }
 
 function money(n) {

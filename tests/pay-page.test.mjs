@@ -36,6 +36,7 @@ function openPay({ order, user = null, id = 'ORDER1', orders = null, query = nul
     window.eval(read('js/common.js'));
     window.initCommonFeatures = () => {};
     window.eval(read('js/bank-info.js'));
+    window.eval(read('js/order-status.js'));
     const inline = html.match(/<script>([\s\S]*?)<\/script>\s*<\/body>/);
     window.eval(inline[1]);
     return { window, document: window.document, calls, root: () => window.document.getElementById('pay-root') };
