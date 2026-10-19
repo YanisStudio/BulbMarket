@@ -666,8 +666,7 @@ function openProductDetailModal(productId) {
     document.getElementById('pd-price').textContent = `$${product.price}/${product.unit}`;
 
     const stockEl = document.getElementById('pd-stock');
-    // 庫存單位跟價格單位一致（例如 $195/顆 → 庫存: 19 顆）
-    stockEl.textContent = product.stock > 0 ? `庫存: ${product.stock} ${product.unit || '份'}` : '無庫存';
+    stockEl.textContent = product.stock > 0 ? `庫存: ${product.stock} 份` : '無庫存';
     stockEl.classList.toggle('low-stock', product.stock > 0 && product.stock < 5);
 
     document.getElementById('pd-desc').textContent = product.description || '';
