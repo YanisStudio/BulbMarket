@@ -479,6 +479,11 @@ footer.site-footer {
         flex-basis: 44%;
     }
 
+    /* 只有一個精選商品時，44% 寬的卡片縮在中間、左右空很多，放大一點 */
+    .product-slider .product-grid > .product-card:only-child {
+        flex-basis: 62%;
+    }
+
     /* 卡片變窄後，加入購物車按鈕要能縮小，愛心按鈕才不會被擠出卡片外 */
     .product-slider .product-info {
         padding: 0.9em 0.75em 1em;

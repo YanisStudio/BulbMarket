@@ -773,7 +773,8 @@ function renderProducts(products) {
             tagHTML = `<span class="product-tag">${escapeHtml(product.tags[0])}</span>`;
         }
 
-        const stockText = product.stock > 0 ? `(庫存: ${product.stock} 份)` : '(無庫存)';
+        // 庫存單位跟價格單位一致（例如 $195/顆 → 庫存: 19 顆），以前寫死成「份」
+        const stockText = product.stock > 0 ? `(庫存: ${product.stock} ${escapeHtml(product.unit || '份')})` : '(無庫存)';
         const stockClass = product.stock < 5 ? 'low-stock' : '';
 
         // 使用與 products.html 完全相同的結構

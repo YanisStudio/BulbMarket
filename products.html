@@ -624,7 +624,8 @@ function buildProductCardHTML(product) {
     window.__productDataCache[product.id] = product;
 
     const tagHTML = product.tags?.length > 0 ? `<span class="product-tag">${escapeHtml(product.tags[0])}</span>` : '';
-    const stockText = product.stock > 0 ? `(庫存: ${product.stock} 份)` : '(無庫存)';
+    // 庫存單位跟價格單位一致（例如 $195/顆 → 庫存: 19 顆），以前寫死成「份」
+    const stockText = product.stock > 0 ? `(庫存: ${product.stock} ${escapeHtml(product.unit || '份')})` : '(無庫存)';
     const stockClass = product.stock < 5 ? 'low-stock' : '';
 
     // 已下架的商品仍然顯示出來（讓顧客知道曾經有這項商品），
