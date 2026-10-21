@@ -436,16 +436,26 @@
                     <img id="pd-image" src="" alt="">
                 </div>
                 <div class="product-detail-info">
-                    <h2 id="pd-name"></h2>
-                    <p class="product-detail-price" id="pd-price"></p>
-                    <p class="product-detail-stock" id="pd-stock"></p>
+                    <!-- 名稱、價格固定在上方；描述／詳細介紹在下面分頁切換、各自捲動；
+                         加入購物車固定在最下面，文字再長也不會被擠走 -->
+                    <div class="product-detail-head">
+                        <h2 id="pd-name"></h2>
+                        <p class="product-detail-price" id="pd-price"></p>
+                        <p class="product-detail-stock" id="pd-stock"></p>
+                    </div>
 
-                    <p class="product-detail-section-label">商品描述</p>
-                    <p class="product-detail-desc-text" id="pd-desc"></p>
+                    <div class="product-detail-tabs" id="pd-tabs" role="tablist" aria-label="商品資訊" hidden>
+                        <button type="button" role="tab" class="active" id="pd-tab-desc" data-tab="desc" aria-controls="pd-panel-desc" aria-selected="true">商品描述</button>
+                        <button type="button" role="tab" id="pd-tab-detail" data-tab="detail" aria-controls="pd-detail-desc-wrap" aria-selected="false" tabindex="-1">詳細介紹</button>
+                    </div>
 
-                    <div id="pd-detail-desc-wrap" style="display:none;">
-                        <p class="product-detail-section-label">詳細介紹</p>
-                        <p class="product-detail-desc-text" id="pd-detail-desc"></p>
+                    <div class="product-detail-content">
+                        <div role="tabpanel" id="pd-panel-desc" aria-labelledby="pd-tab-desc">
+                            <p class="product-detail-desc-text" id="pd-desc"></p>
+                        </div>
+                        <div role="tabpanel" id="pd-detail-desc-wrap" aria-labelledby="pd-tab-detail" hidden>
+                            <p class="product-detail-desc-text" id="pd-detail-desc"></p>
+                        </div>
                     </div>
 
                     <div class="product-detail-actions">

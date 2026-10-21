@@ -669,15 +669,23 @@ function openProductDetailModal(productId) {
     stockEl.textContent = product.stock > 0 ? `庫存: ${product.stock} 份` : '無庫存';
     stockEl.classList.toggle('low-stock', product.stock > 0 && product.stock < 5);
 
-    document.getElementById('pd-desc').textContent = product.description || '';
+    // 商品描述、詳細介紹分成兩個分頁，文字只在下面那一塊捲動，圖片、價格、
+    // 加入購物車按鈕固定不動。手機上以前是全部疊成一長條，按鈕被擠到很下面。
+    // 兩種都有才顯示分頁標籤；只有其中一種就直接顯示那一種
+    const descText = (product.description || '').trim();
+    const detailText = (product.detailDescription || '').trim();
+    document.getElementById('pd-desc').textContent = descText;
+    document.getElementById('pd-detail-desc').textContent = detailText;
 
-    const extraWrap = document.getElementById('pd-detail-desc-wrap');
-    const extraEl = document.getElementById('pd-detail-desc');
-    if (product.detailDescription && product.detailDescription.trim()) {
-        extraEl.textContent = product.detailDescription;
-        extraWrap.style.display = 'block';
-    } else {
-        extraWrap.style.display = 'none';
+    const tabs = document.getElementById('pd-tabs');
+    const detailPanel = document.getElementById('pd-detail-desc-wrap');
+    if (tabs) {
+        tabs.hidden = !(descText && detailText);
+        if (detailPanel) detailPanel.style.display = '';
+        selectProductDetailTab(descText || !detailText ? 'desc' : 'detail');
+    } else if (detailPanel) {
+        // 瀏覽器還快取著舊版頁面（沒有分頁標籤）時，照舊把詳細介紹接在描述下面
+        detailPanel.style.display = detailText ? 'block' : 'none';
     }
 
     const tagEl = document.getElementById('pd-tag');
@@ -741,6 +749,26 @@ function openProductDetailModal(productId) {
 // openProductDetailModal() 開窗前的焦點位置，closeProductDetailModal() 用它還原
 let lastProductDetailTrigger = null;
 
+// 切換商品詳細介紹彈窗的分頁（'desc' 商品描述／'detail' 詳細介紹）
+function selectProductDetailTab(name) {
+    const tabs = [
+        { tab: document.getElementById('pd-tab-desc'), panel: document.getElementById('pd-panel-desc'), key: 'desc' },
+        { tab: document.getElementById('pd-tab-detail'), panel: document.getElementById('pd-detail-desc-wrap'), key: 'detail' }
+    ];
+    tabs.forEach(function(item) {
+        const active = item.key === name;
+        if (item.tab) {
+            item.tab.classList.toggle('active', active);
+            item.tab.setAttribute('aria-selected', active ? 'true' : 'false');
+            item.tab.tabIndex = active ? 0 : -1;
+        }
+        if (item.panel) item.panel.hidden = !active;
+    });
+    // 換分頁時從頭開始看
+    const content = document.querySelector('#product-detail-modal .product-detail-content');
+    if (content) content.scrollTop = 0;
+}
+
 function closeProductDetailModal() {
     const modal = document.getElementById('product-detail-modal');
     if (modal) modal.style.display = 'none';
@@ -773,6 +801,23 @@ function initProductDetailModal() {
     const backdrop = modal.querySelector('.product-detail-backdrop');
     if (backdrop) backdrop.addEventListener('click', closeProductDetailModal);
 
+    // 分頁：點選切換；鍵盤左右鍵在兩個分頁間移動（WAI-ARIA tabs 的慣例）
+    const tabList = document.getElementById('pd-tabs');
+    if (tabList) {
+        tabList.addEventListener('click', function(e) {
+            const tab = e.target.closest('[role="tab"]');
+            if (tab) selectProductDetailTab(tab.dataset.tab);
+        });
+        tabList.addEventListener('keydown', function(e) {
+            if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+            const current = document.activeElement && document.activeElement.dataset.tab;
+            const next = current === 'desc' ? 'detail' : 'desc';
+            selectProductDetailTab(next);
+            document.getElementById(next === 'desc' ? 'pd-tab-desc' : 'pd-tab-detail').focus();
+            e.preventDefault();
+        });
+    }
+
     document.addEventListener('keydown', function(e) {
         if (modal.style.display === 'none') return;
 
@@ -784,9 +829,9 @@ function initProductDetailModal() {
         // 把 Tab 鎖在彈窗裡。aria-modal="true" 只讓讀螢幕忽略後面的內容，
         // 用鍵盤的人還是會 Tab 到被遮住的卡片上，焦點就跑到看不見的地方了
         if (e.key !== 'Tab') return;
-        const focusables = modal.querySelectorAll(
+        const focusables = Array.from(modal.querySelectorAll(
             'button:not([disabled]), [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
+        )).filter(function(el) { return !el.closest('[hidden]') && el.tabIndex !== -1; });
         if (focusables.length === 0) return;
         const first = focusables[0];
         const last = focusables[focusables.length - 1];
@@ -907,6 +952,9 @@ const FirebaseUtils = {
                 id: doc.id,
                 name: data.name || '未知商品',
                 description: data.description || '',
+                // 詳細介紹（後台選填）：只在商品詳細介紹彈窗的「詳細介紹」分頁顯示。
+                // 以前這裡漏了這一欄，彈窗永遠以為是空的，後台寫了也看不到
+                detailDescription: data.detailDescription || '',
                 price: data.price || 0,
                 unit: data.unit || '份',
                 category: data.category || 'other',
