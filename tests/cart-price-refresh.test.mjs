@@ -7,7 +7,8 @@
 //
 // 另外驗證：
 //   - 階梯運費的最大數量是 0 時，前台不能無限迴圈（跟伺服器同一套容錯）
-//   - 移除商品後重新讀取失敗時，不能把舊列表留在畫面上（每列的編號已經對不上）
+//   - 移除商品立刻完成、不再重新讀資料庫（網路斷了也能刪），刪光後顯示「購物車是空的」
+//   - 訂單摘要只列小計／運費／總計，運費註明是超商取貨；手機底部那條的總計跟摘要一致
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert';
@@ -21,7 +22,7 @@ const read = (f) => fs.readFileSync(path.join(ROOT, f), 'utf8').split('\r\n').jo
 const wait = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // 假的 Firestore：products 用 db 物件，其他設定文件都不存在（＝預設值：固定運費、超商 0 元）
-function fakeServices(products, { tieredRates = [], calculationMode = null } = {}) {
+function fakeServices(products, { tieredRates = [], calculationMode = null, freeShipping = null, storeFee = null } = {}) {
     const state = { failReads: false };
     const offline = () => { const e = new Error('Failed to get document from server.'); e.code = 'unavailable'; throw e; };
     const snap = (data) => ({ exists: () => !!data, data: () => data });
@@ -38,6 +39,8 @@ function fakeServices(products, { tieredRates = [], calculationMode = null } = {
                 if (ref.col === 'shippingSettings' && ref.id === 'calculationMode' && calculationMode) {
                     return snap({ mode: calculationMode });
                 }
+                if (ref.col === 'shippingSettings' && ref.id === 'freeShipping' && freeShipping) return snap(freeShipping);
+                if (ref.col === 'shippingRates' && ref.id === 'fixedRates' && storeFee !== null) return snap({ store: storeFee, home: 130 });
                 return snap(null);
             },
             getDocsFromServer: async () => {
@@ -116,20 +119,115 @@ await t('價格沒變時不顯示通知', async () => {
     assert.ok(/NT\$ 120/.test(page.document.getElementById('cart-total').textContent));
 });
 
-await t('移除商品後重新讀取失敗：改顯示連線錯誤，不留下編號對不上的舊列表', async () => {
-    const fake = fakeServices({ p1: LILY, p2: TULIP });
+await t('移除商品立刻完成、不重新讀資料庫（讀取失敗也能刪），列表編號跟著更新', async () => {
+    const fake = fakeServices({ p1: LILY, p2: TULIP }, { storeFee: 60 });
     const page = loadPage('cart.html', [
         { id: 'p1', name: '百合', price: 120, quantity: 1, stock: 10 },
-        { id: 'p2', name: '鬱金香', price: 80, quantity: 1, stock: 10 },
+        { id: 'p2', name: '鬱金香', price: 80, quantity: 2, stock: 10 },
     ], fake);
     await wait(200);
     fake.state.failReads = true;
     page.document.querySelector('.remove-item[data-index="0"]').click();
-    await wait(200);
-    const text = page.document.getElementById('cart-container').textContent;
-    assert.ok(/網路連線不穩定/.test(text), '應顯示連線錯誤，實際：' + text.trim().slice(0, 60));
-    assert.strictEqual(page.document.querySelectorAll('.remove-item').length, 0, '舊列表的刪除按鈕還在');
+    // 不用等：刪除是同步完成的
+    const rows = page.document.querySelectorAll('.cart-table tbody tr');
+    assert.strictEqual(rows.length, 1, '應剩一列');
+    assert.ok(/鬱金香/.test(rows[0].textContent));
+    assert.strictEqual(page.document.querySelector('.remove-item').dataset.index, '0', '編號沒有重新排');
+    assert.strictEqual(page.document.getElementById('remove-loading-overlay'), null, '不應該再蓋「正在移除商品」');
+    assert.ok(/NT\$ 220/.test(page.document.getElementById('cart-total').textContent), '總計應該是 160 + 運費 60');
     assert.deepStrictEqual(page.savedCart().map((i) => i.id), ['p2'], '購物車內容不對');
+    assert.ok(page.toasts.includes('商品已從購物車中移除'));
+});
+
+await t('刪光最後一樣：顯示「購物車是空的」，摘要和手機底部那條都收起來', async () => {
+    const fake = fakeServices({ p1: LILY });
+    const page = loadPage('cart.html', [{ id: 'p1', name: '百合', price: 120, quantity: 1, stock: 10 }], fake);
+    await wait(200);
+    page.document.querySelector('.remove-item').click();
+    const empty = page.document.getElementById('empty-cart');
+    assert.ok(empty && empty.isConnected, '「購物車是空的」不在頁面上（以前會只剩一塊空白）');
+    assert.strictEqual(empty.style.display, 'flex');
+    assert.ok(/購物車是空的/.test(page.document.getElementById('cart-container').textContent));
+    assert.strictEqual(page.document.getElementById('cart-summary').style.display, 'none');
+    assert.ok(!page.document.getElementById('cart-mobile-bar').classList.contains('show'), '底部那條還在');
+    assert.deepStrictEqual(page.savedCart(), []);
+});
+
+await t('訂單摘要只列小計、運費、總計，運費註明超商取貨＋宅急便提醒', async () => {
+    const fake = fakeServices({ p1: LILY, p2: TULIP }, { storeFee: 60 });
+    const page = loadPage('cart.html', [
+        { id: 'p1', name: '百合', price: 120, quantity: 1, stock: 10 },
+        { id: 'p2', name: '鬱金香', price: 80, quantity: 2, stock: 10 },
+    ], fake);
+    await wait(200);
+    const summary = page.document.getElementById('summary-items').textContent.replace(/\s+/g, ' ');
+    assert.ok(!/百合|鬱金香/.test(summary), '摘要不應該再列商品名稱：' + summary);
+    assert.ok(/商品小計（共 3 份） NT\$ 280/.test(summary), summary);
+    assert.ok(/運費（超商取貨） NT\$ 60/.test(summary), summary);
+    assert.ok(/宅急便.*結帳頁重新計算/.test(summary), '沒有宅急便提醒');
+    assert.ok(/NT\$ 340/.test(page.document.getElementById('cart-total').textContent));
+});
+
+await t('達到免運：顯示免費，不需要宅急便提醒（兩種配送都免運）', async () => {
+    const fake = fakeServices({ p1: LILY }, { storeFee: 60, freeShipping: { enabled: true, threshold: 200 } });
+    const page = loadPage('cart.html', [{ id: 'p1', name: '百合', price: 120, quantity: 2, stock: 10 }], fake);
+    await wait(200);
+    const summary = page.document.getElementById('summary-items').textContent;
+    assert.ok(/免費/.test(summary), summary);
+    assert.ok(!/宅急便/.test(summary), '免運時不用提醒宅急便');
+    assert.ok(/NT\$ 240/.test(page.document.getElementById('cart-total').textContent));
+});
+
+// jsdom 不排版，位置都是 0；手動指定摘要結帳按鈕的位置（畫面下方／畫面裡）
+function placeSummaryActions(page, top) {
+    const proto = page.window.HTMLElement.prototype;
+    const orig = proto.getBoundingClientRect;
+    proto.getBoundingClientRect = function() {
+        return this.classList.contains('cart-actions') ? { top, bottom: top + 50 } : orig.call(this);
+    };
+}
+
+await t('手機底部那條：摘要的結帳按鈕已經在畫面上時不出現（不會有兩個結帳按鈕）', async () => {
+    const fake = fakeServices({ p1: LILY }, { storeFee: 60 });
+    const page = loadPage('cart.html', [{ id: 'p1', name: '百合', price: 120, quantity: 1, stock: 10 }], fake);
+    placeSummaryActions(page, 100);
+    await wait(200);
+    assert.ok(!page.document.getElementById('cart-mobile-bar').classList.contains('show'));
+});
+
+await t('手機底部那條：顯示同一個總計，改數量時跟著更新', async () => {
+    const fake = fakeServices({ p1: LILY }, { storeFee: 60 });
+    const page = loadPage('cart.html', [{ id: 'p1', name: '百合', price: 120, quantity: 1, stock: 10 }], fake);
+    placeSummaryActions(page, 2000);
+    await wait(200);
+    const bar = page.document.getElementById('cart-mobile-bar');
+    const amount = () => page.document.getElementById('cart-mobile-bar-amount').textContent;
+    assert.ok(bar.classList.contains('show'), '有商品時應該出現');
+    assert.ok(page.document.body.classList.contains('cart-mobile-bar-shown'));
+    assert.strictEqual(amount(), 'NT$ 180');
+    page.document.querySelector('.quantity-btn.increment').click();
+    assert.strictEqual(amount(), 'NT$ 300');
+    assert.strictEqual(amount(), page.document.getElementById('cart-total').textContent);
+    assert.strictEqual(bar.querySelector('a.checkout-btn').getAttribute('href'), '/payment.html');
+});
+
+await t('商品列表：手機版的單價、刪除按鈕的說明文字', async () => {
+    const fake = fakeServices({ p1: LILY });
+    const page = loadPage('cart.html', [{ id: 'p1', name: '百合', price: 120, quantity: 1, stock: 10 }], fake);
+    await wait(200);
+    assert.strictEqual(page.document.querySelector('.cart-item-unit-price').textContent, '單價 NT$ 120');
+    assert.strictEqual(page.document.querySelector('.remove-item').getAttribute('aria-label'), '移除 百合');
+});
+
+await t('版面：購物車專用樣式在 cart.css 之後載入，橫幅／步驟條有縮小用的 class', async () => {
+    const html = read('cart.html');
+    const a = html.indexOf('href="/css/cart.css"'), b = html.indexOf('href="/css/cart-page.css"');
+    assert.ok(a > 0 && b > a, 'cart-page.css 要在 cart.css 之後');
+    assert.ok(html.includes('<section class="hero cart-hero">'));
+    assert.ok(html.includes('<section class="checkout-section cart-steps">'));
+    const css = read('css/cart-page.css');
+    ['.hero.cart-hero', '.cart-steps', '#cart-section .cart-table tbody tr', '.cart-mobile-bar.show', '.shipping-note']
+        .forEach((sel) => assert.ok(css.includes(sel), sel));
 });
 
 await t('階梯運費最大數量是 0：不會無限迴圈，視為不限（跟伺服器一致）', async () => {

@@ -49,7 +49,7 @@ node tests/offline-not-empty.test.mjs                     # 連線失敗不能�
 node tests/cache-skew.test.mjs                            # 新 HTML 配舊快取 JS 時不會整頁壞掉（4 項）
 cd functions && node ../tests/rate-limit.test.cjs         # 下單頻率限制（15 項）
 cd functions && node ../tests/notify-admin.test.cjs       # 新訂單寄通知信給管理員（6 項）
-node tests/cart-price-refresh.test.mjs                    # 購物車／結帳頁改用最新價格、移除失敗、階梯運費不當機（6 項）
+node tests/cart-price-refresh.test.mjs                    # 購物車：最新價格、刪除立即完成／刪光顯示空購物車、摘要與運費說明、手機底部結帳條、階梯運費不當機（13 項）
 node tests/admin-shipping-save.test.mjs                   # 後台運費：空白運費不存 NaN、存一種不覆蓋另一種（3 項）
 node tests/scheduler-plan.test.mjs                        # 排程上下架：兩個時間都到期時以較晚的為準（6 項）
 node tests/admin-articles.test.mjs                        # 後台栽培小知識／加入會員兩個文章分頁互不干擾（5 項）

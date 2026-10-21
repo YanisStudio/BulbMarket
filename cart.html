@@ -31,6 +31,7 @@
     <link rel="stylesheet" href="/css/style.css">
     <link rel="stylesheet" href="/css/common.css">
     <link rel="stylesheet" href="/css/cart.css">
+    <link rel="stylesheet" href="/css/cart-page.css">
     <link rel="stylesheet" href="/css/auth-modals.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" integrity="sha512-Evv84Mr4kqVGRNSgIGL/F/aIDqQb7xQ2vcrdIwxfjThSH8CSR7PBEakCr51Ck+w+/U6swU2Im1vVX0SVk9ABhg==" crossorigin="anonymous" referrerpolicy="no-referrer">
 
@@ -509,7 +510,7 @@
     
     <main>
         <!-- 購物車頁面 hero 區域 -->
-        <section class="hero">
+        <section class="hero cart-hero">
             <div class="container">
                 <div class="hero-content">
                     <h1>購物車</h1>
@@ -523,7 +524,7 @@
         </section>
         
         <!-- 結帳步驟指示器 -->
-        <section class="checkout-section">
+        <section class="checkout-section cart-steps">
             <div class="container">
                 <div class="checkout-progress">
                     <div class="progress-step active">
@@ -611,6 +612,15 @@
                 </div>
             </div>
         </section>
+
+        <!-- 手機版：固定在畫面底部的總計＋前往結帳（樣式在 css/cart-page.css，出現時機見 refreshMobileBar()） -->
+        <div class="cart-mobile-bar" id="cart-mobile-bar">
+            <div class="cart-mobile-bar-total">
+                <span class="cart-mobile-bar-label">總計</span>
+                <strong id="cart-mobile-bar-amount">NT$ 0</strong>
+            </div>
+            <a href="/payment.html" class="btn btn-primary checkout-btn">前往結帳</a>
+        </div>
     </main>
     
     <footer class="site-footer">
@@ -689,6 +699,44 @@ document.addEventListener('DOMContentLoaded', function() {
     const cartContentLoading = document.getElementById('cart-content-loading');
     const summaryLoading = document.getElementById('summary-loading');
     const freeShippingNotification = document.getElementById('free-shipping-notification');
+
+    // renderCart() 讀到的商品資料（圖片、庫存）。刪除商品後直接拿來重畫，不用再查一次資料庫
+    let lastProductDetails = {};
+
+    // 手機版底部固定的「總計＋前往結帳」（電腦版 CSS 不顯示）。
+    // 訂單摘要裡的結帳按鈕還在畫面下方、看不到時才出現；捲到摘要或更下面就收起來，
+    // 不會兩個結帳按鈕同時出現，也不會蓋住頁尾
+    const cartMobileBar = document.getElementById('cart-mobile-bar');
+    const cartMobileBarAmount = document.getElementById('cart-mobile-bar-amount');
+    const summaryActions = document.querySelector('#cart-summary .cart-actions');
+    let mobileBarActive = false;      // 購物車有商品、金額已經算好
+
+    function refreshMobileBar() {
+        if (!cartMobileBar) return;
+        // 每次都直接量位置（不用 IntersectionObserver：從頁尾一下跳回頂端時，
+        // 按鈕沒有「經過」畫面，觀察器不會通知，底部那條就不會再出現）
+        const actionsBelow = !summaryActions || summaryActions.getBoundingClientRect().top > window.innerHeight;
+        const show = mobileBarActive && actionsBelow;
+        cartMobileBar.classList.toggle('show', show);
+        document.body.classList.toggle('cart-mobile-bar-shown', show);
+    }
+
+    function setMobileBarActive(active) {
+        mobileBarActive = active;
+        refreshMobileBar();
+    }
+
+    let mobileBarRefreshQueued = false;
+    function queueMobileBarRefresh() {
+        if (mobileBarRefreshQueued) return;
+        mobileBarRefreshQueued = true;
+        requestAnimationFrame(function() {
+            mobileBarRefreshQueued = false;
+            refreshMobileBar();
+        });
+    }
+    window.addEventListener('scroll', queueMobileBarRefresh, { passive: true });
+    window.addEventListener('resize', queueMobileBarRefresh);
     
     // 分類對應
     const categoryMap = {
@@ -1258,8 +1306,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 如果購物車變為空
             if (cart.length === 0) {
-                if (emptyCart) emptyCart.style.display = 'flex';
-                if (cartSummary) cartSummary.style.display = 'none';
+                showEmptyCart();
                 // 購物車為空時也要檢查免運通知
                 if (shippingSettings.freeShipping.enabled) {
                     updateFreeShippingNotification(0);
@@ -1268,99 +1315,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 return;
             }
             
-            // 更新加載文字
-            if (loadingText) loadingText.textContent = '正在生成購物車內容';
-            
-            // 創建購物車項目表格
-            let cartHTML = `
-                <table class="cart-table">
-                    <thead>
-                        <tr>
-                            <th>商品</th>
-                            <th>單價</th>
-                            <th>數量</th>
-                            <th>小計</th>
-                            <th>操作</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-            `;
-            
-            // 計算商品總價
-            let subtotal = 0;
-            
-            // 添加每個有效商品
-            cart.forEach((item, index) => {
-                const itemTotal = item.price * item.quantity;
-                subtotal += itemTotal;
-                
-                // 獲取商品詳情
-                const productInfo = productDetails[item.id] || { imageUrl: 'images/placeholder.jpg', stock: 0 };
-                const imageUrl = productInfo.imageUrl;
-                const stock = productInfo.stock;
-                
-                // 添加庫存顯示
-                const stockText = stock > 0 ? `(庫存: ${stock} 份)` : '(無庫存)';
-                const stockClass = stock < 5 ? 'low-stock' : '';
-                
-                cartHTML += `
-                    <tr>
-                        <td class="product-cell">
-                            <div class="product-info">
-                                <img src="${imageUrl}" alt="${escapeHtml(item.name)}" class="product-thumbnail" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
-                                <div class="product-details">
-                                    <h3>${escapeHtml(item.name)}</h3>
-                                    <p class="stock-info ${stockClass}">${stockText}</p>
-                                </div>
-                            </div>
-                        </td>
-                        <td class="price-cell">NT$ ${item.price}</td>
-                        <td class="quantity-cell">
-                            <div class="quantity-control">
-                                <button class="quantity-btn decrement" data-index="${index}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
-                                <input type="number" value="${item.quantity}" min="1" max="${stock}" class="quantity-input" data-index="${index}" data-stock="${stock}">
-                                <button class="quantity-btn increment" data-index="${index}" ${item.quantity >= stock ? 'disabled' : ''}>+</button>
-                            </div>
-                        </td>
-                        <td class="total-cell">NT$ ${itemTotal}</td>
-                        <td class="action-cell">
-                            <button class="remove-item" data-index="${index}">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            });
-            
-            cartHTML += `
-                    </tbody>
-                </table>
-            `;
-            
-            // 隱藏內容加載
-            hideCartContentLoading();
-            
-            // 顯示購物車內容
-            if (cartContainer) cartContainer.innerHTML = cartHTML;
-            
-            // 更新加載文字
-            if (loadingText) loadingText.textContent = '正在計算運費';
-            
-            // 計算運費
-            const shippingResult = calculateShipping(cart, subtotal);
-            const totalAmount = subtotal + shippingResult.fee;
-            
-            // 更新免運通知
-            updateFreeShippingNotification(subtotal);
-            
-            // 更新訂單摘要
-            updateOrderSummary(cart, subtotal, shippingResult, totalAmount);
-            
-            // 添加數量控制功能
-            bindQuantityControls();
-            
-            // 添加移除商品功能
-            bindRemoveButtons();
+            // 畫出商品列表、訂單摘要（刪除商品後也是用同一個函數重畫）
+            lastProductDetails = productDetails;
+            redrawCart();
 
             // 資料都準備好了，直接結束載入畫面
             finishLoading();
@@ -1379,6 +1336,7 @@ document.addEventListener('DOMContentLoaded', function() {
         finishLoading();
         if (cartSummary) cartSummary.style.display = 'none';
         if (emptyCart) emptyCart.style.display = 'none';
+        setMobileBarActive(false);
         if (cartContainer) {
             cartContainer.innerHTML = `
                 <div class="empty-cart-container" style="display: flex;">
@@ -1397,46 +1355,26 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 更新訂單摘要函數
+    // 只列小計、運費、總計——每樣商品上面的列表已經有了。以前這裡又列一次，
+    // 手機上長長的商品名稱擠成兩行，摘要拉得很長
     function updateOrderSummary(cartItems, subtotal, shippingResult, totalAmount) {
         const summaryItems = document.getElementById('summary-items');
         const cartTotal = document.getElementById('cart-total');
-        
+
         // 隱藏摘要加載
         hideSummaryLoading();
-        
+
         if (summaryItems) {
-            let summaryHTML = '';
-            
-            // 商品明細標題
-            summaryHTML += `
-                <div class="summary-section-title">
-                    <h4>購買商品</h4>
-                </div>
-            `;
-            
-            // 商品明細
-            cartItems.forEach(item => {
-                const itemTotal = item.price * item.quantity;
-                summaryHTML += `
-                    <div class="summary-row item-detail">
-                        <span class="item-info">${escapeHtml(item.name)} × ${item.quantity}</span>
-                        <span class="item-price">NT$ ${itemTotal}</span>
-                    </div>
-                `;
-            });
-            
-            // 分隔線
-            summaryHTML += `<div class="summary-divider"></div>`;
-            
-            // 商品小計
-            summaryHTML += `
+            const itemCount = cartItems.reduce((count, item) => count + item.quantity, 0);
+            let summaryHTML = `
                 <div class="summary-row subtotal">
-                    <span class="label">商品小計</span>
+                    <span class="label">商品小計<span class="summary-count">（共 ${itemCount} 份）</span></span>
                     <span class="amount">NT$ ${subtotal}</span>
                 </div>
             `;
-            
-            // 運費
+
+            // 運費：購物車只算得出超商取貨的運費（宅急便要到結帳頁選了才算），
+            // 要講清楚，不然選宅急便的人到結帳頁會以為總額算錯。免運兩種方式都適用，不用提醒
             if (shippingResult.isFreeShipping) {
                 summaryHTML += `
                     <div class="summary-row shipping free-shipping">
@@ -1447,20 +1385,25 @@ document.addEventListener('DOMContentLoaded', function() {
             } else {
                 summaryHTML += `
                     <div class="summary-row shipping">
-                        <span class="label">運費<span class="shipping-method">(${shippingResult.description})</span></span>
+                        <span class="label">運費<span class="shipping-method">（超商取貨）</span></span>
                         <span class="amount">NT$ ${shippingResult.fee}</span>
                     </div>
+                    <p class="shipping-note">選宅急便的話，運費會在結帳頁重新計算</p>
                 `;
             }
-            
+
             summaryItems.innerHTML = summaryHTML;
         }
-        
+
         if (cartTotal) {
             cartTotal.textContent = `NT$ ${totalAmount}`;
         }
+
+        // 手機底部那條顯示同一個總計
+        if (cartMobileBarAmount) cartMobileBarAmount.textContent = `NT$ ${totalAmount}`;
+        setMobileBarActive(cartItems.length > 0);
     }
-    
+
     // 綁定數量控制事件
     function bindQuantityControls() {
         document.querySelectorAll('.quantity-btn').forEach(btn => {
@@ -1523,125 +1466,61 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // 綁定移除按鈕事件
+    // 刪除只是本機操作（陣列 + localStorage），圖片、庫存用 renderCart() 剛讀到的資料
+    // 直接重畫就好。以前每刪一樣都要蓋一層「正在移除商品」、重新查一次資料庫，等一兩秒；
+    // 改數量本來就是馬上更新，刪除也一樣
     function bindRemoveButtons() {
         document.querySelectorAll('.remove-item').forEach(btn => {
-            btn.addEventListener('click', async function() {
+            btn.addEventListener('click', function() {
                 const index = parseInt(this.getAttribute('data-index'));
+                if (!confirm('確定要移除此商品嗎？')) return;
 
-                if (confirm('確定要移除此商品嗎？')) {
-                    // 顯示移除加載效果
-                    showRemoveItemLoading();
+                cart.splice(index, 1);
+                localStorage.setItem('cart', JSON.stringify(cart));
 
-                    // 禁用所有操作按鈕
-                    disableCartActions();
-
-                    // 移除本身只是本機操作（陣列 + localStorage），不用刻意加延遲；
-                    // 真正花時間的是下面 renderCartAfterRemove() 要重新查詢商品資訊
-                    try {
-                        cart.splice(index, 1);
-                        localStorage.setItem('cart', JSON.stringify(cart));
-
-                        if (cart.length === 0) {
-                            hideRemoveItemLoading();
-                            if (emptyCart) emptyCart.style.display = 'flex';
-                            if (cartSummary) cartSummary.style.display = 'none';
-                            cartContainer.innerHTML = '';
-                            // 購物車清空時也更新免運通知
-                            updateFreeShippingNotification(0);
-                            finishLoading();
-                        } else {
-                            // 重新渲染購物車
-                            await renderCartAfterRemove();
-                        }
-
-                        showToast('商品已從購物車中移除');
-                        updateCartCount(true);
-                        enableCartActions();
-
-                    } catch (error) {
-                        // 商品其實已經從購物車移除了（上面的 splice + localStorage），
-                        // 失敗的是之後重新讀取商品資訊。畫面上還是舊的列表，每一列的
-                        // data-index 已經跟購物車對不上，再按刪除會刪到別的商品，
-                        // 所以改顯示連線錯誤畫面，讓使用者重新載入
-                        console.error('移除商品時出錯:', error);
-                        hideRemoveItemLoading();
-                        showCartConnectionError();
-                    }
+                if (cart.length === 0) {
+                    showEmptyCart();
+                    // 購物車清空時也更新免運通知
+                    updateFreeShippingNotification(0);
+                } else {
+                    redrawCart();
                 }
+
+                showToast('商品已從購物車中移除');
+                updateCartCount(true);
             });
         });
     }
-    
-    // 顯示移除商品加載效果
-    function showRemoveItemLoading() {
-        // 創建移除加載覆蓋層
-        const removeLoadingOverlay = document.createElement('div');
-        removeLoadingOverlay.id = 'remove-loading-overlay';
-        removeLoadingOverlay.className = 'cart-loading-overlay';
-        removeLoadingOverlay.innerHTML = `
-            <div class="cart-loading-content">
-                <div class="cart-loading-spinner"></div>
-                <div class="cart-loading-text">正在移除商品</div>
-                <div class="cart-loading-subtext">正在重新計算購物車與運費...</div>
-            </div>
-        `;
-        document.body.appendChild(removeLoadingOverlay);
-    }
-    
-    // 隱藏移除商品加載效果
-    function hideRemoveItemLoading() {
-        const removeLoadingOverlay = document.getElementById('remove-loading-overlay');
-        if (removeLoadingOverlay) {
-            removeLoadingOverlay.remove();
+
+    // 顯示「購物車是空的」。#empty-cart 放在 #cart-container 裡面，畫商品列表時
+    //（innerHTML）會被一起換掉。以前刪掉最後一樣商品後它已經不在頁面上，
+    // 畫面只剩一整塊空白，所以這裡要先放回去
+    function showEmptyCart() {
+        if (cartContainer && emptyCart && !cartContainer.contains(emptyCart)) {
+            cartContainer.innerHTML = '';
+            cartContainer.appendChild(emptyCart);
         }
+        if (emptyCart) emptyCart.style.display = 'flex';
+        if (cartSummary) cartSummary.style.display = 'none';
+        setMobileBarActive(false);
     }
-    
-    // 禁用購物車操作
-    function disableCartActions() {
-        document.querySelectorAll('.quantity-btn, .remove-item, .checkout-btn').forEach(btn => {
-            btn.disabled = true;
-            btn.style.opacity = '0.5';
-            btn.style.pointerEvents = 'none';
-        });
+
+    // 用目前的購物車和 lastProductDetails 重畫商品列表、運費、訂單摘要
+    function redrawCart() {
+        const subtotal = cart.reduce((total, item) => total + item.price * item.quantity, 0);
+        if (cartContainer) cartContainer.innerHTML = buildCartTableHTML(lastProductDetails);
+
+        const shippingResult = calculateShipping(cart, subtotal);
+        updateFreeShippingNotification(subtotal);
+        updateOrderSummary(cart, subtotal, shippingResult, subtotal + shippingResult.fee);
+
+        bindQuantityControls();
+        bindRemoveButtons();
     }
-    
-    // 啟用購物車操作
-    function enableCartActions() {
-        document.querySelectorAll('.quantity-btn, .remove-item, .checkout-btn').forEach(btn => {
-            btn.disabled = false;
-            btn.style.opacity = '1';
-            btn.style.pointerEvents = 'auto';
-        });
-    }
-    
-    // 移除商品後重新渲染購物車
-    async function renderCartAfterRemove() {
-        try {
-            // 更新加載文字
-            const loadingText = document.querySelector('#remove-loading-overlay .cart-loading-text');
-            if (loadingText) loadingText.textContent = '正在重新計算運費';
-            
-            // 重新載入運費設定
-            await loadShippingSettings();
-            
-            // 獲取產品詳情
-            const productDetails = await getProductDetails();
-            
-            // 為購物車項目補充類別資訊，價格同樣以資料庫為準（見 renderCart()）
-            cart = cart.map(item => {
-                const info = productDetails[item.id];
-                return {
-                    ...item,
-                    price: info ? info.price : item.price,
-                    category: info?.category || 'other'
-                };
-            });
-            localStorage.setItem('cart', JSON.stringify(cart));
-            
-            if (loadingText) loadingText.textContent = '正在更新商品列表';
-            
-            // 重新生成購物車HTML
-            let cartHTML = `
+
+    // 商品列表的 HTML。手機上的排法（上排圖片＋名稱、下排數量／小計／刪除）在 css/cart-page.css
+    function buildCartTableHTML(productDetails) {
+        let html = `
                 <table class="cart-table">
                     <thead>
                         <tr>
@@ -1654,27 +1533,27 @@ document.addEventListener('DOMContentLoaded', function() {
                     </thead>
                     <tbody>
             `;
-            
-            let subtotal = 0;
-            
-            cart.forEach((item, index) => {
-                const itemTotal = item.price * item.quantity;
-                subtotal += itemTotal;
-                
-                const productInfo = productDetails[item.id] || { imageUrl: 'images/placeholder.jpg', stock: 0 };
-                const imageUrl = productInfo.imageUrl;
-                const stock = productInfo.stock;
-                
-                const stockText = stock > 0 ? `(庫存: ${stock} 份)` : '(無庫存)';
-                const stockClass = stock < 5 ? 'low-stock' : '';
-                
-                cartHTML += `
+
+        cart.forEach((item, index) => {
+            const itemTotal = item.price * item.quantity;
+            const productInfo = productDetails[item.id] || { imageUrl: 'images/placeholder.jpg', stock: 0 };
+            const imageUrl = productInfo.imageUrl;
+            const stock = productInfo.stock;
+            const name = escapeHtml(item.name);
+
+            // 添加庫存顯示
+            const stockText = stock > 0 ? `(庫存: ${stock} 份)` : '(無庫存)';
+            const stockClass = stock < 5 ? 'low-stock' : '';
+
+            // 單價：電腦版有「單價」欄；手機版那一欄藏起來，改顯示在名稱下面（cart-item-unit-price）
+            html += `
                     <tr>
                         <td class="product-cell">
                             <div class="product-info">
-                                <img src="${imageUrl}" alt="${escapeHtml(item.name)}" class="product-thumbnail" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
+                                <img src="${imageUrl}" alt="${name}" class="product-thumbnail" onerror="this.onerror=null; this.src='/images/placeholder.jpg';">
                                 <div class="product-details">
-                                    <h3>${escapeHtml(item.name)}</h3>
+                                    <h3>${name}</h3>
+                                    <p class="cart-item-unit-price">單價 NT$ ${item.price}</p>
                                     <p class="stock-info ${stockClass}">${stockText}</p>
                                 </div>
                             </div>
@@ -1682,52 +1561,27 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td class="price-cell">NT$ ${item.price}</td>
                         <td class="quantity-cell">
                             <div class="quantity-control">
-                                <button class="quantity-btn decrement" data-index="${index}" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
-                                <input type="number" value="${item.quantity}" min="1" max="${stock}" class="quantity-input" data-index="${index}" data-stock="${stock}">
-                                <button class="quantity-btn increment" data-index="${index}" ${item.quantity >= stock ? 'disabled' : ''}>+</button>
+                                <button class="quantity-btn decrement" data-index="${index}" aria-label="減少數量" ${item.quantity <= 1 ? 'disabled' : ''}>-</button>
+                                <input type="number" value="${item.quantity}" min="1" max="${stock}" class="quantity-input" data-index="${index}" data-stock="${stock}" aria-label="${name} 的數量">
+                                <button class="quantity-btn increment" data-index="${index}" aria-label="增加數量" ${item.quantity >= stock ? 'disabled' : ''}>+</button>
                             </div>
                         </td>
                         <td class="total-cell">NT$ ${itemTotal}</td>
                         <td class="action-cell">
-                            <button class="remove-item" data-index="${index}">
+                            <button class="remove-item" data-index="${index}" aria-label="移除 ${name}">
                                 <i class="fas fa-trash-alt"></i>
                             </button>
                         </td>
                     </tr>
                 `;
-            });
-            
-            cartHTML += `</tbody></table>`;
-            
-            // 更新購物車內容
-            if (cartContainer) cartContainer.innerHTML = cartHTML;
-            
-            if (loadingText) loadingText.textContent = '正在計算最終金額';
-            
-            // 計算運費
-            const shippingResult = calculateShipping(cart, subtotal);
-            const totalAmount = subtotal + shippingResult.fee;
-            
-            // 更新免運通知
-            updateFreeShippingNotification(subtotal);
-            
-            // 更新訂單摘要
-            updateOrderSummary(cart, subtotal, shippingResult, totalAmount);
-            
-            // 重新綁定事件
-            bindQuantityControls();
-            bindRemoveButtons();
-            
-            // 隱藏加載效果
-            hideRemoveItemLoading();
-            
-        } catch (error) {
-            console.error('重新渲染購物車時出錯:', error);
-            hideRemoveItemLoading();
-            throw error;
-        }
+        });
+
+        return html + `
+                    </tbody>
+                </table>
+            `;
     }
-    
+
     // 更新購物車顯示（不重新加載頁面）
     async function updateCartDisplay() {
         // 計算新的小計
