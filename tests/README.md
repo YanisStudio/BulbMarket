@@ -42,6 +42,7 @@ cd functions && node ../tests/append-order-note.test.cjs   # 訂單備註追加�
 node tests/product-detail-keyboard.test.mjs               # 商品彈窗鍵盤操作（14 項）
 node tests/product-modal-tabs.test.mjs                    # 商品彈窗「商品描述／詳細介紹」分頁（13 項）
 node tests/products-filters.test.mjs                      # 商品頁篩選（含 $500 以上）、選完即套用、手機兩欄（8 項）
+node tests/member-pages.test.mjs                         # 會員中心三頁：我的訊息卡片／空白／重試、左右兩欄版面、div 開闔（9 項）
 node tests/category-retry.test.mjs                        # 分類讀取失敗後的背景重試
 node tests/reset-policy.test.mjs                          # 什麼時候該重建 Firestore 連線（20 項）
 node tests/dashboard-retry.test.mjs                       # 後台儀表板連線卡住時：不顯示 0、會自動恢復（6 項）

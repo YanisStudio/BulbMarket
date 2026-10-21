@@ -123,6 +123,13 @@
     }
 }
 
+/* 電腦版左邊有會員中心選單，訂單清單給固定寬度，訂單編號才不會擠成兩行 */
+@media (min-width: 993px) {
+    .order-list {
+        flex: 0 0 290px;
+    }
+}
+
 .order-list {
     flex: 1;
     border-radius: 8px;
@@ -175,6 +182,7 @@
     border-radius: 20px;
     font-size: 0.8em;
     font-weight: bold;
+    white-space: nowrap;
 }
 
 .status-pending {
@@ -235,6 +243,7 @@
     border-radius: 20px;
     font-size: 0.8em;
     font-weight: bold;
+    white-space: nowrap;
     background-color: #FFEBEE;
     color: #C62828;
 }
@@ -705,6 +714,8 @@
         };
     </script>
     <link rel="stylesheet" href="/css/storefront.css">
+    <!-- 會員中心三頁（會員資料／訂單記錄／我的訊息）共用的外框、選單、手機版排法 -->
+    <link rel="stylesheet" href="/css/member-center.css">
 </head>
 <body>
     <header>
@@ -856,8 +867,9 @@
                             </div>
 
                             <div class="order-detail" id="order-detail">
+                                <!-- 以前這裡重複了一層 <div class="no-order-selected">，少一個結尾，
+                                     下面的「需要幫助？」被包進左右兩欄的內容區，變成第三欄 -->
                                 <div class="no-order-selected">
-                                    <div class="no-order-selected">
                                     <i class="fas fa-shopping-bag" style="font-size: 3em; color: #ddd; margin-bottom: 15px;"></i>
                                     <p>請選擇一個訂單查看詳情</p>
                                 </div>
@@ -985,7 +997,9 @@ function checkLoginStatus() {
     window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, function(user) {
         if (user) {
             if (notLoggedInSection) notLoggedInSection.style.display = 'none';
-            if (ordersContentSection) ordersContentSection.style.display = 'block';
+            // 清掉 display: none 就好，交給 CSS 的 display: flex（左邊選單、右邊內容）。
+            // 以前設成 'block' 會蓋掉 flex，電腦版選單獨佔一整排、訂單被擠到下面
+            if (ordersContentSection) ordersContentSection.style.display = '';
             loadUserOrders(user);
         } else {
             if (notLoggedInSection) notLoggedInSection.style.display = 'block';

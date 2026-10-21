@@ -59,12 +59,6 @@
     flex: 3;
 }
 
-/* 訊息卡片本身就是完整內容，不像訂單記錄需要「清單+詳情」兩欄，
-   但整欄全寬顯示太寬鬆、跟訂單記錄的視覺密度不一致，
-   所以限制寬度，大致對齊訂單記錄右側詳情欄的比例 */
-#message-list {
-    max-width: 480px;
-}
 
 .profile-menu {
     background-color: #f8f8f8;
@@ -117,43 +111,82 @@
     text-align: center;
 }
 
+/* 上方：訊息數量＋傳送新訊息 */
+.messages-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.messages-summary {
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    color: #666;
+    font-size: 0.95em;
+}
+
+.messages-summary strong {
+    color: #333;
+}
+
+.messages-new-btn {
+    flex-shrink: 0;
+    width: auto; /* cart.css 在手機上把所有 .btn 設成滿版，這顆不要 */
+    padding: 10px 18px;
+    font-size: 0.95em;
+}
+
+.messages-new-btn i {
+    margin-right: 6px;
+}
+
+/* 訊息卡片：跟訂單記錄同樣的白底卡片、右上角狀態標籤 */
 .message-card {
     background-color: #fff;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.05);
-    padding: 20px;
-    margin-bottom: 20px;
+    padding: 18px 20px;
+    margin-bottom: 16px;
+}
+
+.message-card.is-pending {
+    border-left: 4px solid #FFB300;
+}
+
+.message-card.is-replied {
+    border-left: 4px solid #2e7d32;
 }
 
 .message-card-header {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
-    gap: 10px;
+    gap: 12px;
     margin-bottom: 12px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid #eee;
 }
 
 .message-card-header h3 {
-    margin: 0;
+    margin: 0 0 2px;
     color: #333;
-    font-size: 1.1em;
+    font-size: 1.05em;
 }
 
 .message-card-date {
     font-size: 0.85em;
     color: #999;
-    white-space: nowrap;
 }
 
+/* 跟訂單記錄的 .order-status 同一種標籤 */
 .message-status-badge {
-    display: inline-block;
-    padding: 4px 10px;
+    flex-shrink: 0;
+    padding: 5px 10px;
     border-radius: 20px;
     font-size: 0.8em;
     font-weight: bold;
-    margin-bottom: 12px;
+    white-space: nowrap;
 }
 
 .message-status-badge.replied {
@@ -162,49 +195,121 @@
 }
 
 .message-status-badge.pending {
-    background-color: #f0f0f0;
+    background-color: #FFF8E1;
+    color: #FF8F00;
+}
+
+/* 一來一往的對話 */
+.message-bubble {
+    padding: 12px 14px;
+    border-radius: 8px;
+}
+
+.message-bubble + .message-bubble {
+    margin-top: 10px;
+}
+
+.message-bubble-label {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 10px;
+    margin-bottom: 6px;
+    font-size: 0.8em;
+    font-weight: 600;
     color: #888;
 }
 
-.message-card-content {
-    background-color: #f9f9f9;
-    padding: 15px;
-    border-radius: 6px;
-    border-left: 3px solid #ccc;
-    margin-bottom: 12px;
+.message-bubble-time {
+    font-weight: 400;
+    color: #999;
 }
 
-.message-card-content p {
+.message-bubble p {
     margin: 0;
     color: #333;
-    line-height: 1.6;
+    line-height: 1.7;
     white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
-.message-card-reply {
-    background-color: #e8f5e9;
-    padding: 15px;
-    border-radius: 6px;
-    border-left: 3px solid #2e7d32;
+.message-bubble-mine {
+    background-color: #f6f7f6;
 }
 
-.message-card-reply h4 {
-    margin: 0 0 8px 0;
-    font-size: 0.9em;
+.message-bubble-reply {
+    background-color: #eef7ee;
+}
+
+.message-bubble-reply .message-bubble-label {
     color: #2e7d32;
 }
 
-.message-card-reply p {
-    margin: 0;
-    color: #333;
-    line-height: 1.6;
-    white-space: pre-wrap;
+.message-pending-hint {
+    margin: 10px 0 0;
+    font-size: 0.85em;
+    color: #8d6e00;
 }
 
-.no-messages {
-    padding: 40px;
+.message-pending-hint i {
+    margin-right: 4px;
+}
+
+/* 載入中／沒有訊息／讀取失敗 */
+.messages-state {
+    background-color: #fff;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+    padding: 40px 20px;
     text-align: center;
-    color: #999;
+    color: #888;
+}
+
+.messages-state > i {
+    display: block;
+    font-size: 2.6em;
+    color: #ccc;
+    margin-bottom: 14px;
+}
+
+.messages-state p {
+    margin: 0 0 6px;
+    color: #555;
+    font-size: 1.05em;
+}
+
+.messages-state small {
+    display: block;
+    margin-bottom: 18px;
+}
+
+.messages-spinner {
+    width: 34px;
+    height: 34px;
+    margin: 0 auto 12px;
+    border: 3px solid #e8f5e9;
+    border-top-color: #2e7d32;
+    border-radius: 50%;
+    animation: messagesSpin 0.9s linear infinite;
+}
+
+@keyframes messagesSpin {
+    to { transform: rotate(360deg); }
+}
+
+@media (max-width: 768px) {
+    .messages-toolbar {
+        margin-bottom: 12px;
+    }
+
+    .messages-new-btn {
+        padding: 9px 14px;
+    }
+
+    .message-card {
+        padding: 14px;
+        margin-bottom: 12px;
+    }
 }
 
 .section-alert {
@@ -220,35 +325,15 @@
     color: #5D4037;
 }
 
-.help-section {
-    margin-top: 40px;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border-radius: 8px;
+.not-logged-in-actions {
     text-align: center;
+    margin-top: 20px;
 }
 
-.help-section h3 {
-    margin-top: 0;
-    color: #333;
-}
-
-.help-section p {
-    margin-bottom: 20px;
-    color: #666;
-}
-
-.help-section .btn {
-    background-color: #2e7d32;
-    color: white;
-    padding: 10px 20px;
-    border-radius: 4px;
-    text-decoration: none;
-    transition: background-color 0.3s;
-}
-
-.help-section .btn:hover {
-    background-color: #1b5e20;
+.not-logged-in-actions p {
+    margin: 14px 0 0;
+    font-size: 0.9em;
+    color: #888;
 }
     </style>
 
@@ -335,6 +420,8 @@
         };
     </script>
     <link rel="stylesheet" href="/css/storefront.css">
+    <!-- 會員中心三頁（會員資料／訂單記錄／我的訊息）共用的外框、選單、手機版排法 -->
+    <link rel="stylesheet" href="/css/member-center.css">
 </head>
 <body>
     <header>
@@ -451,8 +538,9 @@
                     <div class="section-alert">
                         <p>請先登入以查看您的訊息紀錄</p>
                     </div>
-                    <div style="text-align: center; margin-top: 20px;">
+                    <div class="not-logged-in-actions">
                         <button id="login-redirect-btn" class="btn btn-primary">前往登入</button>
+                        <p>不想登入也可以直接到<a href="/contact.html">聯絡我們</a>留言，我們會用 Email 回覆您</p>
                     </div>
                 </div>
 
@@ -471,19 +559,19 @@
                     </div>
 
                     <div class="orders-main">
+                        <!-- 訊息是從「聯絡我們」送出的，這裡直接放一個入口；
+                             以前只有頁面最下面的「需要幫助？聯絡我們」 -->
+                        <div class="messages-toolbar" id="messages-toolbar">
+                            <p class="messages-summary" id="messages-summary">您傳送給我們的訊息與回覆</p>
+                            <a href="/contact.html" class="btn btn-primary messages-new-btn"><i class="fas fa-pen"></i>傳送新訊息</a>
+                        </div>
                         <div id="message-list">
-                            <div class="loading">
+                            <div class="messages-state">
+                                <div class="messages-spinner"></div>
                                 <p>載入訊息中...</p>
                             </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- 聯絡我們區塊移到最下面 -->
-                <div class="help-section">
-                    <h3>需要幫助？</h3>
-                    <p>有任何球根花卉相關問題，歡迎隨時與我們聯繫</p>
-                    <a href="/contact.html" class="btn">聯絡我們</a>
                 </div>
             </div>
         </section>
@@ -591,7 +679,9 @@ function checkLoginStatus() {
     window.firebaseServices.onAuthStateChanged(window.firebaseServices.auth, function(user) {
         if (user) {
             if (notLoggedInSection) notLoggedInSection.style.display = 'none';
-            if (messagesContentSection) messagesContentSection.style.display = 'block';
+            // 清掉 display: none 就好，交給 CSS 的 display: flex（左邊選單、右邊訊息）。
+            // 以前設成 'block' 會蓋掉 flex，電腦版選單獨佔一整排、訊息被擠到下面
+            if (messagesContentSection) messagesContentSection.style.display = '';
             loadUserMessages(user);
         } else {
             if (notLoggedInSection) notLoggedInSection.style.display = 'block';
@@ -600,12 +690,52 @@ function checkLoginStatus() {
     });
 }
 
+// 日期時間：跟訂單記錄一樣的格式（2026/10/20 上午10:12），不顯示秒
+function formatMessageTime(ts) {
+    if (!ts || typeof ts.toDate !== 'function') return '';
+    const date = ts.toDate();
+    return date.toLocaleDateString('zh-TW') + ' ' + date.toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+}
+
+// 一則訊息的卡片：上面主題＋時間＋狀態，下面「您的訊息」和「商家回覆」一來一往
+function renderMessageCard(messageData) {
+    const hasReply = !!messageData.reply;
+    const createdDate = formatMessageTime(messageData.createdAt) || '時間不明';
+    const repliedDate = formatMessageTime(messageData.repliedAt);
+
+    // subject 是聯絡表單選的諮詢主題（商品訂購、配送詢問…）
+    return `
+        <article class="message-card ${hasReply ? 'is-replied' : 'is-pending'}">
+            <div class="message-card-header">
+                <div>
+                    <h3>${escapeHtml(messageData.subject) || '一般諮詢'}</h3>
+                    <span class="message-card-date">${createdDate}</span>
+                </div>
+                <span class="message-status-badge ${hasReply ? 'replied' : 'pending'}">${hasReply ? '已回覆' : '待回覆'}</span>
+            </div>
+            <div class="message-bubble message-bubble-mine">
+                <div class="message-bubble-label">您的訊息</div>
+                <p>${escapeHtml(messageData.message)}</p>
+            </div>
+            ${hasReply ? `
+            <div class="message-bubble message-bubble-reply">
+                <div class="message-bubble-label"><span class="message-reply-title"><i class="fas fa-reply"></i> 商家回覆</span>${repliedDate ? `<span class="message-bubble-time">${repliedDate}</span>` : ''}</div>
+                <p>${escapeHtml(messageData.reply)}</p>
+            </div>` : `
+            <p class="message-pending-hint"><i class="far fa-clock"></i>我們回覆後會顯示在這裡，也會寄 Email 通知您</p>`}
+        </article>
+    `;
+}
+
 // 載入使用者自己傳送過的訊息
 async function loadUserMessages(user) {
     const messageList = document.getElementById('message-list');
+    const toolbar = document.getElementById('messages-toolbar');
+    const summary = document.getElementById('messages-summary');
     if (!messageList) return;
 
-    messageList.innerHTML = '<div class="loading"><p>載入訊息中...</p></div>';
+    if (toolbar) toolbar.style.display = '';
+    messageList.innerHTML = '<div class="messages-state"><div class="messages-spinner"></div><p>載入訊息中...</p></div>';
 
     try {
         const db = window.firebaseServices.db;
@@ -624,7 +754,16 @@ async function loadUserMessages(user) {
         const querySnapshot = await getDocsFromServer(q);
 
         if (querySnapshot.empty) {
-            messageList.innerHTML = '<div class="no-messages"><p>目前沒有訊息紀錄</p></div>';
+            // 沒有訊息時，下面的空白提示本身就有「傳送訊息」按鈕，上方那排先收起來
+            if (toolbar) toolbar.style.display = 'none';
+            messageList.innerHTML = `
+                <div class="messages-state">
+                    <i class="far fa-comment-dots"></i>
+                    <p>您還沒有傳送過訊息</p>
+                    <small>球根種植、訂購、配送有任何問題，都歡迎留言給我們</small>
+                    <a href="/contact.html" class="btn btn-primary">傳送訊息給我們</a>
+                </div>
+            `;
             return;
         }
 
@@ -640,42 +779,25 @@ async function loadUserMessages(user) {
             return timeB - timeA;
         });
 
-        let html = '';
-        messages.forEach((messageData) => {
-            const createdDate = messageData.createdAt && messageData.createdAt.toDate
-                ? messageData.createdAt.toDate().toLocaleString('zh-TW')
-                : '未知時間';
-            const hasReply = !!messageData.reply;
-            const repliedDate = messageData.repliedAt && messageData.repliedAt.toDate
-                ? messageData.repliedAt.toDate().toLocaleString('zh-TW')
-                : '';
+        const pendingCount = messages.filter((m) => !m.reply).length;
+        if (summary) {
+            summary.innerHTML = `共 <strong>${messages.length}</strong> 則訊息` +
+                (pendingCount ? `，<strong>${pendingCount}</strong> 則待回覆` : '');
+        }
 
-            html += `
-                <div class="message-card">
-                    <div class="message-card-header">
-                        <h3>${escapeHtml(messageData.subject) || '無主旨'}</h3>
-                        <span class="message-card-date">${createdDate}</span>
-                    </div>
-                    <span class="message-status-badge ${hasReply ? 'replied' : 'pending'}">
-                        ${hasReply ? '已回覆' : '待回覆'}
-                    </span>
-                    <div class="message-card-content">
-                        <p>${escapeHtml(messageData.message).replace(/\n/g, '<br>')}</p>
-                    </div>
-                    ${hasReply ? `
-                        <div class="message-card-reply">
-                            <h4><i class="fas fa-reply"></i> 商家回覆${repliedDate ? `（${repliedDate}）` : ''}</h4>
-                            <p>${escapeHtml(messageData.reply).replace(/\n/g, '<br>')}</p>
-                        </div>
-                    ` : ''}
-                </div>
-            `;
-        });
-
-        messageList.innerHTML = html;
+        messageList.innerHTML = messages.map(renderMessageCard).join('');
     } catch (error) {
         console.error('載入訊息時出錯:', error);
-        messageList.innerHTML = '<div class="no-messages"><p>載入訊息時發生錯誤，請稍後再試</p></div>';
+        messageList.innerHTML = `
+            <div class="messages-state">
+                <i class="fas fa-wifi"></i>
+                <p>網路連線不穩定，暫時讀不到您的訊息</p>
+                <small>您的訊息都還在，請稍後再試</small>
+                <button type="button" class="btn btn-primary" id="messages-retry-btn">重新載入</button>
+            </div>
+        `;
+        const retryBtn = document.getElementById('messages-retry-btn');
+        if (retryBtn) retryBtn.addEventListener('click', function() { loadUserMessages(user); });
     }
 }
     </script>
