@@ -223,6 +223,9 @@
         .pay-form input, .pay-form textarea { width: 100%; padding: .6rem .75rem; border: 1px solid #cfd8d2; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
         .pay-form .form-hint { color: #7a857d; font-size: .85rem; margin-top: .25rem; }
         .pay-actions { display: flex; gap: .75rem; flex-wrap: wrap; margin-top: 1rem; }
+        /* 送出中：按鈕裡的轉圈圈 */
+        .btn-spinner { display: inline-block; width: 1em; height: 1em; margin-right: .45em; vertical-align: -.15em; border: 2px solid rgba(255,255,255,.45); border-top-color: #fff; border-radius: 50%; animation: paySpin .8s linear infinite; }
+        @keyframes paySpin { to { transform: rotate(360deg); } }
         .pay-note { color: #6b776e; font-size: .9rem; margin: .25rem 0 .75rem; }
         .pay-order { padding: .75rem 0; border-top: 1px solid #edf1ee; }
         .pay-order:first-of-type { border-top: 0; padding-top: 0; }
@@ -446,7 +449,7 @@ function bindForm(payable) {
         event.preventDefault();
         const button = document.getElementById('pay-submit');
         button.disabled = true;
-        button.textContent = '送出中...';
+        button.innerHTML = '<span class="btn-spinner"></span>送出中...';
         try {
             await window.firebaseServices.appendOrderNote({
                 orderIds: payable.map(o => o.id),
@@ -464,6 +467,17 @@ function bindForm(payable) {
                 <h3>已收到您的匯款資訊</h3>
                 <p>謝謝您！我們核對款項後會把訂單改成「已付款」，並寄信通知您。</p>
                 <div class="pay-actions"><a class="btn btn-outline" href="/orders.html">查看訂單記錄</a><a class="btn btn-outline" href="/products.html">繼續逛逛</a></div>`;
+            // 上方的「尚未付款，請依下面的步驟完成轉帳」和訂單上的「未付款」也要跟著改，
+            // 不然捲回最上面看到的還是「尚未付款」，顧客會以為沒有送出去
+            const statusBox = document.querySelector('#pay-root .pay-status');
+            if (statusBox) {
+                statusBox.className = 'pay-status ok';
+                statusBox.innerHTML = '<strong>已收到您的匯款回報</strong>，我們核對款項後會改成「已付款」並寄信通知您。';
+            }
+            document.querySelectorAll('#pay-root .pay-badge.due').forEach(badge => {
+                badge.className = 'pay-badge ok';
+                badge.textContent = '已回報・待確認';
+            });
             window.scrollTo({ top: 0, behavior: 'smooth' });
         } catch (error) {
             console.error('回報匯款失敗:', error);
