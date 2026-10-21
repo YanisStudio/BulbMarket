@@ -1,0 +1,288 @@
+/* ===== css/cart-page.css - 購物車頁版面（只有 cart.html 引入） =====
+ *
+ * css/cart.css 好幾個頁面都有引入（結帳、訂單、付款…），購物車頁自己的版面
+ * 放在這裡，選擇器都加上 #cart-section / .cart-hero / .cart-steps，
+ * 不會影響其他頁面；也一定蓋得過 cart.css 裡的舊規則（不管瀏覽器快取的是哪一版）。
+ */
+
+/* ---------- 1. 手機上頂部橫幅、步驟條縮小，商品一進頁面就看得到 ---------- */
+@media (max-width: 768px) {
+    .hero.cart-hero {
+        min-height: 0;
+        padding: 1.3em 0;
+        margin-bottom: 0;
+    }
+
+    .hero.cart-hero h1 {
+        font-size: 1.6rem;
+        margin-bottom: 0;
+    }
+
+    /* 副標題、兩個標語框在手機上只是把商品往下擠 */
+    .hero.cart-hero p,
+    .hero.cart-hero .hero-highlight {
+        display: none;
+    }
+
+    .checkout-section.cart-steps {
+        padding: 1em 0 0;
+    }
+
+    .cart-steps .checkout-progress {
+        margin-bottom: 0.4em;
+        padding: 0;
+    }
+
+    .cart-steps .step-number {
+        width: 28px;
+        height: 28px;
+        font-size: 0.85rem;
+        margin-bottom: 0.3em;
+    }
+
+    .cart-steps .step-text {
+        font-size: 0.78rem;
+    }
+
+    .cart-steps .progress-line {
+        margin: 0 0.6em 1.3em;
+    }
+
+    #cart-section {
+        padding-top: 0.6em;
+    }
+}
+
+/* ---------- 2. 商品列表：圖片在左、名稱在右 ---------- */
+/* style.css 的 .product-info 是商品卡片用的（直向排列、強制靠左上），購物車裡要改回橫向 */
+#cart-section .cart-table .product-info {
+    flex-direction: row;
+    justify-content: flex-start; /* style.css 是 space-between，名稱會被推到最右邊 */
+    align-items: center !important;
+    gap: 1em;
+    padding: 0;
+    margin: 0;
+}
+
+#cart-section .product-thumbnail {
+    flex-shrink: 0;
+    margin-right: 0;
+}
+
+#cart-section .cart-table .product-details h3 {
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.45;
+    margin: 0 0 0.25em;
+}
+
+#cart-section .stock-info {
+    margin: 0;
+    font-size: 0.8rem;
+}
+
+/* 單價：電腦版有「單價」欄，不用再寫一次；欄位被藏起來時（≤768px）才顯示在名稱下面 */
+#cart-section .cart-item-unit-price {
+    display: none;
+    margin: 0 0 0.15em;
+    font-size: 0.85rem;
+    color: #666;
+}
+
+@media (max-width: 768px) {
+    #cart-section .cart-item-unit-price {
+        display: block;
+    }
+}
+
+/* 手機：每樣商品兩排——上排圖片＋名稱，下排數量、小計、刪除 */
+@media (max-width: 576px) {
+    #cart-section .cart-table tbody tr {
+        display: grid;
+        grid-template-columns: auto 1fr auto;
+        grid-template-areas:
+            "product product product"
+            "qty     total   remove";
+        align-items: center;
+        gap: 0.75em 0.8em;
+        padding: 1em;
+    }
+
+    #cart-section .cart-table td {
+        padding: 0;
+        border: none;
+    }
+
+    #cart-section .cart-table .product-cell {
+        grid-area: product;
+    }
+
+    #cart-section .cart-table .product-info {
+        align-items: flex-start !important;
+        gap: 0.8em;
+    }
+
+    #cart-section .product-thumbnail {
+        width: 64px;
+        height: 64px;
+    }
+
+    #cart-section .cart-table .product-details h3 {
+        font-size: 0.95rem;
+    }
+
+    #cart-section .cart-table .quantity-cell {
+        grid-area: qty;
+        display: block !important;
+    }
+
+    #cart-section .cart-table .quantity-cell::before {
+        content: none;
+    }
+
+    #cart-section .quantity-control {
+        width: auto;
+        height: auto;
+    }
+
+    #cart-section .quantity-btn {
+        width: 36px;
+        height: 36px;
+    }
+
+    #cart-section .quantity-input {
+        width: 40px;
+        height: 36px;
+        font-size: 16px; /* 小於 16px 時 iPhone 點輸入框會自動放大畫面 */
+    }
+
+    #cart-section .cart-table .total-cell {
+        grid-area: total;
+        text-align: right;
+        font-weight: 600;
+        color: #333;
+        white-space: nowrap;
+    }
+
+    #cart-section .cart-table .total-cell::before {
+        content: "小計 ";
+        float: none;
+        font-size: 0.85em;
+        font-weight: 400;
+        color: #888;
+    }
+
+    #cart-section .cart-table .action-cell {
+        grid-area: remove;
+    }
+
+    #cart-section .remove-item {
+        width: 38px;
+        height: 38px;
+        margin: 0;
+        font-size: 1rem;
+    }
+}
+
+/* ---------- 3. 訂單摘要：只留小計、運費、總計（商品上面已經列過了） ---------- */
+#cart-section .summary-row.subtotal {
+    border-top: none;
+    padding-top: 0.4em;
+}
+
+#cart-section .summary-count {
+    font-size: 0.85em;
+    font-weight: 400;
+    color: #888;
+}
+
+#cart-section .shipping-note {
+    margin: -0.3em 0 0.6em;
+    font-size: 0.8rem;
+    line-height: 1.5;
+    color: #888;
+}
+
+/* 電腦版：摘要靠右、不用拉滿整行 */
+@media (min-width: 769px) {
+    #cart-section .cart-summary {
+        max-width: 26em;
+        margin-left: auto;
+    }
+}
+
+/* 手機：「前往結帳」放上面、比較好按 */
+@media (max-width: 768px) {
+    #cart-section .cart-actions {
+        flex-direction: column-reverse;
+    }
+
+    #cart-section .cart-actions .btn-outline {
+        margin-bottom: 0;
+    }
+}
+
+/* ---------- 4. 手機：畫面底部固定「總計＋前往結帳」 ---------- */
+/* 訂單摘要的結帳按鈕還在畫面下方時才出現（見 cart.html 的 refreshMobileBar()） */
+.cart-mobile-bar {
+    display: none;
+}
+
+@media (max-width: 576px) {
+    .cart-mobile-bar {
+        display: flex;
+        align-items: center;
+        gap: 1em;
+        position: fixed;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 900;
+        padding: 0.7em 1em calc(0.7em + env(safe-area-inset-bottom, 0px));
+        background: #fff;
+        border-top: 1px solid #e8ece9;
+        box-shadow: 0 -0.3em 1em rgba(0, 0, 0, 0.08);
+        transform: translateY(110%);
+        visibility: hidden;
+        transition: transform 0.25s ease, visibility 0.25s;
+    }
+
+    .cart-mobile-bar.show {
+        transform: none;
+        visibility: visible;
+    }
+
+    .cart-mobile-bar-total {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        line-height: 1.3;
+    }
+
+    .cart-mobile-bar-label {
+        font-size: 0.8rem;
+        color: #777;
+    }
+
+    .cart-mobile-bar-total strong {
+        font-size: 1.2rem;
+        color: #2c3e50;
+    }
+
+    .cart-mobile-bar .btn {
+        flex: 0 0 auto;
+        width: auto;
+        padding: 0.8em 1.6em;
+        border-radius: 10px;
+        font-weight: 600;
+        background-color: #2e7d32;
+        border: 1px solid #2e7d32;
+        color: #fff;
+        box-shadow: 0 4px 10px rgba(46, 125, 50, 0.3);
+    }
+
+    /* 「購物車已更新」之類的提示訊息不要蓋在底部那條上面 */
+    body.cart-mobile-bar-shown .toast-message {
+        bottom: 5.5em;
+    }
+}
