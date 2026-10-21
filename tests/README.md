@@ -43,6 +43,7 @@ node tests/product-detail-keyboard.test.mjs               # 商品彈窗鍵盤�
 node tests/product-modal-tabs.test.mjs                    # 商品彈窗「商品描述／詳細介紹」分頁（13 項）
 node tests/products-filters.test.mjs                      # 商品頁篩選（含 $500 以上）、選完即套用、手機兩欄（8 項）
 node tests/member-pages.test.mjs                         # 會員中心三頁：我的訊息卡片／空白／重試、左右兩欄版面、div 開闔（9 項）
+node tests/checkout-submit.test.mjs                       # 結帳送出：轉圈圈、離開提醒、失敗恢復、庫存檢查訊息；訂單完成頁 NT$／沒留 Email 的提醒（10 項）
 node tests/category-retry.test.mjs                        # 分類讀取失敗後的背景重試
 node tests/reset-policy.test.mjs                          # 什麼時候該重建 Firestore 連線（20 項）
 node tests/dashboard-retry.test.mjs                       # 後台儀表板連線卡住時：不顯示 0、會自動恢復（6 項）
@@ -54,7 +55,7 @@ node tests/cart-price-refresh.test.mjs                    # 購物車：最新�
 node tests/admin-shipping-save.test.mjs                   # 後台運費：空白運費不存 NaN、存一種不覆蓋另一種（3 項）
 node tests/scheduler-plan.test.mjs                        # 排程上下架：兩個時間都到期時以較晚的為準（6 項）
 node tests/admin-articles.test.mjs                        # 後台栽培小知識／加入會員兩個文章分頁互不干擾（5 項）
-node tests/pay-page.test.mjs                              # 付款頁、未付款提醒、訂單記錄預設勾選（12 項）
+node tests/pay-page.test.mjs                              # 付款頁（含送出中轉圈圈、回報後更新狀態）、未付款提醒、訂單記錄預設勾選（20 項）
 node tests/order-status.test.mjs                          # 訂單狀態的順序、名稱、算不算已付款（9 項）
 cd functions && node ../tests/order-email-payment.test.cjs # 訂單成立通知信的匯款帳號與付款連結（8 項）
 ```

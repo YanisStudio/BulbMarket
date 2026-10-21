@@ -290,6 +290,49 @@
     background-color: #1b5e20;
 }
 
+/* 結帳流程（填寫資料、訂單完成）手機版：頂部標題縮成一行、步驟條縮小，
+   內容一進頁面就看得到（跟購物車頁 css/cart-page.css 一致） */
+@media (max-width: 768px) {
+    .hero.checkout-hero,
+    .product-hero.checkout-hero {
+        min-height: 0;
+        padding: 1.3em 0;
+        margin-bottom: 0;
+    }
+
+    .hero.checkout-hero h1,
+    .product-hero.checkout-hero h1 {
+        font-size: 1.6rem;
+        margin-bottom: 0;
+    }
+
+    .hero.checkout-hero p,
+    .product-hero.checkout-hero p {
+        display: none;
+    }
+
+    .checkout-progress.checkout-progress-compact {
+        display: flex; /* 填寫資料頁的 checkout.css 在手機上把步驟條藏起來，三頁要一致 */
+        margin-bottom: 0.8em;
+        padding: 0;
+    }
+
+    .checkout-progress-compact .step-number {
+        width: 28px;
+        height: 28px;
+        font-size: 0.85rem;
+        margin-bottom: 0.3em;
+    }
+
+    .checkout-progress-compact .step-text {
+        font-size: 0.78rem;
+    }
+
+    .checkout-progress-compact .progress-line {
+        margin: 0 0.6em 1.3em;
+    }
+}
+
 /* 結帳步驟樣式 */
 .checkout-section {
     padding: 30px 0;

@@ -189,6 +189,69 @@
             border-left: 4px solid #ff9800;
         }
 
+        /* 手機：外框一層包一層、每層都留很大的空白，匯款帳號被擠成兩行；
+           縮小留白和字級，帳號才能完整一行 */
+        @media (max-width: 576px) {
+            .checkout-section {
+                padding: 14px 0 0;
+            }
+
+            .success-section {
+                padding: 0 0 30px;
+            }
+
+            .success-container {
+                padding: 22px 14px;
+            }
+
+            .success-icon {
+                font-size: 56px;
+                margin-bottom: 10px;
+            }
+
+            .success-container h2 {
+                font-size: 22px;
+            }
+
+            .success-message {
+                font-size: 15px;
+                margin-bottom: 18px;
+            }
+
+            .order-details {
+                padding: 14px 16px;
+                margin-bottom: 18px;
+            }
+
+            .order-info p {
+                font-size: 15px;
+                margin: 7px 0;
+            }
+
+            .payment-notice {
+                padding: 1rem;
+                margin: 1.2rem 0;
+                border-radius: 12px;
+            }
+
+            .payment-notice h3 {
+                font-size: 1.2rem;
+            }
+
+            .payment-notice p {
+                font-size: 0.95rem;
+            }
+
+            .payment-notice .bank-transfer-box {
+                padding: 0.8rem 0.9rem;
+            }
+
+            .important-note {
+                padding: 0.8rem;
+                font-size: 0.9rem;
+            }
+        }
+
         /* 匯款確認表單樣式 */
         .transfer-confirmation {
             background: #ffffff;
@@ -487,7 +550,7 @@
     
     <main>
         <!-- Hero 區域 -->
-        <section class="hero">
+        <section class="hero checkout-hero">
             <div class="container">
                 <div class="hero-content">
                     <h1>訂單完成</h1>
@@ -499,7 +562,7 @@
         <!-- 結帳步驟指示器 -->
         <section class="checkout-section">
             <div class="container">
-                <div class="checkout-progress">
+                <div class="checkout-progress checkout-progress-compact">
                     <div class="progress-step completed">
                         <div class="step-number">1</div>
                         <div class="step-text">確認商品</div>
@@ -689,7 +752,7 @@
             
             // 更新訂單詳情
             document.getElementById('order-number').textContent = lastOrder.orderNumber || '未知';
-            document.getElementById('order-total').textContent = lastOrder.total ? `${lastOrder.total}` : '未知';
+            document.getElementById('order-total').textContent = lastOrder.total ? `NT$ ${lastOrder.total}` : '未知';
             document.getElementById('order-items').textContent = lastOrder.items ? `${lastOrder.items} 件商品` : '未知';
             document.getElementById('customer-name').textContent = lastOrder.customerName || '未知';
             document.getElementById('customer-phone').textContent = lastOrder.customerPhone || '未知';
@@ -724,6 +787,15 @@
                 if (payLink && lastOrder.id) {
                     payLink.href = '/pay.html?id=' + encodeURIComponent(lastOrder.id);
                     payLink.hidden = false;
+                }
+                // Email 是選填的：沒留 Email 的人收不到含付款連結的通知信，
+                // 不能跟他說「付款頁的連結也已經寄到您的信箱」，要提醒他把付款頁存起來
+                //（舊版結帳頁沒有記錄 hasEmail，undefined 時維持原本的說明）
+                const transferNote = document.querySelector('#transfer-notice .important-note');
+                if (transferNote && lastOrder.hasEmail === false) {
+                    transferNote.textContent = '※ 轉帳後請到付款頁回報匯款資訊（帳號後五碼），方便我們對帳。' +
+                        '您沒有留 Email，收不到含付款連結的通知信，請先點上面的「前往付款／回報匯款」並把那一頁加入書籤' +
+                        '（會員也可以之後到「訂單記錄」找到這筆訂單付款）。';
                 }
             }
 

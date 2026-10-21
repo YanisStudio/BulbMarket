@@ -76,6 +76,26 @@ await t('送出回報：呼叫 appendOrderNote（kind=payment，這一筆訂單�
     assert.strictEqual(page.calls[0].payment.lastFiveDigits, '12345');
     assert.strictEqual(page.calls[0].payment.amount, '380');
     assert.ok(/已收到您的匯款資訊/.test($('pay-report').textContent));
+    // 上方說明和訂單標籤也要跟著更新，不能還寫「尚未付款」
+    const status = page.root().querySelector('.pay-status');
+    assert.ok(/已收到您的匯款回報/.test(status.textContent) && !/尚未付款/.test(status.textContent), status.textContent);
+    assert.strictEqual(page.root().querySelectorAll('.pay-badge.due').length, 0, '還有「未付款」標籤');
+    assert.ok(/已回報・待確認/.test(page.root().querySelector('.pay-badge').textContent));
+});
+
+await t('回報送出中：按鈕停用並顯示轉圈圈', async () => {
+    const page = openPay({ order: { ...BASE_ORDER, payment: 'transfer' } });
+    await wait(100);
+    page.window.firebaseServices.appendOrderNote = () => new Promise(() => {}); // 一直沒回應
+    const $ = (id) => page.document.getElementById(id);
+    $('pay-remitter').value = '王小明';
+    $('pay-bank').value = '台灣銀行';
+    $('pay-last5').value = '12345';
+    $('pay-form').dispatchEvent(new page.window.Event('submit', { cancelable: true }));
+    await wait(20);
+    assert.ok($('pay-submit').disabled);
+    assert.ok($('pay-submit').querySelector('.btn-spinner'), '沒有轉圈圈');
+    assert.ok(/送出中/.test($('pay-submit').textContent));
 });
 
 await t('會員訂單、沒有登入（從信件連結進來）：一樣可以直接回報，不用先登入', async () => {

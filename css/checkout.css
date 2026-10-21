@@ -522,6 +522,7 @@ input[type="radio"]:checked + .custom-radio::after {
     }
     
     .checkout-section {
+        padding-top: 14px; /* 上面的標題已經縮成一行，不用再空一大塊 */
         padding-bottom: 76px;
     }
 }
