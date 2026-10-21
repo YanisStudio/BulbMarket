@@ -1061,10 +1061,13 @@ body.modal-open-noscroll {
     position: relative;
     background: #fff;
     border-radius: 1em;
-    max-width: 50em;
+    max-width: 52em;
     width: 100%;
     max-height: 88vh;
-    overflow-y: auto;
+    /* 整個面板不捲動，只有中間的文字區塊捲動：圖片、名稱價格、加入購物車都固定看得到 */
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
     box-shadow: 0 1.5em 3em rgba(0, 0, 0, 0.25);
     animation: productDetailPopIn 0.25s ease;
 }
@@ -1103,14 +1106,16 @@ body.modal-open-noscroll {
 .product-detail-body {
     display: flex;
     flex-direction: column;
+    flex: 1;
+    min-height: 0;
 }
 
 .product-detail-image {
     position: relative;
-    height: 16em;
+    /* 手機上圖片不要太高，留空間給文字；最多佔畫面三成 */
+    height: min(15em, 30vh);
     flex-shrink: 0;
     background-color: #f8f8f8;
-    border-radius: 1em 1em 0 0;
     overflow: hidden;
 }
 
@@ -1121,62 +1126,135 @@ body.modal-open-noscroll {
 }
 
 .product-detail-info {
-    padding: 1.5em;
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 1.1em 1.25em 0;
+}
+
+.product-detail-head {
+    flex-shrink: 0;
 }
 
 .product-detail-info h2 {
-    font-size: 1.5em;
+    font-size: 1.25em;
     color: #333;
-    margin-bottom: 0.5em;
+    margin: 0 0 0.35em;
     line-height: 1.4;
 }
 
 .product-detail-price {
-    font-size: 1.6em;
+    font-size: 1.5em;
     font-weight: 700;
     color: #ff6b6b;
-    margin-bottom: 0.3em;
+    margin: 0 0 0.15em;
 }
 
 .product-detail-stock {
-    font-size: 0.9em;
+    font-size: 0.85em;
     color: #777;
     font-weight: 500;
-    margin-bottom: 1em;
+    margin: 0 0 0.75em;
 }
 
-.product-detail-section-label {
-    font-size: 0.85em;
-    font-weight: 700;
+/* 商品描述／詳細介紹 分頁 */
+.product-detail-tabs {
+    display: flex;
+    flex-shrink: 0;
+    border-bottom: 1px solid #e6ebe7;
+}
+
+.product-detail-tabs[hidden] {
+    display: none;
+}
+
+.product-detail-tabs [role="tab"] {
+    flex: 1;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -1px;
+    padding: 0.7em 0.5em;
+    font-size: 0.95em;
+    font-weight: 600;
+    color: #8a948c;
+    cursor: pointer;
+    transition: color 0.2s ease, border-color 0.2s ease;
+}
+
+.product-detail-tabs [role="tab"]:hover {
     color: #4caf50;
-    margin: 1.2em 0 0.4em;
 }
 
-.product-detail-section-label:first-of-type {
-    margin-top: 0;
+.product-detail-tabs [role="tab"].active {
+    color: #2e7d32;
+    border-bottom-color: #4caf50;
+}
+
+.product-detail-tabs [role="tab"]:focus-visible {
+    outline: 2px solid #4caf50;
+    outline-offset: -2px;
+}
+
+/* 文字區塊：自己捲動 */
+.product-detail-content {
+    flex: 1;
+    min-height: 5em;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding: 0.9em 0.1em 1em 0;
+}
+
+.product-detail-content [role="tabpanel"][hidden] {
+    display: none;
 }
 
 .product-detail-desc-text {
     color: #555;
     font-size: 0.95em;
-    line-height: 1.7;
+    line-height: 1.75;
     white-space: pre-wrap;
+    margin: 0;
 }
 
+/* 加入購物車：固定在面板最下面 */
 .product-detail-actions {
     display: flex;
     align-items: center;
     gap: 0.8em;
-    margin-top: 1.5em;
-    padding-top: 1.2em;
+    flex-shrink: 0;
+    padding: 0.85em 0 1.1em;
     border-top: 1px solid #f0f0f0;
+    background: #fff;
 }
 
 .product-detail-actions .add-to-cart-btn {
     max-width: none;
 }
 
+@media (max-width: 699px) {
+    .product-detail-modal {
+        padding: 0.75em;
+    }
+
+    .product-detail-panel {
+        max-height: 92vh;
+    }
+
+    /* 有兩個分頁時固定高度：不然描述短、詳細介紹長，切換分頁時整個視窗會忽大忽小、圖片跟著跳 */
+    .product-detail-panel:has(.product-detail-tabs:not([hidden])) {
+        height: min(92vh, 46em);
+    }
+}
+
 @media (min-width: 700px) {
+    .product-detail-panel {
+        /* 固定高度，左邊圖片、右邊文字；文字多寡不會讓面板忽大忽小 */
+        height: min(34em, 88vh);
+    }
+
     .product-detail-body {
         flex-direction: row;
     }
@@ -1184,12 +1262,17 @@ body.modal-open-noscroll {
     .product-detail-image {
         height: auto;
         width: 45%;
-        border-radius: 1em 0 0 1em;
     }
 
     .product-detail-info {
         width: 55%;
-        overflow-y: auto;
+        padding: 1.6em 1.6em 0;
+    }
+
+    .product-detail-info h2 {
+        font-size: 1.4em;
+        /* 右上角的關閉按鈕 */
+        padding-right: 1.5em;
     }
 }
 
