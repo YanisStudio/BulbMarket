@@ -1,0 +1,176 @@
+/* ===== css/member-center.css - 會員中心三頁共用版面 =====
+ *
+ * 會員資料（profile.html）、訂單記錄（orders.html）、我的訊息（messages.html）
+ * 三頁的外框都一樣：頂部標題、左邊「會員中心」選單、右邊內容。
+ * 各頁 <style> 裡各自有一份（類別名稱也不同：profile-* / orders-*），
+ * 這裡統一寬度、間距和手機版排法，三頁看起來才會一致。
+ * 放在各頁 storefront.css 之後載入，同樣的選擇器會蓋過頁面裡的舊規則。
+ */
+
+/* ---------- 外框：電腦版左邊選單、右邊內容 ---------- */
+.profile-section,
+.orders-section {
+    padding: 40px 0 50px;
+}
+
+.profile-container,
+.orders-container {
+    max-width: 1100px;
+}
+
+.profile-content,
+.orders-content {
+    display: flex;
+    align-items: flex-start;
+    gap: 28px;
+}
+
+.profile-sidebar,
+.orders-sidebar {
+    flex: 0 0 220px;
+    max-width: 220px;
+}
+
+.profile-main,
+.orders-main {
+    flex: 1;
+    min-width: 0; /* 內容很寬（長訂單編號、表格）時不要把版面撐破 */
+}
+
+/* ---------- 會員中心選單 ---------- */
+.profile-menu {
+    background-color: #fff;
+    border-radius: 10px;
+    padding: 18px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.profile-menu h3 {
+    margin: 0 0 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #eee;
+    font-size: 1.05em;
+    color: #333;
+}
+
+.profile-menu li {
+    margin-bottom: 6px;
+}
+
+.profile-menu li:last-child {
+    margin-bottom: 0;
+}
+
+.profile-menu a {
+    padding: 10px 12px;
+    border-radius: 6px;
+}
+
+/* 主要按鈕統一深綠色（各頁以前有的用網站預設的淺綠） */
+.profile-section .btn-primary,
+.orders-section .btn-primary {
+    background-color: #2e7d32;
+    border-color: #2e7d32;
+    color: #fff;
+}
+
+.profile-section .btn-primary:hover,
+.orders-section .btn-primary:hover {
+    background-color: #1b5e20;
+    border-color: #1b5e20;
+}
+
+/* 頁面裡的未登入提示、說明區塊，三頁一致 */
+.section-alert {
+    border-radius: 8px;
+}
+
+.help-section {
+    background-color: #fff;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* ---------- 手機版 ---------- */
+@media (max-width: 768px) {
+    /* 頂部標題縮成一行，內容一進頁面就看得到 */
+    .product-hero.profile-banner {
+        min-height: 0;
+        padding: 1.3em 0;
+        margin-bottom: 0;
+    }
+
+    .product-hero.profile-banner h1 {
+        font-size: 1.6rem;
+        margin-bottom: 0;
+    }
+
+    .product-hero.profile-banner p {
+        display: none;
+    }
+
+    .profile-section,
+    .orders-section {
+        padding: 16px 0 30px;
+    }
+
+    .profile-content,
+    .orders-content {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 16px;
+    }
+
+    .profile-sidebar,
+    .orders-sidebar {
+        flex: none;
+        max-width: none;
+        margin-bottom: 0;
+    }
+
+    /* 選單改成一排分頁：以前直向四個選項，手機上要先滑過一大塊才看到內容 */
+    .profile-menu {
+        padding: 5px;
+        border-radius: 12px;
+    }
+
+    .profile-menu h3 {
+        display: none;
+    }
+
+    .profile-menu ul {
+        display: flex;
+        gap: 4px;
+    }
+
+    .profile-menu li {
+        flex: 1;
+        margin: 0;
+    }
+
+    .profile-menu a {
+        flex-direction: column;
+        justify-content: center;
+        gap: 4px;
+        height: 100%;
+        padding: 8px 2px;
+        border-radius: 9px;
+        font-size: 0.8rem;
+        text-align: center;
+        white-space: nowrap;
+    }
+
+    .profile-menu i {
+        margin: 0;
+        width: auto;
+        font-size: 1.05rem;
+    }
+
+    /* 登出不是分頁，顏色淡一點 */
+    #sidebar-logout-btn {
+        color: #999;
+    }
+
+    .help-section {
+        margin-top: 24px;
+    }
+}
