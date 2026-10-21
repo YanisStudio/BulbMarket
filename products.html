@@ -272,8 +272,6 @@
                             <option value="name">名稱</option>
                         </select>
                     </div>
-                    
-                    <button id="filter-button" class="btn btn-primary">套用篩選</button>
                 </div>
                 
                 <div class="search-container">
@@ -611,7 +609,7 @@ function getGridColumns() {
     } else if (screenWidth >= 768) {
         return 3;
     } else {
-        return 1;
+        return 2; // 手機一排兩個（css/storefront.css 的 .products-display .product-grid）
     }
 }
 
@@ -624,7 +622,7 @@ function getProductsPerPage() {
     } else if (screenWidth >= 768) {
         return 9;  // 平板：3列 x 3排 = 9個  
     } else {
-        return 6;  // 手機：1列 x 6排 = 6個（實際 CSS 是單欄，見 getGridColumns()）
+        return 8;  // 手機：2列 x 4排 = 8個
     }
 }
 
@@ -694,12 +692,12 @@ function renderCurrentPage(pageNum) {
     updateWishlistButtons();
 }
 
-// 初始化篩選功能
+// 初始化篩選功能：分類、價格、排序選完就直接套用（以前還要再按「套用篩選」）
 function initFilters() {
-    const filterButton = document.getElementById('filter-button');
-    if (filterButton) {
-        filterButton.addEventListener('click', applyFilters);
-    }
+    ['category-filter', 'price-filter', 'sort-filter'].forEach(function(id) {
+        const select = document.getElementById(id);
+        if (select) select.addEventListener('change', applyFilters);
+    });
 }
 
 // 應用篩選條件
@@ -742,6 +740,11 @@ function applyFilters() {
 
 // 價格篩選
 function filterByPrice(products, priceRange) {
+    // 「$500 以上」的值是 500+（沒有 -），以前會整個略過，等於沒篩選、照樣列出所有商品
+    if (priceRange.endsWith('+')) {
+        const minPrice = parseFloat(priceRange);
+        return products.filter(p => p.price >= minPrice);
+    }
     if (priceRange.includes('-')) {
         const parts = priceRange.split('-');
         const minPrice = parseFloat(parts[0]);
