@@ -203,12 +203,65 @@
     color: #888;
 }
 
-/* 電腦版：摘要靠右、不用拉滿整行 */
-@media (min-width: 769px) {
-    #cart-section .cart-summary {
-        max-width: 26em;
-        margin-left: auto;
+/* 頁尾前留一點空間，摘要不要直接貼著頁尾 */
+#cart-section {
+    padding-bottom: 3em;
+}
+
+/* 電腦版：商品列表在左、訂單摘要在右並排（以前摘要在表格下面，縮在右下角、左邊空一大塊）。
+   往下捲時摘要停在畫面上，商品再多也隨時看得到總計和結帳按鈕 */
+@media (min-width: 992px) {
+    #cart-section .cart-layout {
+        display: flex;
+        align-items: flex-start;
+        gap: 24px;
     }
+
+    /* 購物車是空的時候摘要會隱藏，列表自動佔滿整行 */
+    #cart-section .cart-container {
+        flex: 1;
+        min-width: 0;
+    }
+
+    #cart-section .cart-table {
+        margin-bottom: 0;
+    }
+
+    #cart-section .cart-summary {
+        flex: 0 0 340px;
+        position: sticky;
+        top: 168px; /* 頁首固定在上方、約 148px 高，再多留一點空間 */
+    }
+
+    /* 摘要變窄了，「前往結帳」放上面、兩顆按鈕上下排 */
+    #cart-section .cart-actions {
+        flex-direction: column-reverse;
+        gap: 10px;
+    }
+}
+
+/* 小筆電（992～1199px）：表格旁邊還有摘要，寬度不夠放五欄，
+   「單價」欄收起來、改顯示在商品名稱下面（跟手機一樣） */
+@media (min-width: 992px) and (max-width: 1199px) {
+    #cart-section .cart-summary {
+        flex-basis: 300px;
+    }
+
+    #cart-section .cart-table th:nth-child(2),
+    #cart-section .cart-table td:nth-child(2) {
+        display: none;
+    }
+
+    #cart-section .cart-item-unit-price {
+        display: block;
+    }
+}
+
+/* 金額、表頭不要斷成兩行（NT$ 和數字被拆開很難看） */
+#cart-section .cart-table th,
+#cart-section .price-cell,
+#cart-section .total-cell {
+    white-space: nowrap;
 }
 
 /* 手機：「前往結帳」放上面、比較好按 */
