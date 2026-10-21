@@ -391,23 +391,103 @@ footer.site-footer {
 }
 
 @media (max-width: 600px) {
+    /* 手機：分類排成一排左右滑。以前一排 3 個、18 個分類要 6 排，
+       精選商品被擠到很下面。右邊露出半個，提示可以往右滑 */
     .category-tiles {
-        grid-template-columns: repeat(3, 1fr);
-        gap: 1.6em 0.6em;
+        display: flex;
+        gap: 1.1em;
+        overflow-x: auto;
+        scroll-snap-type: x proximity;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        /* 水滴轉 45 度後四個角會超出方框，左右上下都要留空間，不然捲動區會把尖端切掉 */
+        padding: 1.4em 1em 0.6em;
+        margin: 0 -1em;
+    }
+
+    .category-tiles::-webkit-scrollbar {
+        display: none;
     }
 
     .category-tile {
-        font-size: 0.9em;
-        gap: 0.8em;
+        /* 一個畫面放 4.4 個：最右邊固定露出半個，看得出來可以往右滑 */
+        flex: 0 0 calc((100% - 4 * 1.1em) / 4.4);
+        scroll-snap-align: start;
+        font-size: 0.85em;
+        gap: 0.9em;
     }
 
     .category-tile-shape {
-        width: 5.6em;
-        height: 5.6em;
+        width: 4.8em;
+        height: 4.8em;
     }
 
     .category-tile-shape i {
         font-size: 2em;
+    }
+}
+
+/* ---------- 商品頁：手機一排兩個 ---------- */
+/* 以前手機一排只有一個，12 個商品要滑好幾個畫面；
+   一排兩個時卡片變窄，文字、按鈕都要跟著縮小，愛心按鈕才不會被擠出去 */
+@media (max-width: 767px) {
+    .products-display .product-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 0.75em;
+    }
+
+    .products-display .product-image {
+        height: 9.5em;
+    }
+
+    .products-display .product-info {
+        padding: 0.75em 0.7em 0.9em;
+    }
+
+    .products-display .product-info h3 {
+        font-size: 0.92em;
+        line-height: 1.4;
+        margin-bottom: 0.35em;
+    }
+
+    .products-display .product-desc {
+        font-size: 0.78em;
+        line-height: 1.5;
+    }
+
+    .products-display .product-detail-hint {
+        font-size: 0.75em;
+    }
+
+    .products-display .product-price {
+        font-size: 1.05em;
+        margin: 0.3em 0 0.1em;
+    }
+
+    .products-display .stock-info {
+        font-size: 0.72em;
+    }
+
+    .products-display .product-actions {
+        gap: 0.4em;
+    }
+
+    .products-display .add-to-cart-btn {
+        min-width: 0;
+        padding: 0.6em 0.3em;
+        font-size: 0.8em;
+        white-space: nowrap;
+    }
+
+    .products-display .wish-btn {
+        flex-shrink: 0;
+        width: 2.3em;
+        height: 2.3em;
+    }
+
+    .products-display .product-tag,
+    .products-display .unavailable-badge {
+        font-size: 0.7em;
     }
 }
 

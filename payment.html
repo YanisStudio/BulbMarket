@@ -157,84 +157,6 @@
             }
         }
 
-        /* 登入提醒彈窗樣式 */
-        .login-reminder-modal {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            z-index: 10000;
-        }
-
-        .login-reminder-content {
-            background: white;
-            padding: 2.5rem;
-            border-radius: 15px;
-            max-width: 450px;
-            margin: 0 1rem;
-            text-align: center;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            position: relative;
-            border: 1px solid #e0e0e0;
-        }
-
-        .login-reminder-icon {
-            font-size: 3rem;
-            color: #66bb6a;
-            margin-bottom: 1rem;
-        }
-
-        .login-reminder-content h3 {
-            color: #2c5530;
-            margin: 0 0 1rem 0;
-            font-size: 1.4rem;
-        }
-
-        .login-reminder-content p {
-            color: #666;
-            margin: 0.5rem 0 1.5rem 0;
-            line-height: 1.6;
-        }
-
-        .login-reminder-actions {
-            display: flex;
-            gap: 1rem;
-            justify-content: center;
-            flex-wrap: wrap;
-        }
-
-        .login-reminder-actions .btn {
-            padding: 0.8rem 1.5rem;
-            border-radius: 8px;
-            text-decoration: none;
-            font-weight: 600;
-            transition: transform 0.2s ease;
-            min-width: 120px;
-            border: none;
-            cursor: pointer;
-        }
-
-        .login-reminder-actions .btn:hover {
-            transform: translateY(-2px);
-        }
-
-        .btn-reminder-primary {
-            background: linear-gradient(135deg, #66bb6a, #4caf50);
-            color: white;
-        }
-
-        .btn-reminder-skip {
-            background: #f5f5f5;
-            color: #666;
-            border: 1px solid #ddd;
-            font-size: 0.9rem;
-        }
-
         @media (max-width: 768px) {
             .checkout-loading-content {
                 padding: 2rem;
@@ -245,16 +167,6 @@
                 width: 50px;
                 height: 50px;
                 border-width: 4px;
-            }
-
-            .login-reminder-actions {
-                flex-direction: column;
-                align-items: center;
-            }
-            
-            .login-reminder-actions .btn {
-                width: 100%;
-                max-width: 200px;
             }
         }
 
@@ -808,47 +720,6 @@
                 }
             }
             
-            // 顯示登入提醒彈窗
-            function showLoginReminderModal() {
-                const modal = document.createElement('div');
-                modal.className = 'login-reminder-modal';
-                modal.innerHTML = `
-                    <div class="login-reminder-content">
-                        <div class="login-reminder-icon">
-                            <i class="fas fa-user-circle"></i>
-                        </div>
-                        <h3>建議先登入會員</h3>
-                        <p>登入會員帳戶可以自動填充收件人資料，享受更便利的購物體驗，並可追蹤訂單狀態。</p>
-                        <div class="login-reminder-actions">
-                            <button class="btn btn-reminder-primary" id="modal-login-btn">立即登入</button>
-                            <button class="btn btn-reminder-skip" id="modal-skip-btn">稍後再說</button>
-                        </div>
-                    </div>
-                `;
-                
-                document.body.appendChild(modal);
-                
-                // 添加事件監聽器
-                document.getElementById('modal-login-btn').addEventListener('click', function(e) {
-                    e.preventDefault();
-                    modal.remove();
-                    const loginBtn = document.getElementById('login-btn');
-                    if (loginBtn) loginBtn.click();
-                });
-                
-                document.getElementById('modal-skip-btn').addEventListener('click', function(e) {
-                    e.preventDefault();
-                    modal.remove();
-                });
-                
-                // 點擊背景關閉
-                modal.addEventListener('click', function(e) {
-                    if (e.target === modal) {
-                        modal.remove();
-                    }
-                });
-            }
-            
             // 檢查登入狀態並顯示相應提示
             function checkLoginStatus() {
                 const memberReminder = document.getElementById('member-reminder');
@@ -862,21 +733,14 @@
                             // 載入用戶資料
                             loadUserProfile(user);
                         } else {
-                            // 用戶未登入，顯示提醒
+                            // 用戶未登入，顯示頁面上的「建議先登入會員」區塊。
+                            // 以前 2 秒後還會再跳一個同樣內容的彈窗，打斷正在填資料的顧客，拿掉了
                             memberReminder.style.display = 'block';
-                            
-                            // 延遲2秒顯示彈窗，讓用戶先看到頁面
-                            setTimeout(() => {
-                                showLoginReminderModal();
-                            }, 2000);
                         }
                     });
                 } else {
                     // Firebase 未初始化，顯示提醒
                     memberReminder.style.display = 'block';
-                    setTimeout(() => {
-                        showLoginReminderModal();
-                    }, 2000);
                 }
                 
                 // 提醒區域的登入按鈕事件
