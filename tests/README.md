@@ -54,7 +54,7 @@ cd functions && node ../tests/rate-limit.test.cjs         # 下單頻率限制�
 cd functions && node ../tests/notify-admin.test.cjs       # 新訂單寄通知信給管理員（6 項）
 node tests/cart-price-refresh.test.mjs                    # 購物車：最新價格、刪除立即完成／刪光顯示空購物車、摘要與運費說明、手機底部結帳條、階梯運費不當機（13 項）
 node tests/admin-shipping-save.test.mjs                   # 後台運費：空白運費不存 NaN、存一種不覆蓋另一種（3 項）
-node tests/scheduler-plan.test.mjs                        # 排程上下架：兩個時間都到期時以較晚的為準（6 項）
+node tests/scheduler-plan.test.mjs                        # 商品排程上下架（functions/product-scheduler.js）：到期判斷、去重、分批寫入、每 5 分鐘設定（10 項）
 node tests/admin-articles.test.mjs                        # 後台栽培小知識／加入會員兩個文章分頁互不干擾（5 項）
 node tests/pay-page.test.mjs                              # 付款頁（含送出中轉圈圈、回報後更新狀態）、未付款提醒、訂單記錄預設勾選（20 項）
 node tests/order-status.test.mjs                          # 訂單狀態的順序、名稱、算不算已付款（9 項）
