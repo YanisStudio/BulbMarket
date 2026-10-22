@@ -1801,6 +1801,14 @@ body.modal-open-noscroll {
     grid-column: 1 / -1;
 }
 
+/* 聯絡我們：手機上一欄一個。兩欄並排時欄位太窄，「諮詢主題」下拉選單的文字會被切掉 */
+@media (max-width: 600px) {
+    .contact-form {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
+}
+
 .form-group label {
     display: block;
     margin-bottom: 0.5em;

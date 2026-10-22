@@ -105,17 +105,24 @@ t('登入的人用 uid', () => {
 });
 
 t('訪客用來源 IP 的雜湊，不存原始 IP', () => {
-    const req = { rawRequest: { headers: { 'x-forwarded-for': '203.0.113.5, 10.0.0.1' } } };
+    const req = { rawRequest: { headers: { 'x-forwarded-for': '203.0.113.5' } } };
     const k = rateLimitKey(req);
     assert.ok(k.startsWith('ip_'), k);
     assert.ok(!k.includes('203.0.113.5'), '不應該把原始 IP 存進鍵值: ' + k);
     assert.strictEqual(k.length, 3 + 32);
 });
 
-t('x-forwarded-for 取第一段（才是真實來源，後面是負載平衡器）', () => {
-    const a = rateLimitKey({ rawRequest: { headers: { 'x-forwarded-for': '203.0.113.5, 10.0.0.1' } } });
+// Google 把真實來源接在 x-forwarded-for 最後面，前面是發送端自己帶的（2026-10 實測）
+t('x-forwarded-for 取最後一段（Google 加的真實來源）', () => {
+    const a = rateLimitKey({ rawRequest: { headers: { 'x-forwarded-for': '1.2.3.4,203.0.113.5' } } });
     const b = rateLimitKey({ rawRequest: { headers: { 'x-forwarded-for': '203.0.113.5' } } });
     assert.strictEqual(a, b, '同一個來源應該得到同一個鍵');
+});
+
+t('自己帶假的 x-forwarded-for 繞不過限制：每次換不同的假值，鍵都一樣', () => {
+    const keys = new Set(['1.1.1.1', '8.8.8.8, 9.9.9.9', 'garbage'].map((fake) =>
+        rateLimitKey({ rawRequest: { ip: fake.split(',')[0], headers: { 'x-forwarded-for': fake + ',203.0.113.5' } } })));
+    assert.strictEqual(keys.size, 1, '假值不同就得到不同的鍵，代表可以繞過');
 });
 
 t('不同 IP 得到不同的鍵（不會互相影響）', () => {

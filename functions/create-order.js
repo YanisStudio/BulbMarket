@@ -53,12 +53,17 @@ function generateOrderNumber() {
 // 頻率限制的識別鍵：登入的人用 uid，訪客用來源 IP。
 //
 // 不存原始 IP：只存雜湊值，比對得出「是不是同一個來源」就夠了，不需要知道是誰。
-// Cloud Functions 前面有 Google 的負載平衡器，真實來源在 x-forwarded-for 的第一段。
+//
+// 真實來源要取 x-forwarded-for 的「最後一段」：Google 會把連線進來的 IP 接在最後面，
+// 前面的內容是發送端自己帶的，可以隨便填。2026-10 實測（部署暫時的探測程式）：
+//   不帶標頭      → "真實IP"
+//   帶 "1.2.3.4" → "1.2.3.4,真實IP"（rawRequest.ip 也會變成 1.2.3.4）
+// 以前取第一段，用程式每次帶不同的值就能繞過「10 分鐘 5 筆」的限制
 function rateLimitKey(request) {
     if (request.auth?.uid) return "uid_" + request.auth.uid;
     const raw = request.rawRequest || {};
-    const forwarded = raw.headers?.["x-forwarded-for"] || "";
-    const ip = String(forwarded).split(",")[0].trim() || raw.ip || "unknown";
+    const forwarded = String(raw.headers?.["x-forwarded-for"] || "");
+    const ip = forwarded.split(",").pop().trim() || "unknown";
     return "ip_" + crypto.createHash("sha256").update(ip).digest("hex").slice(0, 32);
 }
 

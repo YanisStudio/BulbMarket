@@ -286,17 +286,17 @@
                         <form id="contact-form" class="contact-form">
                             <div class="form-group">
                                 <label for="name">姓名 <span class="required">*</span></label>
-                                <input type="text" id="name" name="name" required>
+                                <input type="text" id="name" name="name" required maxlength="50">
                             </div>
                             
                             <div class="form-group">
                                 <label for="email">電子郵件 <span class="required">*</span></label>
-                                <input type="email" id="email" name="email" required>
+                                <input type="email" id="email" name="email" required maxlength="100">
                             </div>
                             
                             <div class="form-group">
                                 <label for="phone">聯絡電話</label>
-                                <input type="tel" id="phone" name="phone">
+                                <input type="tel" id="phone" name="phone" maxlength="20">
                             </div>
                             
                             <div class="form-group">
@@ -313,7 +313,7 @@
                             
                             <div class="form-group full-width">
                                 <label for="message">詳細內容 <span class="required">*</span></label>
-                                <textarea id="message" name="message" rows="6" placeholder="請詳細描述您的問題或需求，例如想了解的球根花卉品種、種植環境等..." required></textarea>
+                                <textarea id="message" name="message" rows="6" placeholder="請詳細描述您的問題或需求，例如想了解的球根花卉品種、種植環境等..." required maxlength="2000"></textarea>
                             </div>
                             
                             <div class="form-group full-width">
@@ -592,11 +592,11 @@ function initContactForm() {
                 .then((docRef) => {
                     console.log('球根花卉諮詢已發送，文檔 ID:', docRef.id);
                     
-                    // 顯示成功訊息
-                    showSuccessMessage();
-                    
-                    // 清除表單內容
-                    clearContactForm();
+                    // 顯示成功訊息（會員多一個「我的訊息」的入口）
+                    showSuccessMessage(!!currentUser);
+
+                    // 清除表單內容：會員的姓名、信箱、電話是自動帶入的，留著，要再問別的問題不用重填
+                    clearContactForm(!!currentUser);
                 })
                 .catch((error) => {
                     console.error('發送諮詢時出錯:', error);
@@ -610,14 +610,15 @@ function initContactForm() {
     }
 }
 
-// 清除聯絡表單內容
-function clearContactForm() {
+// 清除聯絡表單內容（keepContact：保留姓名、信箱、電話）
+function clearContactForm(keepContact) {
     const contactForm = document.getElementById('contact-form');
     if (contactForm) {
-        // 清除所有表單字段
-        document.getElementById('name').value = '';
-        document.getElementById('email').value = '';
-        document.getElementById('phone').value = '';
+        if (!keepContact) {
+            document.getElementById('name').value = '';
+            document.getElementById('email').value = '';
+            document.getElementById('phone').value = '';
+        }
         document.getElementById('subject').value = '';
         document.getElementById('message').value = '';
         
@@ -626,7 +627,7 @@ function clearContactForm() {
 }
 
 // 顯示成功訊息
-function showSuccessMessage() {
+function showSuccessMessage(isMember) {
     // 創建自定義成功通知
     const successMessage = document.createElement('div');
     successMessage.className = 'contact-success-message';
@@ -634,7 +635,8 @@ function showSuccessMessage() {
         <div class="success-content">
             <i class="fas fa-check-circle"></i>
             <h3>諮詢已成功送出！</h3>
-            <p>感謝您的諮詢！我們會盡快回覆您關於球根花卉的問題。</p>
+            <p>感謝您的諮詢！我們會盡快回覆，回覆時會寄到您留的 Email。</p>
+            ${isMember ? '<p class="success-member-hint">也可以到<a href="/messages.html">「我的訊息」</a>查看所有留言和回覆。</p>' : ''}
             <button onclick="closeSuccessMessage()" class="btn btn-primary">確定</button>
         </div>
         <div class="success-overlay" onclick="closeSuccessMessage()"></div>
@@ -700,10 +702,12 @@ function showSuccessMessage() {
         document.head.appendChild(styles);
     }
     
-    // 3秒後自動關閉
-    setTimeout(() => {
-        closeSuccessMessage();
-    }, 5000);
+    // 5 秒後自動關閉；會員的視窗裡有「我的訊息」連結，不自動關，讓他有時間點
+    if (!isMember) {
+        setTimeout(() => {
+            closeSuccessMessage();
+        }, 5000);
+    }
 }
 
 // 顯示錯誤訊息

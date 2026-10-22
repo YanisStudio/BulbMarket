@@ -97,9 +97,23 @@ service cloud.firestore {
     }
 
     // ---------- 聯絡我們的訊息 ----------
+    // 誰都可以留言（訪客也行），所以欄位和長度都要擋（2026-10）：以前只檢查 read／reply／userId，
+    // 任何人都能塞進任意欄位（例如假的 status、repliedAt）、每則最大 1MB 的內容，灌爆後台訊息列表。
+    // 欄位跟 contact.html 送出的一致；長度跟表單的 maxlength 一致
+    function validNewMessage(d) {
+      return d.keys().hasOnly(['name', 'email', 'phone', 'subject', 'message', 'createdAt', 'read', 'userId'])
+        && d.keys().hasAll(['name', 'email', 'subject', 'message', 'createdAt', 'read'])
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 50
+        && d.email is string && d.email.size() <= 100
+        && d.get('phone', '') is string && d.get('phone', '').size() <= 20
+        && d.subject is string && d.subject.size() <= 50
+        && d.message is string && d.message.size() > 0 && d.message.size() <= 2000
+        && d.createdAt == request.time
+        && d.read == false;
+    }
+
     match /messages/{messageId} {
-      allow create: if request.resource.data.get('read', false) == false
-        && !('reply' in request.resource.data)
+      allow create: if validNewMessage(request.resource.data)
         && (!('userId' in request.resource.data)
             || (signedIn() && request.resource.data.userId == request.auth.uid));
       allow read: if isAdmin()

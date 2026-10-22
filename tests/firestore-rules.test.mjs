@@ -21,9 +21,12 @@ const myOrder = { ...guestOrder, userId: 'cust-1', customer: { ...guestOrder.cus
 const myPhoneOrder = { ...guestOrder, customer: { ...guestOrder.customer, phone: '0912345678' } };
 const othersOrder = { ...guestOrder, userId: 'other-9', customer: { ...guestOrder.customer, email: 'other@example.com' } };
 
+// 訊息建立時間要等於伺服器時間（request.time）
+const MSG_TIME = '2026-10-22T08:00:00Z';
+
 const cases = [];
 function T(group, name, expectation, auth, method, path, resourceData, requestData) {
-    const request = { path: DB + path, method };
+    const request = { path: DB + path, method, time: MSG_TIME };
     if (auth) request.auth = auth;
     if (requestData) request.resource = { data: requestData };
     const tc = { expectation, request };
@@ -51,10 +54,20 @@ T('訪客訂單', '不能偽造已付款', 'DENY', guest, 'update', '/orders/o-g
 T('訪客訂單', '不能刪訂單', 'DENY', guest, 'delete', '/orders/o-guest', guestOrder);
 
 // ========== 訪客：聯絡我們 ==========
-T('聯絡我們', '訪客送出諮詢', 'ALLOW', guest, 'create', '/messages/m1', null, { name: '王', email: 'a@b.c', subject: 's', message: 'm', read: false });
-T('聯絡我們', '不能自己標成已讀', 'DENY', guest, 'create', '/messages/m1', null, { name: '王', email: 'a@b.c', message: 'm', read: true });
-T('聯絡我們', '不能自己塞商家回覆', 'DENY', guest, 'create', '/messages/m1', null, { name: '王', email: 'a@b.c', message: 'm', read: false, reply: '假回覆' });
-T('聯絡我們', '不能冒用他人 userId 送訊息', 'DENY', guest, 'create', '/messages/m1', null, { name: '王', message: 'm', read: false, userId: 'cust-1' });
+// 聯絡表單送出的內容（contact.html）；createdAt 是 serverTimestamp()，規則裡等於 request.time
+const MSG = { name: '王', email: 'a@b.c', phone: '', subject: '商品訂購', message: '請問什麼時候到貨？', createdAt: MSG_TIME, read: false };
+T('聯絡我們', '訪客送出諮詢', 'ALLOW', guest, 'create', '/messages/m1', null, MSG);
+T('聯絡我們', '沒填電話也可以', 'ALLOW', guest, 'create', '/messages/m1', null, (({ phone, ...rest }) => rest)(MSG));
+T('聯絡我們', '內容剛好 2000 字可以', 'ALLOW', guest, 'create', '/messages/m1', null, { ...MSG, message: '花'.repeat(2000) });
+T('聯絡我們', '不能自己標成已讀', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, read: true });
+T('聯絡我們', '不能自己塞商家回覆', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, reply: '假回覆' });
+T('聯絡我們', '不能冒用他人 userId 送訊息', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, userId: 'cust-1' });
+T('聯絡我們', '不能塞表單以外的欄位（例如假的狀態）', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, status: 'replied' });
+T('聯絡我們', '內容超過 2000 字擋掉', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, message: '花'.repeat(2001) });
+T('聯絡我們', '空白內容擋掉', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, message: '' });
+T('聯絡我們', '姓名超過 50 字擋掉', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, name: 'x'.repeat(51) });
+T('聯絡我們', '少了必填欄位（沒有內容）擋掉', 'DENY', guest, 'create', '/messages/m1', null, (({ message, ...rest }) => rest)(MSG));
+T('聯絡我們', '時間不能自己填（要用伺服器時間）', 'DENY', guest, 'create', '/messages/m1', null, { ...MSG, createdAt: '2020-01-01T00:00:00Z' });
 T('聯絡我們', '訪客不能讀訊息', 'DENY', guest, 'get', '/messages/m1', { userId: 'cust-1', message: 'm' });
 
 // ========== 訪客：不該碰的 ==========
@@ -87,7 +100,7 @@ T('會員資料', '不能改別人的資料', 'DENY', cust, 'update', '/users/ot
 T('會員訊息', '讀自己送的訊息', 'ALLOW', cust, 'get', '/messages/m-mine', { userId: 'cust-1', message: 'm' });
 T('會員訊息', '列出自己送的訊息', 'ALLOW', cust, 'list', '/messages/m-mine', { userId: 'cust-1', message: 'm' });
 T('會員訊息', '不能讀別人的訊息', 'DENY', cust, 'get', '/messages/m-others', { userId: 'other-9', message: 'm' });
-T('會員訊息', '帶自己 userId 送訊息', 'ALLOW', cust, 'create', '/messages/m2', null, { name: '王', message: 'm', read: false, userId: 'cust-1' });
+T('會員訊息', '帶自己 userId 送訊息', 'ALLOW', cust, 'create', '/messages/m2', null, { ...MSG, userId: 'cust-1' });
 T('會員訊息', '不能自己改訊息', 'DENY', cust, 'update', '/messages/m-mine', { userId: 'cust-1', message: 'm' }, { userId: 'cust-1', message: '改' });
 
 // ========== 管理員：後台所有操作 ==========
