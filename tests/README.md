@@ -44,6 +44,7 @@ node tests/product-modal-tabs.test.mjs                    # 商品彈窗「商�
 node tests/products-filters.test.mjs                      # 商品頁篩選（含 $500 以上）、選完即套用、手機兩欄（8 項）
 node tests/member-pages.test.mjs                         # 會員中心三頁：我的訊息卡片／空白／重試、左右兩欄版面、div 開闔（9 項）
 node tests/checkout-submit.test.mjs                       # 結帳送出：轉圈圈、離開提醒、失敗恢復、庫存檢查訊息；訂單完成頁 NT$／沒留 Email 的提醒（10 項）
+node tests/contact-form.test.mjs                          # 聯絡我們：欄位／長度跟 Firestore 規則一致、會員保留資料與「我的訊息」連結、手機一欄（5 項）
 node tests/category-retry.test.mjs                        # 分類讀取失敗後的背景重試
 node tests/reset-policy.test.mjs                          # 什麼時候該重建 Firestore 連線（20 項）
 node tests/dashboard-retry.test.mjs                       # 後台儀表板連線卡住時：不顯示 0、會自動恢復（6 項）

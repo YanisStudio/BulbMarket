@@ -5,6 +5,10 @@ on:
     - cron: '0 18 * * *'
   workflow_dispatch: {}
 
+# 只需要讀取程式碼，不需要寫入儲存庫的權限
+permissions:
+  contents: read
+
 jobs:
   run-sync:
     runs-on: ubuntu-latest
@@ -21,7 +25,10 @@ jobs:
           node-version: '24'
 
       - name: Install dependencies
-        run: npm install
+        # 依 package-lock.json 安裝固定版本（npm ci），而且不執行套件的安裝腳本（--ignore-scripts）。
+        # 這個流程帶著資料庫最高權限的金鑰；以前 npm install 每次都抓最新版，
+        # 萬一某個相依套件在 npm 上被植入惡意版本，下一次執行就會拿到這把金鑰
+        run: npm ci --ignore-scripts
 
       - name: 執行會員資料同步
         env:
