@@ -1,4 +1,4 @@
-// 商品排程上下架（functions/product-scheduler.js，Cloud Scheduler 每 5 分鐘）：
+// 商品排程上下架（functions/product-scheduler.js，Cloud Scheduler 每分鐘）：
 // - 同一個商品的上架、下架時間都已經到了時，要以比較晚的那個為準
 // - 處理流程：兩個查詢撈到同一個商品要去重、清掉用過的排程欄位、超過 500 筆要分批寫入
 import assert from 'node:assert';
@@ -115,9 +115,9 @@ ta('超過 500 筆分批寫入（Firestore 單一批次上限）', async () => {
     assert.strictEqual(batches(), 3);
 });
 
-ta('排程設定：每 5 分鐘、台北時間、台灣機房', async () => {
+ta('排程設定：每分鐘、台北時間、台灣機房', async () => {
     const endpoint = productScheduler.__endpoint;
-    assert.strictEqual(endpoint.scheduleTrigger.schedule, '*/5 * * * *');
+    assert.strictEqual(endpoint.scheduleTrigger.schedule, '* * * * *');
     assert.strictEqual(endpoint.scheduleTrigger.timeZone, 'Asia/Taipei');
     assert.deepStrictEqual([...endpoint.region], ['asia-east1']);
 });

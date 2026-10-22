@@ -1,9 +1,13 @@
-// 商品排程上下架（Cloud Scheduler 每 5 分鐘觸發一次）
+// 商品排程上下架（Cloud Scheduler 每分鐘觸發一次）
 //
 // 以前放在 GitHub Actions（scripts/product-scheduler，cron 每 15 分鐘），但 GitHub 的排程是
 // best-effort：2026-10 統計 19 天只跑了 100 次（應該約 1800 次），兩次之間平均隔 4.5 小時、
 // 最久近 10 小時，設定好時間的上下架常常晚好幾個小時才生效。改用 Cloud Scheduler 後準時到分鐘，
 // 也不用再把服務帳戶金鑰交給 GitHub 保管。
+//
+// 每分鐘一次（後台可以設定到分鐘，例如 20:03 開賣）。費用：每月約 4.3 萬次執行；
+// 兩個查詢沒撈到資料時各算 1 次讀取，一天多約 2,900 次讀取，2026-10 網站平均一天約 8,000 次，
+// 加起來仍遠低於 Firestore 每天 5 萬次的免費額度
 //
 // 檢查 products 集合裡，誰的 scheduledPublishAt / scheduledUnpublishAt 已經到了，
 // 就把 status 改成對應的值，並清掉已經用過的排程欄位（避免重複觸發）。
@@ -90,10 +94,10 @@ async function processScheduledTransitions(db, now, deleteField) {
 }
 
 exports.productScheduler = onSchedule({
-    schedule: "*/5 * * * *",
+    schedule: "* * * * *",
     timeZone: "Asia/Taipei",
     region: "asia-east1",
-    // 排程本身就會每 5 分鐘再跑一次，失敗了不用另外重試；同時只需要一個執行個體
+    // 排程本身下一分鐘就會再跑一次，失敗了不用另外重試；同時只需要一個執行個體
     retryCount: 0,
     maxInstances: 1,
 }, async () => {

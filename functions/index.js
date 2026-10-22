@@ -15,7 +15,7 @@ exports.appendOrderNote = require("./append-order-note").appendOrderNote;
 // 有新訂單時寄通知信給管理員，收件人寫在 notify-admin.js 的 ADMIN_ORDER_NOTIFY_EMAILS
 exports.notifyAdminNewOrder = require("./notify-admin").notifyAdminNewOrder;
 
-// 商品排程上下架：Cloud Scheduler 每 5 分鐘檢查一次（以前在 GitHub Actions，見 product-scheduler.js）
+// 商品排程上下架：Cloud Scheduler 每分鐘檢查一次（以前在 GitHub Actions，見 product-scheduler.js）
 exports.productScheduler = require("./product-scheduler").productScheduler;
 
 const BREVO_API_KEY = defineSecret("BREVO_API_KEY");
